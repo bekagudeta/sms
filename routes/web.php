@@ -39,7 +39,7 @@ Route::get('/', function () {
 
         foreach ($roleMap as $prefix => $mappedRole) {
             if (str_starts_with($email, $prefix)) {
-                // $user->assignRole($mappedRole);
+                $user->assignRole($mappedRole);
                 $role = $mappedRole;
                 break;
             }
@@ -54,13 +54,13 @@ Route::get('/', function () {
 
     switch ($role) {
         case 'admin':
-            return redirect()->route('admin.dashboard');
+            return app(DashboardController::class)->admin();
         case 'scheduler':
-            return redirect()->route('scheduler.dashboard');
+            return app(DashboardController::class)->scheduler();
         case 'teacher':
-            return redirect()->route('teacher.dashboard');
+            return app(DashboardController::class)->teacher();
         case 'student':
-            return redirect()->route('student.dashboard');
+            return app(DashboardController::class)->student();
         default:
             return redirect()->route('login');
     }

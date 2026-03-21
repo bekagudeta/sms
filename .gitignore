@@ -12,7 +12,7 @@
 /.vscode
 /.zed
 /auth.json
-/bootstrap/cache
+/bootstrap/cacheg
 /node_modules
 /public/build
 /public/hot

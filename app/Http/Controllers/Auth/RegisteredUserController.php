@@ -40,17 +40,33 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'must_change_password' => false,
+            'plain_password' => null,
         ]);
 
         // Assign a default role so permissions work immediately.
         // We default to "student" for newly registered accounts.
         if (class_exists(\Spatie\Permission\Models\Role::class)) {
             $user->assignRole('student');
-            // Create student record for this user
-            \App\Models\Student::create([
-                'user_id' => $user->id,
-                // Add more fields as needed, e.g. department_id, level, section
-            ]);
+            
+            try {
+                // Create student record for this user
+                \App\Models\Student::create([
+                    'student_id' => 'STU' . str_pad($user->id, 3, '0', STR_PAD_LEFT),
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'first_name' => explode(' ', trim($user->name))[0] ?? null,
+                    'last_name' => trim(str_replace(explode(' ', trim($user->name))[0] ?? '', '', $user->name)),
+                    'department_id' => \App\Models\Department::first()?->id ?? 1,
+                    'semester' => 1,
+                    'level' => 'undergraduate',
+                    'section' => 'A',
+                    'enrollment_date' => now()->toDateString(),
+                ]);
+            } catch (\Exception $e) {
+                // Log the error but don't fail registration
+                \Log::error('Failed to create student record during registration: ' . $e->getMessage());
+            }
         }
 
         event(new Registered($user));

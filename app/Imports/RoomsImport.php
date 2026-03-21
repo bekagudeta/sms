@@ -3,27 +3,35 @@
 namespace App\Imports;
 
 use App\Models\Room;
-use Maatwebsite\Excel\Concerns\ToModel;
+use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
 use Illuminate\Support\Facades\Log;
 
-class RoomsImport implements ToModel, WithHeadingRow, WithValidation
+class RoomsImport implements ToCollection, WithHeadingRow, WithValidation
 {
     protected $rowCount = 0;
 
-    public function model(array $row)
+    public function collection(Collection $rows)
     {
-        $this->rowCount++;
+        // Clear all existing rooms first to ensure proper ordering
+        Room::query()->delete();
         
-        // Log the row data for debugging
-        Log::info('Processing room row: ', $row);
-        
-        try {
-            // Use updateOrCreate to handle duplicates
-            return Room::updateOrCreate(
-                ['room_code' => $row['room_code']], // Search criteria
-                [
+        // Sort the collection by building, then floor, then room_code
+        $sortedRows = $rows->sortBy([
+            ['building', 'asc'],
+            ['floor', 'asc'],
+            ['room_code', 'asc']
+        ]);
+
+        foreach ($sortedRows as $row) {
+            $this->rowCount++;
+            
+            try {
+                // Create new room (no updateOrCreate since we cleared all)
+                Room::create([
+                    'room_code' => $row['room_code'],
                     'building' => $row['building'],
                     'floor' => $row['floor'],
                     'capacity' => $row['capacity'],
@@ -31,11 +39,11 @@ class RoomsImport implements ToModel, WithHeadingRow, WithValidation
                     'has_projector' => $row['has_projector'] ?? false,
                     'has_computers' => $row['has_computers'] ?? false,
                     'computer_count' => $row['computer_count'] ?? 0
-                ]
-            );
-        } catch (\Exception $e) {
-            Log::error('Error creating room from row: ' . $e->getMessage(), $row);
-            throw $e;
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Error creating room from row: ' . $e->getMessage(), $row->toArray());
+                throw $e;
+            }
         }
     }
 

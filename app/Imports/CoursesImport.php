@@ -18,30 +18,48 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
     public function collection(Collection $rows)
     {
         foreach ($rows as $row) {
-            $department = Department::firstOrCreate(
-                ['code' => $row['department_code'] ?? 'UNK'],
-                ['name' => $row['department_name'] ?? 'Unknown Department']
-            );
-            $semester = Semester::firstOrCreate(
-                ['code' => $row['semester_code'] ?? 'UNK'],
-                ['name' => $row['semester_name'] ?? 'Unknown Semester', 'start_date' => now(), 'end_date' => now()->addMonths(4)]
-            );
-            $teacher = Teacher::where('teacher_id', $row['teacher_id'] ?? '')->first();
+
+            // Skip empty rows
+            if (empty($row['course_code'])) {
+                continue;
+            }
+
+            // Handle department_id - find existing department
+            $department = null;
+            if (!empty($row['department_id'])) {
+                $department = Department::find($row['department_id']);
+            }
+
+            // Handle semester_id - find existing semester
+            $semester = null;
+            if (!empty($row['semester_id'])) {
+                $semester = Semester::find($row['semester_id']);
+            }
+
+            // Only import if both department and semester exist
+            if (!$department || !$semester) {
+                continue; // Skip this row if department or semester doesn't exist
+            }
+
+            $teacher = null;
+            if (!empty($row['teacher_id'])) {
+                $teacher = Teacher::where('teacher_id', $row['teacher_id'])->first();
+            }
 
             Course::updateOrCreate(
-                ['course_code' => $row['course_code'] ?? null],
+                ['course_code' => $row['course_code']],
                 [
-                    'course_name' => $row['course_name'] ?? '',
+                    'course_name' => $row['course_name'],
                     'description' => $row['description'] ?? null,
                     'credits' => $row['credits'] ?? 3,
                     'hours_per_week' => $row['hours_per_week'] ?? 3,
                     'department_id' => $department->id,
                     'semester_id' => $semester->id,
-                    'teacher_id' => $teacher->id ?? null,
+                    'teacher_id' => $teacher ? $teacher->id : null,
                     'level' => $row['level'] ?? 'undergraduate'
                 ]
             );
-            
+
             $this->rowCount++;
         }
     }
@@ -49,13 +67,13 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
     public function rules(): array
     {
         return [
-            'course_code' => 'required|string',
-            'course_name' => 'required|string',
-            'credits' => 'required|integer|min:1|max:6',
-            'hours_per_week' => 'required|integer|min:1|max:6',
-            'department_code' => 'required|string|exists:departments,code',
-            'semester_code' => 'required|string|exists:semesters,code',
-            'level' => 'required|in:undergraduate,graduate,diploma'
+            '*.course_code' => 'required|string',
+            '*.course_name' => 'required|string',
+            '*.credits' => 'required|integer|min:1|max:6',
+            '*.hours_per_week' => 'required|integer|min:1|max:6',
+            '*.department_id' => 'required|integer',
+            '*.semester_id' => 'required|integer',
+            '*.level' => 'required|in:undergraduate,graduate,diploma'
         ];
     }
 

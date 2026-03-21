@@ -41,7 +41,12 @@ class DashboardTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole('admin');
 
-        $response = $this->actingAs($user)->get('/dashboard');
+        $response = $this->actingAs($user)
+            ->withHeaders([
+                'X-Inertia' => 'true',
+                'X-Inertia-Version' => app('App\\Http\\Middleware\\HandleInertiaRequests')->version(request()),
+            ])
+            ->get('/dashboard');
         $response->assertOk();
 
         $data = $response->json('props');
@@ -57,7 +62,12 @@ class DashboardTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole('scheduler');
 
-        $response = $this->actingAs($user)->get('/dashboard');
+        $response = $this->actingAs($user)
+            ->withHeaders([
+                'X-Inertia' => 'true',
+                'X-Inertia-Version' => app('App\\Http\\Middleware\\HandleInertiaRequests')->version(request()),
+            ])
+            ->get('/dashboard');
         $response->assertOk();
 
         $data = $response->json('props');
@@ -71,7 +81,12 @@ class DashboardTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole('teacher');
 
-        $response = $this->actingAs($user)->get('/dashboard');
+        $response = $this->actingAs($user)
+            ->withHeaders([
+                'X-Inertia' => 'true',
+                'X-Inertia-Version' => app('App\\Http\\Middleware\\HandleInertiaRequests')->version(request()),
+            ])
+            ->get('/dashboard');
         $response->assertOk();
 
         $data = $response->json('props');

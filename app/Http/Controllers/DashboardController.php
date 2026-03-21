@@ -22,17 +22,27 @@ class DashboardController extends Controller
     public function studentSchedule()
     {
         $user = Auth::user();
-        $student = $user->student;
+        $student = $this->resolveStudent($user);
+
         if (!$student) {
-            abort(403, 'Student profile missing');
+            // If no student profile is found, show generic schedule entries
+            $schedules = Schedule::with(['course', 'teacher.user', 'room', 'timeslot'])
+                ->latest()
+                ->take(20)
+                ->get();
+            return view('student.schedule', compact('schedules'));
         }
-        $schedules = \App\Models\Schedule::with(['course', 'teacher.user', 'room', 'timeslot'])
-            ->whereHas('course', function ($q) use ($student) {
-                $q->where('department_id', $student->department_id)
-                  ->where('level', $student->level)
-                  ->where('section', $student->section);
-            })
-            ->get();
+
+        $schedules = $this->buildStudentScheduleQuery($student)->get();
+
+        // fallback to broader schedule when no exact matches are found
+        if ($schedules->isEmpty()) {
+            $schedules = Schedule::with(['course', 'teacher.user', 'room', 'timeslot'])
+                ->latest()
+                ->take(20)
+                ->get();
+        }
+
         return view('student.schedule', compact('schedules'));
     }
 
@@ -44,7 +54,7 @@ class DashboardController extends Controller
         if (!$teacher) {
             abort(403, 'Teacher profile missing');
         }
-        $schedules = \App\Models\Schedule::with(['course', 'room', 'timeslot'])
+        $schedules = Schedule::with(['course', 'room', 'timeslot'])
             ->where('teacher_id', $teacher->id)
             ->get();
         return view('teacher.schedule', compact('schedules'));
@@ -72,16 +82,28 @@ class DashboardController extends Controller
                     $user->assignRole($mappedRole);
                     $role = $mappedRole;
 
-                    // Ensure student/teacher record exists
+                    // Ensure student/teacher record exists with basic contact details (for team integration).
                     if ($role === 'student' && !$user->student) {
-                        Student::firstOrCreate([
-                            'user_id' => $user->id
-                        ]);
+                        Student::firstOrCreate(
+                            ['user_id' => $user->id],
+                            [
+                                'email' => $user->email,
+                                'first_name' => explode(' ', trim($user->name))[0] ?? null,
+                                'last_name' => trim(str_replace(explode(' ', trim($user->name))[0] ?? '', '', $user->name)),
+                                'semester' => 1,
+                                'section' => 'A',
+                            ]
+                        );
                     }
                     if ($role === 'teacher' && !$user->teacher) {
-                        Teacher::firstOrCreate([
-                            'user_id' => $user->id
-                        ]);
+                        Teacher::firstOrCreate(
+                            ['user_id' => $user->id],
+                            [
+                                'email' => $user->email,
+                                'first_name' => explode(' ', trim($user->name))[0] ?? null,
+                                'last_name' => trim(str_replace(explode(' ', trim($user->name))[0] ?? '', '', $user->name)),
+                            ]
+                        );
                     }
                     break;
                 }
@@ -98,13 +120,13 @@ class DashboardController extends Controller
 
         switch ($role) {
             case 'admin':
-                return redirect()->route('admin.dashboard');
+                return $this->admin();
             case 'scheduler':
-                return redirect()->route('scheduler.dashboard');
+                return $this->scheduler();
             case 'teacher':
-                return redirect()->route('teacher.dashboard');
+                return $this->teacher();
             case 'student':
-                return redirect()->route('student.dashboard');
+                return $this->student();
             default:
                 // should never happen once role exists, but keep safe fallback
                 return redirect()->route('login');
@@ -118,7 +140,7 @@ class DashboardController extends Controller
 
         $pendingCredentials = 0;
         if (Schema::hasTable('users') && Schema::hasColumn('users', 'must_change_password') && Schema::hasColumn('users', 'plain_password')) {
-            $pendingCredentials = \App\Models\User::where('must_change_password', true)
+            $pendingCredentials = User::where('must_change_password', true)
                 ->whereNotNull('plain_password')
                 ->count();
         }
@@ -166,7 +188,7 @@ class DashboardController extends Controller
         $user = Auth::user();
         $role = $user->roles->first()?->name;
 
-        $teacher = Teacher::where('email', $user->email)->first();
+        $teacher = $user->teacher;
         $recentSchedules = collect();
         if ($teacher) {
             $recentSchedules = Schedule::where('teacher_id', $teacher->id)
@@ -192,16 +214,17 @@ class DashboardController extends Controller
         $stats = [];
 
         // Find the student record so we can filter schedules for their semester.
-        $student = Student::where('email', $user->email)->first();
+        $student = $this->resolveStudent($user);
 
         $recentSchedules = collect();
         if ($student) {
-            $semesterNumber = $student->semester;
-            $semesterModel = Semester::where('name', $semesterNumber . ' Semester')->first();
+            $recentSchedules = $this->buildStudentScheduleQuery($student)
+                ->latest()
+                ->take(5)
+                ->get();
 
-            if ($semesterModel) {
+            if ($recentSchedules->isEmpty()) {
                 $recentSchedules = Schedule::with(['course', 'teacher', 'room', 'timeslot'])
-                    ->where('semester_id', $semesterModel->id)
                     ->latest()
                     ->take(5)
                     ->get();
@@ -213,6 +236,68 @@ class DashboardController extends Controller
             'recentSchedules' => $recentSchedules,
             'role' => $role,
         ]);
+    }
+
+    private function resolveStudent($user)
+    {
+        if ($user->student) {
+            return $user->student;
+        }
+
+        $student = Student::where('user_id', $user->id)
+            ->orWhere('email', $user->email)
+            ->first();
+
+        if ($student) {
+            return $student;
+        }
+
+        if ($user->hasRole('student')) {
+            return Student::create([
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'first_name' => explode(' ', trim($user->name))[0] ?? null,
+                'last_name' => trim(str_replace(explode(' ', trim($user->name))[0] ?? '', '', $user->name)),
+                'semester' => 1,
+                'section' => 'A'
+            ]);
+        }
+
+        return null;
+    }
+
+    private function buildStudentScheduleQuery(Student $student)
+    {
+        $query = Schedule::with(['course', 'teacher.user', 'room', 'timeslot']);
+
+        if ($student->department_id) {
+            $query->whereHas('course', function ($q) use ($student) {
+                $q->where('department_id', $student->department_id);
+
+                if (!empty($student->level)) {
+                    $q->where('level', $student->level);
+                }
+            });
+        } elseif (!empty($student->level)) {
+            $query->whereHas('course', function ($q) use ($student) {
+                $q->where('level', $student->level);
+            });
+        }
+
+        if (!empty($student->semester)) {
+            $semesterModel = Semester::where('name', $student->semester . ' Semester')->first();
+            if ($semesterModel) {
+                $query->where('semester_id', $semesterModel->id);
+            } elseif (is_numeric($student->semester)) {
+                $query->where('semester_id', (int) $student->semester);
+            }
+        }
+
+        if (!empty($student->section)) {
+            $query->where('section', $student->section);
+        }
+
+        return $query;
     }
 
     public function create()
@@ -243,6 +328,8 @@ class DashboardController extends Controller
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => bcrypt($validated['password']),
+                'must_change_password' => false,
+                'plain_password' => null,
             ]);
             $user->assignRole($validated['role']);
 

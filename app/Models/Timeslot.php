@@ -16,11 +16,6 @@ class Timeslot extends Model
         'slot_code'
     ];
 
-    protected $casts = [
-        'start_time' => 'datetime:H:i',
-        'end_time' => 'datetime:H:i'
-    ];
-
     public function schedules()
     {
         return $this->hasMany(Schedule::class);

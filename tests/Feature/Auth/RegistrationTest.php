@@ -4,10 +4,21 @@ namespace Tests\Feature\Auth;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Spatie\Permission\Models\Role;
 
 class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        
+        // Seed roles for testing
+        $this->artisan('db:seed', ['--class' => 'RolesAndPermissionsSeeder']);
+        $this->artisan('db:seed', ['--class' => 'RoleSeeder']);
+        $this->artisan('db:seed', ['--class' => 'DepartmentSeeder']);
+    }
 
     public function test_registration_screen_can_be_rendered(): void
     {

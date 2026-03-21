@@ -149,11 +149,27 @@ class AutoSchedulerService
         $units = collect();
 
         foreach ($this->courses as $course) {
+            // Get all available rooms for this course
+            $eligibleRooms = $this->getEligibleRooms($course);
+            
+            if ($eligibleRooms->isEmpty()) {
+                // Fallback to all rooms if no eligible rooms found
+                $eligibleRooms = $this->rooms;
+            }
+
             if (!empty($course->section)) {
-                $units->push(['course' => $course, 'section' => trim($course->section)]);
+                // Create schedule unit for each room when course has explicit section
+                foreach ($eligibleRooms as $room) {
+                    $units->push([
+                        'course' => $course, 
+                        'section' => trim($course->section),
+                        'room' => $room
+                    ]);
+                }
                 continue;
             }
 
+            // Get student sections for this course
             $courseSections = $this->students
                 ->where('department_id', $course->department_id)
                 ->where('level', $course->level)
@@ -166,8 +182,15 @@ class AutoSchedulerService
                 $courseSections = collect(['A']);
             }
 
+            // Create schedule units for each section and each eligible room
             foreach ($courseSections as $section) {
-                $units->push(['course' => $course, 'section' => trim($section)]);
+                foreach ($eligibleRooms as $room) {
+                    $units->push([
+                        'course' => $course, 
+                        'section' => trim($section),
+                        'room' => $room
+                    ]);
+                }
             }
         }
 
@@ -198,12 +221,19 @@ class AutoSchedulerService
         $unit = $this->courseScheduleUnits[$index];
         $course = $unit['course'];
         $section = $unit['section'];
+        $preAssignedRoom = $unit['room'] ?? null;
 
         // Get candidates (CSP: reduce search space early)
         $teachers = $this->getQualifiedTeachers($course)
             ->sortBy(fn($teacher) => $this->teacherHours[$teacher->id] ?? 0);
 
-        $rooms = $this->getEligibleRooms($course)->sortBy('capacity');
+        // Use pre-assigned room if available, otherwise get eligible rooms
+        if ($preAssignedRoom) {
+            $rooms = collect([$preAssignedRoom]);
+        } else {
+            $rooms = $this->getEligibleRooms($course)->sortBy('capacity');
+        }
+        
         $timeslots = $this->timeslots->shuffle();
 
         foreach ($teachers as $teacher) {
@@ -563,10 +593,18 @@ class AutoSchedulerService
         foreach ($this->courseScheduleUnits as $unit) {
             $course = $unit['course'];
             $section = $unit['section'];
+            $preAssignedRoom = $unit['room'] ?? null;
             $assigned = false;
+            
             $teachers = $this->getQualifiedTeachers($course)
                               ->sortBy(fn($teacher) => $this->teacherHours[$teacher->id] ?? 0);
-            $rooms = $this->getEligibleRooms($course)->sortBy('capacity');
+
+            // Use pre-assigned room if available, otherwise get eligible rooms
+            if ($preAssignedRoom) {
+                $rooms = collect([$preAssignedRoom]);
+            } else {
+                $rooms = $this->getEligibleRooms($course)->sortBy('capacity');
+            }
 
             foreach ($teachers as $teacher) {
                 if (!$this->hasTeacherHoursAvailable($teacher, $course)) {

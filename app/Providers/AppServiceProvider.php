@@ -4,6 +4,13 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use App\Models\User;
+use App\Observers\UserObserver;
+
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,11 +31,11 @@ class AppServiceProvider extends ServiceProvider
 
         // bind middleware aliases so kernel->terminate() can resolve them
         // by name when cleaning up after a request.
-        $this->app->alias(\Spatie\Permission\Middleware\PermissionMiddleware::class, 'permission');
-        $this->app->alias(\Spatie\Permission\Middleware\RoleMiddleware::class, 'role');
-        $this->app->alias(\Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class, 'role_or_permission');
+        $this->app->alias(PermissionMiddleware::class, 'permission');
+        $this->app->alias(RoleMiddleware::class, 'role');
+        $this->app->alias(RoleOrPermissionMiddleware::class, 'role_or_permission');
 
         // Register UserObserver for integrity enforcement
-        \App\Models\User::observe(\App\Observers\UserObserver::class);
+        User::observe(UserObserver::class);
     }
 }
