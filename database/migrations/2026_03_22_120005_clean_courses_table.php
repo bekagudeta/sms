@@ -9,18 +9,14 @@ return new class extends Migration
     public function up()
     {
         Schema::table('courses', function (Blueprint $table) {
-            // Remove fields that don't belong in course definition
-            $table->dropForeign(['semester_id']);
-            $table->dropForeign(['teacher_id']);
-            $table->dropColumn(['semester_id', 'teacher_id']);
+            // Already removed semester_id and teacher_id from courses table
         });
     }
 
     public function down()
     {
         Schema::table('courses', function (Blueprint $table) {
-            $table->foreignId('semester_id')->nullable()->constrained();
-            $table->foreignId('teacher_id')->nullable()->constrained();
+            // Do not re-add semester_id and teacher_id
         });
     }
 };

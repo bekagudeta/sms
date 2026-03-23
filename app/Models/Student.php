@@ -17,14 +17,12 @@ class Student extends Model
         'last_name',
         'email',
         'phone',
-        'semester',
         'level',
         'section',
         'enrollment_date',
     ];
 
     protected $casts = [
-        'semester' => 'integer',
         'enrollment_date' => 'datetime:Y-m-d',
     ];
 

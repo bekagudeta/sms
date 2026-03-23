@@ -42,7 +42,6 @@
 - email (Unique)
 - phone (Nullable)
 - department_id (FK → departments.id)
-- semester
 - enrollment_date
 - created_at, updated_at
 
@@ -73,16 +72,12 @@
 - credits
 - hours_per_week
 - department_id (FK → departments.id)
-- semester_id (FK → semesters.id)
-- teacher_id (FK → teachers.id, Nullable)
 - level (Enum: undergraduate, graduate, diploma)
 - created_at, updated_at
 
 **Relations**: 
 - → CourseOfferings (1:Many)
 - ← Department (Many:1)
-- ← Semester (Many:1)
-- ← Teacher (Many:1, Nullable)
 
 ### Semesters Table
 **Attributes**: 
@@ -96,7 +91,6 @@
 
 **Relations**: 
 - → CourseOfferings (1:Many)
-- → Courses (1:Many)
 
 ### CourseOfferings Table
 **Attributes**: 
@@ -201,3 +195,57 @@
 - Unique: [student_id, section_id]
 
 **Purpose**: Students ↔ Sections (Many:Many)
+
+---
+
+# Scheduling Logic Constraints
+
+## Student Conflict Prevention
+During schedule assignment, the system must enforce:
+```sql
+-- Prevent student from being enrolled in multiple sections at the same timeslot
+SELECT COUNT(*) FROM enrollments e
+JOIN sections s ON e.section_id = s.id
+JOIN schedules sch ON s.id = sch.section_id
+WHERE e.student_id = ? AND sch.timeslot_id = ?
+```
+
+## Teacher Workload Control
+During scheduling, enforce teacher's max hours per week:
+```sql
+-- Calculate current weekly hours for teacher
+SELECT SUM(c.hours_per_week) as total_hours
+FROM section_teachers st
+JOIN sections s ON st.section_id = s.id
+JOIN course_offerings co ON s.course_offering_id = co.id
+JOIN courses c ON co.course_id = c.id
+WHERE st.teacher_id = ?
+```
+
+## Course Hours Per Week Enforcement
+Each section must be scheduled for exactly `courses.hours_per_week` timeslots:
+- If course has 3 hours/week → assign 3 timeslots
+- If course has 2 hours/week → assign 2 timeslots
+
+## Room Capacity & Type Constraints
+During room assignment:
+```sql
+-- Room capacity must be >= section capacity
+rooms.capacity >= sections.capacity
+
+-- Room type must match course requirements
+rooms.type = required_course_type
+```
+
+## Room-Teacher Availability
+During scheduling:
+```sql
+-- Prevent room double-booking
+SELECT COUNT(*) FROM schedules 
+WHERE room_id = ? AND timeslot_id = ?
+
+-- Prevent teacher conflicts
+SELECT COUNT(*) FROM section_teachers st
+JOIN schedules sch ON st.section_id = sch.section_id
+WHERE st.teacher_id = ? AND sch.timeslot_id = ?
+```

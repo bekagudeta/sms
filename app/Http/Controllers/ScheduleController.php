@@ -15,9 +15,9 @@ use App\Services\AutoSchedulerService;
 use App\Repositories\ScheduleRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ScheduleController extends Controller
 {
@@ -79,7 +79,7 @@ class ScheduleController extends Controller
         
         // Debug: Check first section data
         $firstSection = $sections->first();
-        \Log::info('First section data:', [
+        Log::info('First section data:', [
             'section_id' => $firstSection?->id,
             'section_name' => $firstSection?->section_name,
             'course_offering_id' => $firstSection?->course_offering_id,
@@ -286,6 +286,29 @@ class ScheduleController extends Controller
                 return ['success' => false, 'message' => 'Teacher is already assigned for this timeslot'];
             }
 
+            // Enforce student conflict prevention
+            $studentConflict = $this->hasStudentConflict($section, $timeslot);
+            if ($studentConflict) {
+                return ['success' => false, 'message' => 'One or more students are already enrolled in another section at this timeslot'];
+            }
+
+            // Enforce teacher workload constraints
+            $teacherHoursCheck = $this->checkTeacherWorkload($teacher, $timeslot);
+            if (!$teacherHoursCheck['valid']) {
+                return ['success' => false, 'message' => $teacherHoursCheck['message']];
+            }
+
+            // Enforce room capacity constraint
+            if ($room->capacity < $section->capacity) {
+                return ['success' => false, 'message' => "Room capacity ({$room->capacity}) is insufficient for section size ({$section->capacity})"];
+            }
+
+            // Enforce room type constraint
+            $course = $section->courseOffering->course;
+            if (!$this->isRoomSuitableForCourse($room, $course)) {
+                return ['success' => false, 'message' => 'Room type is not suitable for this course'];
+            }
+
             // Create or update schedule entry
             Schedule::updateOrCreate(
                 ['section_id' => $section->id, 'timeslot_id' => $timeslot->id],
@@ -392,7 +415,7 @@ class ScheduleController extends Controller
     public function edit(Schedule $schedule)
     {
         try {
-            \Log::info('Edit method called for schedule ID: ' . $schedule->id);
+            Log::info('Edit method called for schedule ID: ' . $schedule->id);
             $this->authorize('update', $schedule);
 
             $schedule->load([
@@ -408,7 +431,7 @@ class ScheduleController extends Controller
             $rooms = Room::all();
             $timeslots = Timeslot::orderBy('day_of_week')->orderBy('start_time')->get();
 
-            \Log::info('Data loaded successfully', [
+            Log::info('Data loaded successfully', [
                 'schedule_count' => 1,
                 'sections_count' => $sections->count(),
                 'rooms_count' => $rooms->count(),
@@ -424,7 +447,7 @@ class ScheduleController extends Controller
                 'timeslots' => $timeslots
             ]);
         } catch (\Exception $e) {
-            \Log::error('Edit method error: ' . $e->getMessage(), [
+            Log::error('Edit method error: ' . $e->getMessage(), [
                 'schedule_id' => $schedule->id,
                 'trace' => $e->getTraceAsString()
             ]);
@@ -508,5 +531,66 @@ class ScheduleController extends Controller
 
         return redirect()->route('schedules.index')
             ->with('success', 'Schedule deleted successfully.');
+    }
+
+    /**
+     * Check if any students in the section have conflicts at the given timeslot
+     */
+    private function hasStudentConflict($section, $timeslot)
+    {
+        foreach ($section->enrollments as $enrollment) {
+            $conflict = Schedule::whereHas('section.enrollments', function ($q) use ($enrollment) {
+                $q->where('student_id', $enrollment->student_id);
+            })->where('timeslot_id', $timeslot->id)
+            ->where('section_id', '!=', $section->id)
+            ->exists();
+            
+            if ($conflict) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if teacher has available hours for this assignment
+     */
+    private function checkTeacherWorkload($teacher, $timeslot)
+    {
+        $currentHours = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
+            $q->where('teacher_id', $teacher->id);
+        })->count();
+        
+        $maxHours = $teacher->max_hours_per_week ?? 20;
+        
+        if ($currentHours >= $maxHours) {
+            return [
+                'valid' => false,
+                'message' => "Teacher has reached maximum weekly hours ({$currentHours}/{$maxHours})"
+            ];
+        }
+        
+        return ['valid' => true];
+    }
+
+    /**
+     * Check if room is suitable for course based on type and requirements
+     */
+    private function isRoomSuitableForCourse($room, $course)
+    {
+        $roomType = $room->type ?? 'lecture';
+        $courseLevel = $course->level ?? 'undergraduate';
+        
+        // Labs require lab rooms
+        if (str_contains(strtolower($course->course_name ?? ''), 'lab') && $roomType !== 'lab') {
+            return false;
+        }
+        
+        // Seminars can use seminar or lecture rooms
+        if ($courseLevel === 'graduate' && !in_array($roomType, ['seminar', 'lecture', 'conference'])) {
+            return false;
+        }
+        
+        return true;
     }
 }

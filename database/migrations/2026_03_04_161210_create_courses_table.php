@@ -16,8 +16,7 @@ return new class extends Migration
             $table->integer('credits');
             $table->integer('hours_per_week');
             $table->foreignId('department_id')->constrained();
-            $table->foreignId('semester_id')->constrained();
-            $table->foreignId('teacher_id')->nullable()->constrained();
+            // Removed semester_id and teacher_id as per new design
             $table->enum('level', ['undergraduate', 'graduate', 'diploma']);
             $table->timestamps();
         });

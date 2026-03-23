@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('phone')->nullable();
             $table->foreignId('department_id')->constrained();
-            $table->integer('semester');
+            // Removed semester field as per new design
             $table->date('enrollment_date');
             $table->timestamps();
         });
