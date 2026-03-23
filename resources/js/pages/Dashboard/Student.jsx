@@ -17,7 +17,7 @@ export default function StudentDashboard({ recentSchedules }) {
                             {recentSchedules.map(s => (
                                 <li key={s.id} className="p-4 border rounded-lg flex justify-between items-center">
                                     <div>
-                                        <strong>{s.course.course_code}</strong> - {s.course.course_name}
+                                        <strong>{s.course ? s.course.course_code : 'Not assigned'}</strong> - {s.course ? s.course.course_name : 'Not assigned'}
                                         <div className="text-sm text-gray-500">
                                             {s.timeslot?.day_of_week || 'TBA'}{' '}
                                             {s.timeslot ? `${s.timeslot.start_time} - ${s.timeslot.end_time}` : ''}

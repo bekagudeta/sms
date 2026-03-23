@@ -30,20 +30,9 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
                 $department = Department::find($row['department_id']);
             }
 
-            // Handle semester_id - find existing semester
-            $semester = null;
-            if (!empty($row['semester_id'])) {
-                $semester = Semester::find($row['semester_id']);
-            }
-
-            // Only import if both department and semester exist
-            if (!$department || !$semester) {
-                continue; // Skip this row if department or semester doesn't exist
-            }
-
-            $teacher = null;
-            if (!empty($row['teacher_id'])) {
-                $teacher = Teacher::where('teacher_id', $row['teacher_id'])->first();
+            // Only import if department exists
+            if (!$department) {
+                continue; // Skip this row if department doesn't exist
             }
 
             Course::updateOrCreate(
@@ -54,8 +43,6 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
                     'credits' => $row['credits'] ?? 3,
                     'hours_per_week' => $row['hours_per_week'] ?? 3,
                     'department_id' => $department->id,
-                    'semester_id' => $semester->id,
-                    'teacher_id' => $teacher ? $teacher->id : null,
                     'level' => $row['level'] ?? 'undergraduate'
                 ]
             );
@@ -72,7 +59,6 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
             '*.credits' => 'required|integer|min:1|max:6',
             '*.hours_per_week' => 'required|integer|min:1|max:6',
             '*.department_id' => 'required|integer',
-            '*.semester_id' => 'required|integer',
             '*.level' => 'required|in:undergraduate,graduate,diploma'
         ];
     }

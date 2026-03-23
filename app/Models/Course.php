@@ -16,13 +16,7 @@ class Course extends Model
         'credits',
         'hours_per_week',
         'department_id',
-        'semester_id',
-        'teacher_id',
         'level',
-        'student_count',
-        'required_room_type',
-        'prerequisites',
-        'section'
     ];
 
     public function department()
@@ -30,18 +24,18 @@ class Course extends Model
         return $this->belongsTo(Department::class);
     }
 
-    public function semester()
+    public function courseOfferings()
     {
-        return $this->belongsTo(Semester::class);
+        return $this->hasMany(CourseOffering::class);
     }
 
-    public function teacher()
+    public function getTeacherAttribute()
     {
-        return $this->belongsTo(Teacher::class);
-    }
+        $teacher = $this->courseOfferings
+            ->flatMap(fn($offering) => $offering->sections)
+            ->flatMap(fn($section) => $section->teachers)
+            ->first();
 
-    public function schedules()
-    {
-        return $this->hasMany(Schedule::class);
+        return $teacher?->user;
     }
 }

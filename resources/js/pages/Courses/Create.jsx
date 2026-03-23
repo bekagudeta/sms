@@ -11,8 +11,6 @@ export default function Create({ teachers, departments, semesters }) {
         credits: '',
         hours_per_week: '',
         department_id: '',
-        semester_id: '',
-        teacher_id: '',
         level: 'undergraduate'
     });
 
@@ -33,20 +31,6 @@ export default function Create({ teachers, departments, semesters }) {
             type: 'select',
             options: departments.map(d => ({ value: d.id, label: d.name })),
             required: true 
-        },
-        { 
-            name: 'semester_id', 
-            label: 'Semester', 
-            type: 'select',
-            options: semesters.map(s => ({ value: s.id, label: s.name })),
-            required: true 
-        },
-        { 
-            name: 'teacher_id', 
-            label: 'Teacher', 
-            type: 'select',
-            options: teachers.map(t => ({ value: t.id, label: t.full_name })),
-            required: false 
         },
         { 
             name: 'level', 

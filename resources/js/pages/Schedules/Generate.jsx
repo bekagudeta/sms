@@ -1,151 +1,15 @@
 import React, { useState } from 'react';
-import { Head, useForm, router, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
 
-export default function Generate({ courses, teachers, rooms, semesters }) {
-    const [schedule, setSchedule] = useState([]);
-    const [activeTab, setActiveTab] = useState('manual');
-    const [errors, setErrors] = useState({});
-    const { data, setData, post, processing } = useForm({
-        course_id: '',
-        teacher_id: '',
-        room: '',
-        day: '',
-        start_time: '',
-        end_time: '',
-        semester_id: ''
-    });
+export default function Generate({ semesters, courseOfferings, teachers, rooms, timeslots, sections }) {
+    const [activeTab, setActiveTab] = useState('auto');
+    const { props } = usePage();
+    const flash = props.flash;
 
     const { data: autoData, setData: setAutoData, post: autoPost, processing: autoProcessing } = useForm({
         semester_id: ''
     });
-
-    const { props } = usePage();
-    const flash = props.flash;
-
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-    const validateScheduleItem = (item) => {
-        const newErrors = {};
-        
-        if (!item.course_id) newErrors.course_id = 'Course is required';
-        if (!item.teacher_id) newErrors.teacher_id = 'Teacher is required';
-        if (!item.room) newErrors.room = 'Room is required';
-        if (!item.day) newErrors.day = 'Day is required';
-        if (!item.start_time) newErrors.start_time = 'Start time is required';
-        if (!item.end_time) newErrors.end_time = 'End time is required';
-        
-        // Validate time format
-        if (item.start_time && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(item.start_time)) {
-            newErrors.start_time = 'Invalid time format (HH:MM)';
-        }
-        if (item.end_time && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(item.end_time)) {
-            newErrors.end_time = 'Invalid time format (HH:MM)';
-        }
-        
-        // Validate time logic
-        if (item.start_time && item.end_time && item.start_time >= item.end_time) {
-            newErrors.end_time = 'End time must be after start time';
-        }
-        
-        return newErrors;
-    };
-
-    const handleAddToSchedule = () => {
-        const validationErrors = validateScheduleItem(data);
-        
-        if (Object.keys(validationErrors).length > 0) {
-            setErrors(validationErrors);
-            return;
-        }
-        
-        const course = courses.find(c => c.id == data.course_id);
-        const teacher = teachers.find(t => t.id == data.teacher_id);
-        
-        const newScheduleItem = {
-            ...data,
-            course_name: course?.course_name || 'Unknown Course',
-            teacher_name: teacher?.full_name || 'Unknown Teacher',
-            id: Date.now()
-        };
-        
-        setSchedule([...schedule, newScheduleItem]);
-        setErrors({});
-        
-        // Reset form fields except semester
-        setData({
-            ...data,
-            course_id: '',
-            teacher_id: '',
-            room: '',
-            day: '',
-            start_time: '',
-            end_time: ''
-        });
-    };
-
-    const handleRemoveFromSchedule = (id) => {
-        setSchedule(schedule.filter(item => item.id !== id));
-    };
-
-    const handleGenerate = () => {
-        if (schedule.length === 0) {
-            alert('Please add at least one schedule item before generating');
-            return;
-        }
-
-        if (!data.semester_id) {
-            alert('Please select a semester before generating');
-            return;
-        }
-
-        // Validate all items before submission
-        let hasErrors = false;
-        const allErrors = {};
-        
-        schedule.forEach((item, index) => {
-            const itemErrors = validateScheduleItem(item);
-            if (Object.keys(itemErrors).length > 0) {
-                hasErrors = true;
-                allErrors[`item_${index}`] = itemErrors;
-            }
-        });
-        
-        if (hasErrors) {
-            alert('Please fix validation errors before generating schedules');
-            return;
-        }
-        
-        // Submit the entire schedule
-        router.post('/schedules/generate', {
-            data: { 
-                schedule: schedule.map(item => ({
-                    course_id: item.course_id,
-                    teacher_id: item.teacher_id,
-                    room: item.room,
-                    day: item.day,
-                    start_time: item.start_time,
-                    end_time: item.end_time
-                })), 
-                semester_id: data.semester_id 
-            }
-        }, {
-            onSuccess: (page) => {
-                setSchedule([]);
-                setErrors({});
-                // Show success message from flash session
-                if (page.props.flash?.success) {
-                    // Success message will be shown automatically
-                }
-            },
-            onError: (errors) => {
-                console.error('Generation errors:', errors);
-                setErrors(errors);
-                alert('Error generating schedule: ' + Object.values(errors).join(', '));
-            },
-            preserveState: false
-        });
-    };
 
     const handleAutoGenerate = () => {
         if (!autoData.semester_id) {
@@ -153,11 +17,9 @@ export default function Generate({ courses, teachers, rooms, semesters }) {
             return;
         }
 
-        // Pass semester_id in request payload and let Inertia handle redirection/flash on server response.
         autoPost('/schedules/generate-auto', { semester_id: autoData.semester_id }, {
             onSuccess: () => {
-                // After successful generation, server redirects to /schedules with flash message.
-                // No need to force client-side navigation here.
+                // Server will redirect to /schedules with flash message
             },
             onError: (errors) => {
                 console.error('Auto generation errors:', errors);
@@ -189,16 +51,6 @@ export default function Generate({ courses, teachers, rooms, semesters }) {
                     <div className="border-b border-gray-200 mb-6">
                         <nav className="-mb-px flex space-x-8">
                             <button
-                                onClick={() => setActiveTab('manual')}
-                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === 'manual'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                Manual Generation
-                            </button>
-                            <button
                                 onClick={() => setActiveTab('auto')}
                                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                                     activeTab === 'auto'
@@ -208,234 +60,18 @@ export default function Generate({ courses, teachers, rooms, semesters }) {
                             >
                                 Automatic Generation
                             </button>
+                            <button
+                                onClick={() => setActiveTab('manual')}
+                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                    activeTab === 'manual'
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                Manual Generation
+                            </button>
                         </nav>
                     </div>
-
-                    {/* Manual Generation Tab */}
-                    {activeTab === 'manual' && (
-                        <div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700">Semester *</label>
-                                <select
-                                    value={data.semester_id}
-                                    onChange={e => setData('semester_id', e.target.value)}
-                                    className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                                        errors.semester_id ? 'border-red-500' : ''
-                                    }`}
-                                    required
-                                >
-                                    <option value="">Select Semester</option>
-                                    <option value="1">1st Semester</option>
-                                    <option value="2">2nd Semester</option>
-                                </select>
-                                {errors.semester_id && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.semester_id}</p>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Course *</label>
-                                    <select
-                                        value={data.course_id}
-                                        onChange={e => setData('course_id', e.target.value)}
-                                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.course_id ? 'border-red-500' : ''
-                                        }`}
-                                    >
-                                        <option value="">Select Course</option>
-                                        {courses.map(course => (
-                                            <option key={course.id} value={course.id}>
-                                                {course.course_code} - {course.course_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.course_id && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.course_id}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Teacher *</label>
-                                    <select
-                                        value={data.teacher_id}
-                                        onChange={e => setData('teacher_id', e.target.value)}
-                                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.teacher_id ? 'border-red-500' : ''
-                                        }`}
-                                    >
-                                        <option value="">Select Teacher</option>
-                                        {teachers.map(teacher => (
-                                            <option key={teacher.id} value={teacher.id}>
-                                                {teacher.full_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.teacher_id && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.teacher_id}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Room *</label>
-                                    <select
-                                        value={data.room}
-                                        onChange={e => setData('room', e.target.value)}
-                                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.room ? 'border-red-500' : ''
-                                        }`}
-                                    >
-                                        <option value="">Select Room</option>
-                                        {rooms.map(room => (
-                                            <option key={room.id} value={room.room_code}>
-                                                {room.room_code} (Capacity: {room.capacity})
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.room && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.room}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Day *</label>
-                                    <select
-                                        value={data.day}
-                                        onChange={e => setData('day', e.target.value)}
-                                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.day ? 'border-red-500' : ''
-                                        }`}
-                                    >
-                                        <option value="">Select Day</option>
-                                        {days.map(day => (
-                                            <option key={day} value={day}>{day}</option>
-                                        ))}
-                                    </select>
-                                    {errors.day && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.day}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Start Time *</label>
-                                    <input
-                                        type="time"
-                                        value={data.start_time}
-                                        onChange={e => setData('start_time', e.target.value)}
-                                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.start_time ? 'border-red-500' : ''
-                                        }`}
-                                    />
-                                    {errors.start_time && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.start_time}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">End Time *</label>
-                                    <input
-                                        type="time"
-                                        value={data.end_time}
-                                        onChange={e => setData('end_time', e.target.value)}
-                                        className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.end_time ? 'border-red-500' : ''
-                                        }`}
-                                    />
-                                    {errors.end_time && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.end_time}</p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="mb-6">
-                                <button
-                                    type="button"
-                                    onClick={handleAddToSchedule}
-                                    disabled={processing}
-                                    className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-md transition-colors duration-200"
-                                >
-                                    Add to Schedule
-                                </button>
-                            </div>
-
-                            {schedule.length > 0 && (
-                                <div className="mb-6">
-                                    <h3 className="text-lg font-semibold mb-4">Schedule Preview ({schedule.length} items)</h3>
-                                    <div className="bg-gray-50 rounded-lg overflow-hidden">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-100">
-                                                <tr>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Course
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Teacher
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Room
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Day
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Time
-                                                    </th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        Action
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                {schedule.map((item) => (
-                                                    <tr key={item.id} className="hover:bg-gray-50">
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                            {item.course_name}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            {item.teacher_name}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            {item.room}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            {item.day}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                            {item.start_time} - {item.end_time}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                            <button
-                                                                onClick={() => handleRemoveFromSchedule(item.id)}
-                                                                className="text-red-600 hover:text-red-900 font-medium"
-                                                            >
-                                                                Remove
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div className="mt-6 flex items-center space-x-4">
-                                        <button
-                                            onClick={handleGenerate}
-                                            disabled={processing}
-                                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-md transition-colors duration-200"
-                                        >
-                                            {processing ? 'Generating...' : 'Generate Schedule'}
-                                        </button>
-                                        <button
-                                            onClick={() => setSchedule([])}
-                                            className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-md transition-colors duration-200"
-                                        >
-                                            Clear All
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
 
                     {/* Automatic Generation Tab */}
                     {activeTab === 'auto' && (
@@ -492,8 +128,270 @@ export default function Generate({ courses, teachers, rooms, semesters }) {
                             </div>
                         </div>
                     )}
+
+                    {/* Manual Generation Tab */}
+                    {activeTab === 'manual' && (
+                        <ManualScheduleForm
+                            semesters={semesters}
+                            courseOfferings={courseOfferings}
+                            teachers={teachers}
+                            rooms={rooms}
+                            timeslots={timeslots}
+                            sections={sections}
+                        />
+                    )}
                 </div>
             </div>
         </DashboardLayout>
+    );
+}
+
+function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, timeslots, sections }) {
+    console.log('ManualScheduleForm data:', {
+        sectionsCount: sections?.length || 0,
+        firstSection: sections?.[0],
+        sectionsSample: sections?.slice(0, 10),
+        allSectionIds: sections?.map(s => ({ id: s.id, name: s.section_name }))
+    });
+    const { data, setData, post, processing, errors, reset } = useForm({
+        data: {
+            semester_id: '',
+            schedule: []
+        }
+    });
+
+    const [newLine, setNewLine] = useState({
+        course_offering_id: '',
+        section_id: '',
+        teacher_id: '',
+        room_id: '',
+        timeslot_id: ''
+    });
+
+    const handleAddLine = () => {
+        if (!newLine.course_offering_id || !newLine.section_id || !newLine.teacher_id || !newLine.room_id || !newLine.timeslot_id) {
+            alert('Please fill all fields for manual schedule row.');
+            return;
+        }
+
+        const selectedOffering = courseOfferings.find(o => o.id === parseInt(newLine.course_offering_id));
+        const selectedSection = sections.find(s => s.id === parseInt(newLine.section_id));
+        const selectedRoom = rooms.find(r => r.id === parseInt(newLine.room_id));
+        const selectedTimeslot = timeslots.find(t => t.id === parseInt(newLine.timeslot_id));
+
+        if (!selectedOffering || !selectedSection || !selectedRoom || !selectedTimeslot) {
+            alert('Invalid data. Please verify selection.');
+            return;
+        }
+
+        const scheduleItem = {
+            course_offering_id: selectedOffering.id,
+            section_id: selectedSection.id,
+            section_name: selectedSection.section_name,
+            teacher_id: parseInt(newLine.teacher_id),
+            room_id: parseInt(newLine.room_id),
+            timeslot_id: parseInt(newLine.timeslot_id),
+            course_name: selectedOffering.course.course_name,
+            room_code: selectedRoom.room_code,
+            day: selectedTimeslot.day_of_week,
+            start_time: selectedTimeslot.start_time,
+            end_time: selectedTimeslot.end_time
+        };
+
+        setData('data', {
+            ...data.data,
+            schedule: [...data.data.schedule, scheduleItem]
+        });
+
+        setNewLine({
+            course_offering_id: '',
+            section_id: '',
+            teacher_id: '',
+            room_id: '',
+            timeslot_id: ''
+        });
+    };
+
+    const handleRemove = (index) => {
+        const newSchedule = data.data.schedule.filter((_, idx) => idx !== index);
+        setData('data', { ...data.data, schedule: newSchedule });
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        if (!data.data.semester_id) {
+            alert('Please choose semester.');
+            return;
+        }
+
+        if (data.data.schedule.length === 0) {
+            alert('Add at least one manual schedule entry.');
+            return;
+        }
+
+        post('/schedules/generate', {
+            data: data.data,
+            onSuccess: () => {
+                reset();
+                alert('Manual schedule entries submitted.');
+            }
+        });
+    };
+
+    return (
+        <div>
+            <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700">Semester *</label>
+                <select
+                    value={data.data.semester_id}
+                    onChange={e => setData('data.semester_id', e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    required
+                >
+                    <option value="">Select Semester</option>
+                    {semesters?.map(semester => (
+                        <option key={semester.id} value={semester.id}>
+                            {semester.name}
+                        </option>
+                    ))}
+                </select>
+                {errors['data.semester_id'] && (
+                    <p className="mt-2 text-sm text-red-600">{errors['data.semester_id']}</p>
+                )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Course Offering</label>
+                    <select
+                        value={newLine.course_offering_id}
+                        onChange={e => setNewLine({ ...newLine, course_offering_id: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300"
+                    >
+                        <option value="">Select</option>
+                        {courseOfferings?.map(offering => (
+                            <option key={offering.id} value={offering.id}>
+                                {offering.course.course_code} - {offering.course.course_name} ({offering.semester.name})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Section</label>
+                    <select
+                        value={newLine.section_id}
+                        onChange={e => setNewLine({ ...newLine, section_id: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300"
+                    >
+                        <option value="">Select</option>
+                        {sections?.filter(section => !newLine.course_offering_id || section.course_offering_id === parseInt(newLine.course_offering_id)).map(section => (
+                            <option key={section.id} value={section.id}>
+                                {section.section_name} (ID: {section.id})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Teacher</label>
+                    <select
+                        value={newLine.teacher_id}
+                        onChange={e => setNewLine({ ...newLine, teacher_id: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300"
+                    >
+                        <option value="">Select</option>
+                        {teachers?.map(teacher => (
+                            <option key={teacher.id} value={teacher.id}>
+                                {teacher.first_name} {teacher.last_name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Room</label>
+                    <select
+                        value={newLine.room_id}
+                        onChange={e => setNewLine({ ...newLine, room_id: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300"
+                    >
+                        <option value="">Select</option>
+                        {rooms?.map(room => (
+                            <option key={room.id} value={room.id}>{room.room_code}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Timeslot</label>
+                    <select
+                        value={newLine.timeslot_id}
+                        onChange={e => setNewLine({ ...newLine, timeslot_id: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300"
+                    >
+                        <option value="">Select</option>
+                        {timeslots?.map(ts => (
+                            <option key={ts.id} value={ts.id}>
+                                {ts.day_of_week} {ts.start_time} - {ts.end_time}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                onClick={handleAddLine}
+                className="mb-6 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+            >
+                Add Manual Schedule Row
+            </button>
+
+            {data.data.schedule.length > 0 && (
+                <div className="mb-6">
+                    <h4 className="font-semibold mb-2">Manual Schedule Rows</h4>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full bg-white border border-gray-200">
+                            <thead>
+                                <tr>
+                                    <th className="px-3 py-2 border">Course</th>
+                                    <th className="px-3 py-2 border">Section</th>
+                                    <th className="px-3 py-2 border">Teacher</th>
+                                    <th className="px-3 py-2 border">Room</th>
+                                    <th className="px-3 py-2 border">Timeslot</th>
+                                    <th className="px-3 py-2 border">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.data.schedule.map((item, index) => (
+                                    <tr key={index}>
+                                        <td className="px-3 py-2 border">{item.course_name}</td>
+                                        <td className="px-3 py-2 border">{item.section_name}</td>
+                                        <td className="px-3 py-2 border">{item.teacher_id}</td>
+                                        <td className="px-3 py-2 border">{item.room_code}</td>
+                                        <td className="px-3 py-2 border">{item.day} {item.start_time}-{item.end_time}</td>
+                                        <td className="px-3 py-2 border">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemove(index)}
+                                                className="text-red-600 hover:text-red-800"
+                                            >
+                                                Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            <button
+                onClick={handleSubmit}
+                disabled={processing}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 px-5 rounded-md"
+            >
+                {processing ? 'Submitting...' : 'Submit Manual Schedule'}
+            </button>
+        </div>
     );
 }

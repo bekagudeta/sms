@@ -49,7 +49,7 @@ class RoleSeeder extends Seeder
         $student->syncPermissions(['view schedule']);
 
         $adminUser = User::firstOrCreate(
-            ['email' => 'admin@example.com'],
+            ['email' => 'admin@admin.com'],
             [
                 'name' => 'Admin',
                 'password' => Hash::make('password')

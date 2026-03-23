@@ -20,10 +20,12 @@ class ScheduleExport implements FromCollection, WithHeadings, WithMapping, WithS
 
     public function collection()
     {
-        $query = Schedule::with(['course', 'teacher', 'room', 'semester']);
+        $query = Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot', 'section.courseOffering.semester']);
         
         if ($this->semesterId) {
-            $query->where('semester_id', $this->semesterId);
+            $query->whereHas('section.courseOffering', function($q) {
+                $q->where('semester_id', $this->semesterId);
+            });
         }
         
         return $query->get();
@@ -47,19 +49,23 @@ class ScheduleExport implements FromCollection, WithHeadings, WithMapping, WithS
 
     public function map($schedule): array
     {
+        $course = $schedule->section?->courseOffering?->course;
+        $teacher = $schedule->section?->teachers?->first();
+        $semester = $schedule->section?->courseOffering?->semester;
+        
         return [
-            $schedule->course->course_code,
-            $schedule->course->course_name,
-            $schedule->teacher->full_name,
-            $schedule->room->room_code,
-            $schedule->day,
-            $schedule->start_time && $schedule->end_time ? 
-                $schedule->start_time . ' - ' . $schedule->end_time : 
+            $course?->course_code ?? 'N/A',
+            $course?->course_name ?? 'N/A',
+            $teacher?->user?->name ?? 'Not assigned',
+            $schedule->room?->room_code ?? 'N/A',
+            $schedule->timeslot?->day_of_week ?? 'Not set',
+            $schedule->timeslot?->start_time && $schedule->timeslot?->end_time ? 
+                $schedule->timeslot->start_time . ' - ' . $schedule->timeslot->end_time : 
                 'Not set',
-            $schedule->semester->name,
-            $schedule->section,
-            $schedule->max_students,
-            ucfirst($schedule->status)
+            $semester?->name ?? 'N/A',
+            $schedule->section?->section_name ?? 'N/A',
+            $schedule->section?->capacity ?? 'N/A',
+            'Scheduled'
         ];
     }
 

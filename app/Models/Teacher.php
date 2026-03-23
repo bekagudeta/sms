@@ -10,15 +10,15 @@ class Teacher extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
         'teacher_id',
+        'user_id',
+        'department_id',
         'first_name',
         'last_name',
         'email',
         'phone',
-        'department_id',
         'qualification',
-        'max_hours_per_week'
+        'max_hours_per_week',
     ];
 
     protected $appends = ['full_name'];
@@ -32,14 +32,14 @@ class Teacher extends Model
         return $this->belongsTo(Department::class);
     }
 
-    public function courses()
+    public function sections()
     {
-        return $this->hasMany(Course::class);
+        return $this->belongsToMany(Section::class, 'section_teachers');
     }
 
-    public function schedules()
+    public function getSchedulesAttribute()
     {
-        return $this->hasMany(Schedule::class);
+        return $this->sections()->with('schedule')->get()->pluck('schedule');
     }
 
     public function user()
@@ -49,6 +49,6 @@ class Teacher extends Model
 
     public function getFullNameAttribute()
     {
-        return "{$this->first_name} {$this->last_name}";
+        return $this->user?->name ?? 'Unknown';
     }
 }

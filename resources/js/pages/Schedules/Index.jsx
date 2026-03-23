@@ -17,8 +17,8 @@ export default function SchedulesIndex({ schedules, semesters, currentSemester }
 
     const filteredSchedules = schedulesData.filter(schedule => {
         return (
-            (!filter.day || schedule.day === filter.day) &&
-            (!filter.teacher || schedule.teacher?.full_name.toLowerCase().includes(filter.teacher.toLowerCase())) &&
+            (!filter.day || schedule.timeslot?.day_of_week === filter.day) &&
+            (!filter.teacher || schedule.teacher?.user?.name?.toLowerCase().includes(filter.teacher.toLowerCase())) &&
             (!filter.room || schedule.room?.room_code.toLowerCase().includes(filter.room.toLowerCase()))
         );
     });
@@ -95,49 +95,45 @@ export default function SchedulesIndex({ schedules, semesters, currentSemester }
                                     <tr key={schedule.id}>
                                         <td className="px-6 py-4">
                                             <div className="text-sm font-medium text-gray-900">
-                                                {schedule.course?.course_code}
+                                                {schedule.course?.course_code || schedule.section?.course_offering?.course?.course_code || 'Not assigned'}
                                             </div>
                                             <div className="text-sm text-gray-500">
-                                                {schedule.course?.course_name}
+                                                {schedule.course?.course_name || schedule.section?.course_offering?.course?.course_name || 'Not assigned'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {schedule.teacher?.full_name || 'Not assigned'}
+                                            {schedule.teacher_name || 'Not assigned'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {schedule.room?.room_code || 'Not assigned'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {schedule.day || 'Not assigned'}
+                                            {schedule.timeslot?.day_of_week || 'Not assigned'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {schedule.start_time && schedule.end_time ? 
-                                                `${schedule.start_time} - ${schedule.end_time}` : 
+                                            {schedule.timeslot?.start_time && schedule.timeslot?.end_time ? 
+                                                `${schedule.timeslot.start_time} - ${schedule.timeslot.end_time}` : 
                                                 'Not assigned'
                                             }
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {schedule.semester?.name}
+                                            {schedule.semester?.name || 'Not assigned'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                schedule.status === 'scheduled' ? 'bg-green-100 text-green-800' :
-                                                schedule.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                                'bg-gray-100 text-gray-800'
-                                            }`}>
-                                                {schedule.status}
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                Scheduled
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <Link
-                                                href={route('schedules.show', schedule.id)}
+                                                href={`/schedules/${schedule.id}`}
                                                 className="text-blue-600 hover:text-blue-900 mr-3"
                                             >
                                                 View
                                             </Link>
                                             {(userRole === 'admin' || userRole === 'scheduler') && (
                                                 <Link
-                                                    href={route('schedules.destroy', schedule.id)}
+                                                    href={`/schedules/${schedule.id}`}
                                                     method="delete"
                                                     as="button"
                                                     className="text-red-600 hover:text-red-900"

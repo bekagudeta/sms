@@ -33,16 +33,18 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             $plainPassword = null;
 
             if ($user) {
-                // Ensure we have a plain password to export, and force a password reset if not already required.
-                if (! $user->must_change_password || ! $user->plain_password) {
+                if (empty($user->plain_password)) {
                     $plainPassword = Str::random(8);
                     $user->update([
                         'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                        'must_change_password' => true,
                         'plain_password' => $plainPassword,
+                        'must_change_password' => true,
                     ]);
                 } else {
                     $plainPassword = $user->plain_password;
+                    if (empty($user->password)) {
+                        $user->update(['password' => Hash::make($plainPassword, ['rounds' => 8])]);
+                    }
                 }
             } else {
                 $plainPassword = Str::random(8);
@@ -51,8 +53,8 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
                     'name' => trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')),
                     'email' => $row['email'],
                     'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                    'must_change_password' => true,
                     'plain_password' => $plainPassword,
+                    'must_change_password' => true,
                 ]);
             }
 

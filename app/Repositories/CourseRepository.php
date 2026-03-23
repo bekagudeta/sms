@@ -9,12 +9,12 @@ class CourseRepository
 {
     public function getAll(): Collection
     {
-        return Course::with(['department', 'semester', 'teacher'])->get();
+        return Course::with(['department', 'courseOfferings.sections.teachers.user'])->get();
     }
 
     public function paginate(int $perPage = 10, ?string $search = null)
     {
-        return Course::with(['department', 'semester', 'teacher'])
+        return Course::with(['department', 'courseOfferings.sections.teachers.user'])
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('course_name', 'like', "%{$search}%")
@@ -28,7 +28,7 @@ class CourseRepository
 
     public function findById($id): ?Course
     {
-        return Course::with(['department', 'semester', 'teacher'])->find($id);
+        return Course::with(['department', 'courseOfferings.sections.teachers.user'])->find($id);
     }
 
     public function create(array $data): Course
@@ -57,15 +57,19 @@ class CourseRepository
 
     public function getBySemester($semesterId): Collection
     {
-        return Course::where('semester_id', $semesterId)
-                     ->with(['department', 'semester', 'teacher'])
-                     ->get();
+        return Course::whereHas('courseOfferings', function ($q) use ($semesterId) {
+                     $q->where('semester_id', $semesterId);
+                 })
+                 ->with(['department', 'courseOfferings.sections.teachers.user'])
+                 ->get();
     }
 
     public function getByTeacher($teacherId): Collection
     {
-        return Course::where('teacher_id', $teacherId)
-                     ->with(['department', 'semester', 'teacher'])
-                     ->get();
+        return Course::whereHas('courseOfferings.sections.teachers', function ($q) use ($teacherId) {
+                     $q->where('teacher_id', $teacherId);
+                 })
+                 ->with(['department', 'courseOfferings.sections.teachers.user'])
+                 ->get();
     }
 }

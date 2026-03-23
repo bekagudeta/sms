@@ -75,6 +75,36 @@ class ImportController extends Controller
         return back()->with('error', $result['message']);
     }
 
+    public function importCourseOfferings(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv'
+        ]);
+
+        $result = $this->importService->importCourseOfferings($request->file('file'));
+
+        if ($result['success']) {
+            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
+        }
+
+        return back()->with('error', $result['message']);
+    }
+
+    public function importSections(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv'
+        ]);
+
+        $result = $this->importService->importSections($request->file('file'));
+
+        if ($result['success']) {
+            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
+        }
+
+        return back()->with('error', $result['message']);
+    }
+
     public function importDepartments(Request $request)
     {
         $request->validate([

@@ -11,7 +11,7 @@ export default function Show({ schedule }) {
                 <div className="p-6 bg-white border-b border-gray-200">
                     <div className="mb-6">
                         <Link
-                            href={route('schedules.index')}
+                            href="/schedules"
                             className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                         >
                             Back to Schedules
@@ -24,23 +24,23 @@ export default function Show({ schedule }) {
                             <div className="space-y-3">
                                 <div>
                                     <span className="font-medium text-gray-700">Course Code:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.course?.course_code}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.course?.course_code || schedule.section?.course_offering?.course?.course_code || 'Not assigned'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Course Name:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.course?.course_name}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.course?.course_name || schedule.section?.course_offering?.course?.course_name || 'Not assigned'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Credits:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.course?.credits}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.course?.credits || schedule.section?.course_offering?.course?.credits || 'Not assigned'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Hours per Week:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.course?.hours_per_week}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.course?.hours_per_week || schedule.section?.course_offering?.course?.hours_per_week || 'Not assigned'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Department:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.course?.department?.name || 'N/A'}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.course?.department?.name || schedule.section?.course_offering?.course?.department?.name || 'N/A'}</span>
                                 </div>
                             </div>
                         </div>
@@ -50,41 +50,36 @@ export default function Show({ schedule }) {
                             <div className="space-y-3">
                                 <div>
                                     <span className="font-medium text-gray-700">Teacher:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.teacher?.full_name || schedule.teacher?.name}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.teacher_name || 'Not assigned'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Room:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.room?.room_code} ({schedule.room?.type})</span>
+                                    <span className="ml-2 text-gray-600">{schedule.room?.room_code || 'Not assigned'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Day:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.day}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.timeslot?.day_of_week || 'Not set'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Time:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.start_time} - {schedule.end_time}</span>
+                                    <span className="ml-2 text-gray-600">
+                                        {schedule.timeslot?.start_time && schedule.timeslot?.end_time ? 
+                                            `${schedule.timeslot.start_time} - ${schedule.timeslot.end_time}` : 
+                                            'Not set'
+                                        }
+                                    </span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Semester:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.semester?.name}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.semester?.name || schedule.section?.course_offering?.semester?.name || 'Not assigned'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Section:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.section}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.section?.section_name || 'Not assigned'}</span>
                                 </div>
                                 <div>
-                                    <span className="font-medium text-gray-700">Max Students:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.max_students}</span>
-                                </div>
-                                <div>
-                                    <span className="font-medium text-gray-700">Status:</span>
-                                    <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${
-                                        schedule.status === 'scheduled' 
-                                            ? 'bg-green-100 text-green-800'
-                                            : 'bg-yellow-100 text-yellow-800'
-                                    }`}>
-                                        {schedule.status}
-                                    </span>
+                                    <span className="font-medium text-gray-700">Capacity:</span>
+                                    <span className="ml-2 text-gray-600">{schedule.section?.capacity || 'Not set'}</span>
                                 </div>
                             </div>
                         </div>
@@ -99,7 +94,7 @@ export default function Show({ schedule }) {
 
                     <div className="mt-8 flex justify-end space-x-3">
                         <Link
-                            href={route('schedules.edit', schedule.id)}
+                            href={`/schedules/${schedule.id}/edit`}
                             className="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:border-indigo-900 focus:ring focus:ring-indigo-300 disabled:opacity-25 transition"
                         >
                             Edit Schedule

@@ -11,8 +11,6 @@ export default function Edit({ course, teachers, departments, semesters }) {
         credits: course.credits || '',
         hours_per_week: course.hours_per_week || '',
         department_id: course.department_id || '',
-        semester_id: course.semester_id || '',
-        teacher_id: course.teacher_id || '',
         level: course.level || 'undergraduate'
     });
 
@@ -33,23 +31,6 @@ export default function Edit({ course, teachers, departments, semesters }) {
             type: 'select',
             options: departments.map(d => ({ value: d.id, label: d.name })),
             required: true 
-        },
-        { 
-            name: 'semester_id', 
-            label: 'Semester', 
-            type: 'select',
-            options: semesters.map(s => ({ value: s.id, label: s.name })),
-            required: true 
-        },
-        { 
-            name: 'teacher_id', 
-            label: 'Teacher', 
-            type: 'select',
-            options: [
-                { value: '', label: 'No Teacher Assigned' },
-                ...teachers.map(t => ({ value: t.id, label: t.full_name }))
-            ],
-            required: false 
         },
         { 
             name: 'level', 

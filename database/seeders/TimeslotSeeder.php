@@ -13,11 +13,9 @@ class TimeslotSeeder extends Seeder
 
         $times = [
             ['start' => '02:00', 'end' => '03:50'],
-            ['start' => '04:00', 'end' => '04:50'],
-            ['start' => '05:00', 'end' => '05:50'],
-            ['start' => '07:30', 'end' => '09:10'],
-            ['start' => '09:20', 'end' => '10:10'],
-            ['start' => '10:20', 'end' => '11:10'],
+            ['start' => '04:00', 'end' => '05:50'],
+            ['start' => '07:30', 'end' => '09:20'],
+            ['start' => '09:30', 'end' => '11:20'],
         ];
 
         foreach ($days as $day) {

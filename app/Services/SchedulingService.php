@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Course;
+use App\Models\CourseOffering;
+use App\Models\Section;
 use App\Models\Schedule;
 use App\Models\Teacher;
 use App\Models\Room;
@@ -18,39 +20,33 @@ class SchedulingService
 
         try {
 
-            // Remove previous schedules
-            Schedule::where('semester_id', $semesterId)->delete();
+            // Remove previous schedules for this semester
+            Schedule::whereHas('section.courseOffering', function($q) use ($semesterId) {
+                $q->where('semester_id', $semesterId);
+            })->delete();
 
-            $courses = Course::where('semester_id', $semesterId)
-                ->orderByDesc('student_count') // harder courses first
+            $courseOfferings = CourseOffering::where('semester_id', $semesterId)
+                ->with(['course', 'sections.teachers'])
                 ->get();
 
             $teachers = Teacher::all();
             $rooms = Room::all();
-            $timeslots = Timeslot::orderBy('day')->orderBy('start_time')->get();
+            $timeslots = Timeslot::orderBy('day_of_week')->orderBy('start_time')->get();
 
             $scheduled = 0;
 
-            foreach ($courses as $course) {
-
-                $blocks = $course->hours_per_week;
-
-                while ($blocks > 0) {
-
-                    $result = $this->scheduleSingleBlock(
-                        $course,
+            foreach ($courseOfferings as $courseOffering) {
+                foreach ($courseOffering->sections as $section) {
+                    $result = $this->scheduleSingleSection(
+                        $section,
                         $teachers,
                         $rooms,
-                        $timeslots,
-                        $semesterId
+                        $timeslots
                     );
 
-                    if (!$result) {
-                        break;
+                    if ($result) {
+                        $scheduled++;
                     }
-
-                    $scheduled++;
-                    $blocks--;
                 }
             }
 
@@ -58,69 +54,49 @@ class SchedulingService
 
             return [
                 'success' => true,
-                'message' => 'Schedule generated successfully',
-                'scheduled_blocks' => $scheduled
+                'message' => "Scheduled {$scheduled} sections successfully",
+                'scheduled_count' => $scheduled
             ];
 
         } catch (\Exception $e) {
-
             DB::rollBack();
-
             return [
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => 'Scheduling failed: ' . $e->getMessage()
             ];
         }
     }
 
-    protected function scheduleSingleBlock($course, $teachers, $rooms, $timeslots, $semesterId)
+    protected function scheduleSingleSection($section, $teachers, $rooms, $timeslots)
     {
+        // If section already has a schedule, skip
+        if ($section->schedule) {
+            return true;
+        }
 
-        foreach ($teachers as $teacher) {
-
-            if (!$this->isTeacherEligible($teacher, $course)) {
+        foreach ($rooms as $room) {
+            if (!$this->isRoomEligible($room, $section)) {
                 continue;
             }
 
-            if (!$this->checkTeacherWeeklyLoad($teacher, $semesterId)) {
-                continue;
-            }
-
-            foreach ($rooms as $room) {
-
-                if (!$this->isRoomEligible($room, $course)) {
+            foreach ($timeslots as $timeslot) {
+                if ($this->hasRoomConflict($room, $timeslot)) {
                     continue;
                 }
 
-                foreach ($timeslots as $timeslot) {
-
-                    if ($this->hasTeacherConflict($teacher, $timeslot, $semesterId)) {
-                        continue;
-                    }
-
-                    if ($this->hasRoomConflict($room, $timeslot, $semesterId)) {
-                        continue;
-                    }
-
-                    if ($this->hasStudentConflict($course, $timeslot, $semesterId)) {
-                        continue;
-                    }
-
-                    if (!$this->checkTeacherDailyLoad($teacher, $timeslot, $semesterId)) {
-                        continue;
-                    }
-
-                    return Schedule::create([
-                        'course_id' => $course->id,
-                        'teacher_id' => $teacher->id,
-                        'room_id' => $room->id,
-                        'timeslot_id' => $timeslot->id,
-                        'semester_id' => $semesterId,
-                        'section' => $course->section ?? 'A',
-                        'max_students' => $room->capacity,
-                        'status' => 'scheduled'
-                    ]);
+                if ($this->hasTeacherConflict($section, $timeslot)) {
+                    continue;
                 }
+
+                if ($this->hasStudentConflict($section, $timeslot)) {
+                    continue;
+                }
+
+                return Schedule::create([
+                    'section_id' => $section->id,
+                    'room_id' => $room->id,
+                    'timeslot_id' => $timeslot->id,
+                ]);
             }
         }
 
@@ -132,49 +108,40 @@ class SchedulingService
         return $teacher->department_id == $course->department_id;
     }
 
-    protected function isRoomEligible($room, $course)
+    protected function isRoomEligible($room, $section)
     {
-
-        if ($room->capacity < $course->student_count) {
-            return false;
-        }
-
-        if ($course->room_type && $room->type != $course->room_type) {
-            return false;
-        }
-
-        return true;
+        return $room->capacity >= $section->capacity;
     }
 
-    protected function hasTeacherConflict($teacher, $timeslot, $semesterId)
+    protected function hasTeacherConflict($section, $timeslot)
     {
-
-        return Schedule::where('teacher_id', $teacher->id)
+        foreach ($section->teachers as $teacher) {
+            $conflict = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
+                $q->where('teacher_id', $teacher->id);
+            })
             ->where('timeslot_id', $timeslot->id)
-            ->where('semester_id', $semesterId)
             ->exists();
+
+            if ($conflict) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    protected function hasRoomConflict($room, $timeslot, $semesterId)
+    protected function hasRoomConflict($room, $timeslot)
     {
-
         return Schedule::where('room_id', $room->id)
             ->where('timeslot_id', $timeslot->id)
-            ->where('semester_id', $semesterId)
             ->exists();
     }
 
-    protected function hasStudentConflict($course, $timeslot, $semesterId)
+    protected function hasStudentConflict($section, $timeslot)
     {
-
+        // Check if any student in this section has another class at the same time
         return Schedule::where('timeslot_id', $timeslot->id)
-            ->where('semester_id', $semesterId)
-            ->whereHas('course', function ($query) use ($course) {
-
-                $query->where('department_id', $course->department_id)
-                    ->where('level', $course->level)
-                    ->where('section', $course->section);
-
+            ->whereHas('section.enrollments', function($q) use ($section) {
+                $q->whereIn('student_id', $section->enrollments->pluck('student_id'));
             })
             ->exists();
     }
@@ -204,20 +171,32 @@ class SchedulingService
 
     public function assignTeacher($scheduleId, $teacherId)
     {
-
         $schedule = Schedule::findOrFail($scheduleId);
         $teacher = Teacher::findOrFail($teacherId);
 
-        if ($this->hasTeacherConflict($teacher, $schedule->timeslot, $schedule->semester_id)) {
-
+        // Check if teacher is already assigned to this section
+        if ($schedule->section->teachers->contains($teacher)) {
             return [
                 'success' => false,
-                'message' => 'Teacher conflict'
+                'message' => 'Teacher already assigned to this section'
             ];
         }
 
-        $schedule->teacher_id = $teacherId;
-        $schedule->save();
+        // Check for time conflict
+        $conflict = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
+            $q->where('teacher_id', $teacher->id);
+        })
+        ->where('timeslot_id', $schedule->timeslot_id)
+        ->exists();
+
+        if ($conflict) {
+            return [
+                'success' => false,
+                'message' => 'Teacher time conflict'
+            ];
+        }
+
+        $schedule->section->teachers()->attach($teacherId);
 
         return [
             'success' => true,
@@ -227,21 +206,17 @@ class SchedulingService
 
     public function assignRoom($scheduleId, $roomId)
     {
-
         $schedule = Schedule::findOrFail($scheduleId);
         $room = Room::findOrFail($roomId);
-        $course = $schedule->course;
 
-        if (!$this->isRoomEligible($room, $course)) {
-
+        if (!$this->isRoomEligible($room, $schedule->section)) {
             return [
                 'success' => false,
                 'message' => 'Room not suitable'
             ];
         }
 
-        if ($this->hasRoomConflict($room, $schedule->timeslot, $schedule->semester_id)) {
-
+        if ($this->hasRoomConflict($room, $schedule->timeslot)) {
             return [
                 'success' => false,
                 'message' => 'Room conflict'

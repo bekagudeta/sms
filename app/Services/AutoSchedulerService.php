@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Course;
+use App\Models\CourseOffering;
+use App\Models\Section;
 use App\Models\Schedule;
 use App\Models\Teacher;
 use App\Models\Room;
@@ -16,12 +18,12 @@ use Illuminate\Support\Facades\Log;
 class AutoSchedulerService
 {
     protected $semesterId;
-    protected $courses;
+    protected $sections;
     protected $teachers;
     protected $rooms;
     protected $timeslots;
     protected $students;
-    protected $courseScheduleUnits;
+    protected $sectionScheduleUnits;
 
     // In-memory conflict tracking to avoid repeated DB queries
     protected $teacherTimeslotMap = [];
@@ -45,24 +47,31 @@ class AutoSchedulerService
         
         try {
             // Clear existing schedules for the semester
-            Schedule::where('semester_id', $semesterId)->delete();
+            Schedule::whereHas('section.courseOffering', function($q) {
+                $q->where('semester_id', $this->semesterId);
+            })->delete();
             
             // Load data
             $this->loadData();
-            
-            // Sort courses by difficulty (CSP heuristic: hardest first)
-            $this->courses = $this->courses->sortByDesc('student_count')->values();
-            $this->courseScheduleUnits = $this->buildCourseScheduleUnits();
+
+            // Sort sections by enrollment count (hardest first)
+            $this->sections = $this->sections->sortByDesc(function($section) {
+                return $section->enrollments->count();
+            })->values();
 
             // Validate data completeness
             $this->validateData();
 
-            // 🔥 BACKTRACKING STARTS HERE (in-memory only)
-            $success = $this->backtrackSchedule(0);
+            // Simple greedy scheduling
+            $this->buildGreedySchedule();
 
-            if (!$success) {
-                // If optimal backtracking fails, fall back to a best-effort greedy schedule
-                $this->buildGreedySchedule();
+            if (count($this->schedules) === 0) {
+                throw new \Exception("Could not generate any schedule entries - check data constraints");
+            }
+
+            // Persist final schedule entries once after generation
+            foreach ($this->schedules as $scheduleEntry) {
+                Schedule::create($scheduleEntry);
             }
 
             if (count($this->schedules) === 0) {
@@ -81,7 +90,7 @@ class AutoSchedulerService
                 'message' => 'Schedule generated successfully',
                 'scheduled' => count($this->schedules),
                 'conflicts' => count($this->conflicts),
-                'total_courses' => $this->courses->count()
+                'total_sections' => $this->sections->count()
             ];
             
         } catch (\Exception $e) {
@@ -97,10 +106,13 @@ class AutoSchedulerService
 
     protected function loadData()
     {
-        $this->courses = Course::with(['teacher', 'department'])
-                              ->where('semester_id', $this->semesterId)
-                              ->get();
-        
+        // Load sections for the semester
+        $this->sections = Section::with(['courseOffering.course', 'courseOffering.semester', 'teachers', 'enrollments'])
+                                ->whereHas('courseOffering', function($q) {
+                                    $q->where('semester_id', $this->semesterId);
+                                })
+                                ->get();
+
         $this->teachers = Teacher::with('department')->get();
         $this->rooms = Room::all();
         $this->students = Student::all();
@@ -123,22 +135,18 @@ class AutoSchedulerService
 
     protected function validateData()
     {
-        if ($this->courses->isEmpty()) {
-            throw new \Exception('No courses found for this semester');
+        if ($this->sections->isEmpty()) {
+            throw new \Exception('No sections found for this semester');
         }
 
-        if (empty($this->courseScheduleUnits)) {
-            throw new \Exception('No scheduling units were created for the selected semester');
-        }
-        
         if ($this->teachers->isEmpty()) {
             throw new \Exception('No teachers found in the system');
         }
-        
+
         if ($this->rooms->isEmpty()) {
             throw new \Exception('No rooms found in the system');
         }
-        
+
         if ($this->timeslots->isEmpty()) {
             throw new \Exception('No timeslots found in the system');
         }
@@ -583,89 +591,70 @@ class AutoSchedulerService
 
     protected function buildGreedySchedule()
     {
-        // Reset in-memory state to build a new best-effort schedule.
+        // Reset in-memory state
         $this->teacherTimeslotMap = [];
         $this->roomTimeslotMap = [];
         $this->studentGroupTimeslotMap = [];
         $this->teacherHours = [];
         $this->schedules = [];
 
-        foreach ($this->courseScheduleUnits as $unit) {
-            $course = $unit['course'];
-            $section = $unit['section'];
-            $preAssignedRoom = $unit['room'] ?? null;
+        foreach ($this->sections as $section) {
             $assigned = false;
-            
-            $teachers = $this->getQualifiedTeachers($course)
-                              ->sortBy(fn($teacher) => $this->teacherHours[$teacher->id] ?? 0);
 
-            // Use pre-assigned room if available, otherwise get eligible rooms
-            if ($preAssignedRoom) {
-                $rooms = collect([$preAssignedRoom]);
-            } else {
-                $rooms = $this->getEligibleRooms($course)->sortBy('capacity');
-            }
-
-            foreach ($teachers as $teacher) {
-                if (!$this->hasTeacherHoursAvailable($teacher, $course)) {
-                    continue;
+            // Try each timeslot
+            foreach ($this->timeslots as $timeslot) {
+                // Check teacher conflicts
+                $teacherConflict = false;
+                foreach ($section->teachers as $teacher) {
+                    if (isset($this->teacherTimeslotMap[$teacher->id][$timeslot->id])) {
+                        $teacherConflict = true;
+                        break;
+                    }
                 }
+                if ($teacherConflict) continue;
 
-                foreach ($this->timeslots as $timeslot) {
-                    if ($this->hasTeacherConflictInMemory($teacher, $timeslot)) {
-                        continue;
+                // Check student conflicts
+                $studentConflict = false;
+                foreach ($section->enrollments as $enrollment) {
+                    $studentId = $enrollment->student_id;
+                    if (isset($this->studentGroupTimeslotMap[$studentId][$timeslot->id])) {
+                        $studentConflict = true;
+                        break;
+                    }
+                }
+                if ($studentConflict) continue;
+
+                // Try each room
+                foreach ($this->rooms as $room) {
+                    if ($room->capacity < $section->capacity) continue;
+                    if (isset($this->roomTimeslotMap[$room->id][$timeslot->id])) continue;
+
+                    // Found a valid assignment
+                    $scheduleEntry = [
+                        'section_id' => $section->id,
+                        'room_id' => $room->id,
+                        'timeslot_id' => $timeslot->id,
+                    ];
+
+                    // Mark conflicts in memory
+                    foreach ($section->teachers as $teacher) {
+                        $this->teacherTimeslotMap[$teacher->id][$timeslot->id] = true;
+                    }
+                    $this->roomTimeslotMap[$room->id][$timeslot->id] = true;
+                    foreach ($section->enrollments as $enrollment) {
+                        $this->studentGroupTimeslotMap[$enrollment->student_id][$timeslot->id] = true;
                     }
 
-                    foreach ($rooms as $room) {
-                        if ($this->hasRoomConflictInMemory($room, $timeslot)) {
-                            continue;
-                        }
-
-                        $group = $section ?: $this->generateStudentGroup($course, $section);
-                        if ($group && $this->hasStudentGroupConflictInMemory($group, $timeslot)) {
-                            continue;
-                        }
-
-                        if (!$this->hasPrerequisitesScheduled($course, $timeslot)) {
-                            continue;
-                        }
-
-                        if (!$this->maintainsCourseSequence($course, $timeslot)) {
-                            continue;
-                        }
-
-                        if (!$this->hasRequiredEquipment($course, $room)) {
-                            continue;
-                        }
-
-                        // Assign in memory and break out of loops.
-                        $scheduleEntry = [
-                            'course_id' => $course->id,
-                            'teacher_id' => $teacher->id,
-                            'room_id' => $room->id,
-                            'timeslot_id' => $timeslot->id,
-                            'semester_id' => $this->semesterId,
-                            'section' => $group,
-                            'max_students' => $course->student_count ?? 30,
-                            'status' => 'scheduled',
-                            'day' => $timeslot->day_of_week,
-                            'start_time' => $timeslot->start_time,
-                            'end_time' => $timeslot->end_time
-                        ];
-
-                        $this->markConflictMaps($teacher, $room, $timeslot, $group, $course);
-                        $this->schedules[] = $scheduleEntry;
-                        $assigned = true;
-                        break 3;
-                    }
+                    $this->schedules[] = $scheduleEntry;
+                    $assigned = true;
+                    break 2;
                 }
             }
 
             if (!$assigned) {
                 $this->conflicts[] = [
-                    'course' => $course->course_name ?? 'Unknown',
-                    'section' => $section ?? 'A',
-                    'reason' => 'Could not find any valid timeslot/teacher/room combination'
+                    'section' => $section->courseOffering->course->course_name . ' ' . $section->section_name,
+                    'reason' => 'Could not find any valid timeslot/room combination'
                 ];
             }
         }

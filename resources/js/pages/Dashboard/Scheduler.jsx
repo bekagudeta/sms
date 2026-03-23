@@ -70,7 +70,12 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                         <ul className="space-y-2">
                             {recentSchedules.map(s => (
                                 <li key={s.id} className="p-4 border rounded-lg flex justify-between items-center">
-                                    <span>{s.course.course_code} - {s.course.course_name}</span>
+                                    <span>
+                                        {s.course ? `${s.course.course_code} - ${s.course.course_name}` : 'Course not assigned'}
+                                        {s.section && ` - Section ${s.section.section_name}`}
+                                        {s.room && ` - Room ${s.room.room_code}`}
+                                        {s.timeslot && ` - ${s.timeslot.day_of_week} ${s.timeslot.start_time}`}
+                                    </span>
                                     <Link href={`/schedules/${s.id}`} className="text-blue-600 hover:underline">View</Link>
                                 </li>
                             ))}

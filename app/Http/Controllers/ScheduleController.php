@@ -6,6 +6,8 @@ use App\Models\Schedule;
 use App\Models\Semester;
 use App\Models\Room;
 use App\Models\Course;
+use App\Models\CourseOffering;
+use App\Models\Section;
 use App\Models\Teacher;
 use App\Models\Timeslot;
 use App\Services\SchedulingService;
@@ -37,22 +39,18 @@ class ScheduleController extends Controller
 
         // Teachers should only see schedules assigned to them.
         if ($role === 'teacher') {
-            $teacher = Teacher::where('email', $user->email)->first();
+            $teacher = $user->teacher;
             $schedules = $teacher
                 ? $this->repository->paginateByTeacher($teacher->id, 10)
                 : new \Illuminate\Pagination\LengthAwarePaginator([], 0, 10, $request->input('page', 1));
         }
-        // Students should only see schedules for their semester.
+        // Students should only see schedules for their enrolled sections.
         elseif ($role === 'student') {
-            $student = \App\Models\Student::where('email', $user->email)->first();
+            $student = $user->student;
             $schedules = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 10, $request->input('page', 1));
 
             if ($student) {
-                $semesterNumber = $student->semester;
-                $semesterModel = Semester::where('name', $semesterNumber . ' Semester')->first();
-                if ($semesterModel) {
-                    $schedules = $this->repository->paginateBySemester($semesterModel->id, 10);
-                }
+                $schedules = $this->repository->paginateByStudent($student->id, 10);
             }
         }
         // Admins/schedulers can view full schedule list (optional semester filter).
@@ -72,16 +70,30 @@ class ScheduleController extends Controller
 
     public function showGenerateForm()
     {
-        $courses = Course::with(['teacher', 'department', 'semester'])->get();
+        $courseOfferings = \App\Models\CourseOffering::with(['course', 'semester', 'sections.teachers'])->get();
         $teachers = Teacher::with('department')->get();
         $rooms = Room::all();
         $semesters = Semester::all();
+        $timeslots = Timeslot::orderBy('day_of_week')->orderBy('start_time')->get();
+        $sections = \App\Models\Section::with(['courseOffering.course', 'courseOffering.semester'])->get();
+        
+        // Debug: Check first section data
+        $firstSection = $sections->first();
+        \Log::info('First section data:', [
+            'section_id' => $firstSection?->id,
+            'section_name' => $firstSection?->section_name,
+            'course_offering_id' => $firstSection?->course_offering_id,
+            'course_offering' => $firstSection?->courseOffering?->toArray(),
+            'course' => $firstSection?->courseOffering?->course?->toArray()
+        ]);
         
         return Inertia::render('Schedules/Generate', [
-            'courses' => $courses,
+            'courseOfferings' => $courseOfferings,
             'teachers' => $teachers,
             'rooms' => $rooms,
-            'semesters' => $semesters
+            'semesters' => $semesters,
+            'timeslots' => $timeslots,
+            'sections' => $sections,
         ]);
     }
 
@@ -180,9 +192,9 @@ class ScheduleController extends Controller
             return ['valid' => false, 'message' => 'Please add at least one schedule item.'];
         }
         
-        // Validate each schedule item has required fields
+        // Validate each schedule item has required fields (manual section-based scheduling)
         foreach ($scheduleItems as $index => $item) {
-            $requiredFields = ['course_id', 'teacher_id', 'room', 'day', 'start_time', 'end_time'];
+            $requiredFields = ['course_offering_id', 'section_name', 'teacher_id', 'room_id', 'timeslot_id'];
             foreach ($requiredFields as $field) {
                 if (empty($item[$field])) {
                     return ['valid' => false, 'message' => "Schedule item " . ($index + 1) . " is missing required field: $field"];
@@ -216,69 +228,72 @@ class ScheduleController extends Controller
     private function createScheduleItem(array $item, Semester $semester): array
     {
         try {
-            // Validate course exists
-            $course = Course::find($item['course_id']);
-            if (!$course) {
-                return ['success' => false, 'message' => 'Course not found'];
+            // Find course offering
+            $courseOffering = CourseOffering::find($item['course_offering_id'] ?? null);
+            if (!$courseOffering) {
+                return ['success' => false, 'message' => 'Course offering not found'];
             }
-            
+
             // Validate teacher exists
-            $teacher = Teacher::find($item['teacher_id']);
+            $teacher = Teacher::find($item['teacher_id'] ?? null);
             if (!$teacher) {
                 return ['success' => false, 'message' => 'Teacher not found'];
             }
-            
+
             // Validate room exists
-            $room = Room::where('room_code', $item['room'])->first();
+            $room = Room::find($item['room_id'] ?? null);
             if (!$room) {
                 return ['success' => false, 'message' => 'Room not found'];
             }
-            
-            // Validate time format
-            if (!$this->isValidTime($item['start_time']) || !$this->isValidTime($item['end_time'])) {
-                return ['success' => false, 'message' => 'Invalid time format'];
-            }
-            
-            // Validate day
-            if (!in_array($item['day'], ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'])) {
-                return ['success' => false, 'message' => 'Invalid day'];
-            }
-            
-            // Find or create timeslot
-            $timeslot = $this->findOrCreateTimeslot($item['day'], $item['start_time'], $item['end_time']);
 
-            // Prevent scheduling conflicts for room and teacher
-            if (Schedule::where('semester_id', $semester->id)
-                        ->where('timeslot_id', $timeslot->id)
-                        ->where('room_id', $room->id)
-                        ->exists()) {
+            // Find timeslot
+            $timeslot = Timeslot::find($item['timeslot_id'] ?? null);
+            if (!$timeslot) {
+                return ['success' => false, 'message' => 'Timeslot not found'];
+            }
+
+            // Validate semester consistency
+            if ($courseOffering->semester_id !== $semester->id) {
+                return ['success' => false, 'message' => 'Selected course offering does not belong to selected semester'];
+            }
+
+            // Ensure section exists for this offering
+            $section = Section::firstOrCreate(
+                [
+                    'course_offering_id' => $courseOffering->id,
+                    'section_name' => $item['section_name'] ?? 'A'
+                ],
+                [
+                    'capacity' => $item['capacity'] ?? $courseOffering->expected_students ?? 30
+                ]
+            );
+
+            // Attach teacher if not assigned for section yet
+            if (!$section->teachers()->where('teacher_id', $teacher->id)->exists()) {
+                $section->teachers()->attach($teacher->id);
+            }
+
+            // Prevent scheduling conflicts for room and teacher at this timeslot
+            if (Schedule::where('room_id', $room->id)->where('timeslot_id', $timeslot->id)->exists()) {
                 return ['success' => false, 'message' => 'Room is already booked for this timeslot'];
             }
 
-            if (Schedule::where('semester_id', $semester->id)
-                        ->where('timeslot_id', $timeslot->id)
-                        ->where('teacher_id', $teacher->id)
-                        ->exists()) {
+            $teacherConflict = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
+                $q->where('teacher_id', $teacher->id);
+            })->where('timeslot_id', $timeslot->id)->exists();
+
+            if ($teacherConflict) {
                 return ['success' => false, 'message' => 'Teacher is already assigned for this timeslot'];
             }
 
-            // Create schedule
-            Schedule::create([
-                'course_id' => $item['course_id'],
-                'teacher_id' => $item['teacher_id'],
-                'room_id' => $room->id,
-                'timeslot_id' => $timeslot->id,
-                'semester_id' => $semester->id,
-                'section' => $item['section'] ?? 'A',
-                'max_students' => $course->student_count ?? 30,
-                'status' => 'scheduled',
-                'day' => $item['day'],
-                'start_time' => $item['start_time'],
-                'end_time' => $item['end_time']
-            ]);
-            
+            // Create or update schedule entry
+            Schedule::updateOrCreate(
+                ['section_id' => $section->id, 'timeslot_id' => $timeslot->id],
+                ['room_id' => $room->id]
+            );
+
             return ['success' => true, 'message' => 'Schedule created successfully'];
-            
+
         } catch (\Exception $e) {
             return ['success' => false, 'message' => 'Error creating schedule: ' . $e->getMessage()];
         }
@@ -360,9 +375,15 @@ class ScheduleController extends Controller
     public function show(Schedule $schedule)
     {
         $this->authorize('view', $schedule);
-        
-        $schedule->load(['course', 'teacher', 'room', 'timeslot', 'semester']);
-        
+
+        $schedule->load([ 
+            'section.courseOffering.course',
+            'section.courseOffering.semester',
+            'section.teachers.user',
+            'room',
+            'timeslot'
+        ]);
+
         return Inertia::render('Schedules/Show', [
             'schedule' => $schedule
         ]);
@@ -370,24 +391,46 @@ class ScheduleController extends Controller
 
     public function edit(Schedule $schedule)
     {
-        $this->authorize('update', $schedule);
-        
-        $schedule->load(['course', 'teacher', 'room', 'timeslot', 'semester']);
-        
-        $courses = Course::with(['department', 'semester'])->get();
-        $teachers = Teacher::with('department')->get();
-        $rooms = Room::all();
-        $timeslots = Timeslot::orderBy('day_of_week')->orderBy('start_time')->get();
-        $semesters = Semester::all();
-        
-        return Inertia::render('Schedules/Edit', [
-            'schedule' => $schedule,
-            'courses' => $courses,
-            'teachers' => $teachers,
-            'rooms' => $rooms,
-            'timeslots' => $timeslots,
-            'semesters' => $semesters
-        ]);
+        try {
+            \Log::info('Edit method called for schedule ID: ' . $schedule->id);
+            $this->authorize('update', $schedule);
+
+            $schedule->load([
+                'section.courseOffering.course',
+                'section.courseOffering.semester',
+                'section.teachers.user',
+                'room',
+                'timeslot'
+            ]);
+
+            $sections = Section::all();
+
+            $rooms = Room::all();
+            $timeslots = Timeslot::orderBy('day_of_week')->orderBy('start_time')->get();
+
+            \Log::info('Data loaded successfully', [
+                'schedule_count' => 1,
+                'sections_count' => $sections->count(),
+                'rooms_count' => $rooms->count(),
+                'timeslots_count' => $timeslots->count(),
+                'sample_section' => $sections->first(),
+                'all_sections' => $sections->take(3)->toArray()
+            ]);
+
+            return Inertia::render('Schedules/Edit', [
+                'schedule' => $schedule,
+                'sections' => $sections,
+                'rooms' => $rooms,
+                'timeslots' => $timeslots
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Edit method error: ' . $e->getMessage(), [
+                'schedule_id' => $schedule->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return back()->with('error', 'Failed to load edit form: ' . $e->getMessage());
+        }
     }
 
     public function update(Request $request, Schedule $schedule)
@@ -395,21 +438,10 @@ class ScheduleController extends Controller
         $this->authorize('update', $schedule);
 
         $validated = $request->validate([
-            'course_id' => 'required|exists:courses,id',
-            'teacher_id' => 'required|exists:teachers,id',
+            'section_id' => 'required|exists:sections,id',
             'room_id' => 'required|exists:rooms,id',
             'timeslot_id' => 'required|exists:timeslots,id',
-            'semester_id' => 'required|exists:semesters,id',
-            'section' => 'required|string|max:10',
-            'max_students' => 'required|integer|min:1|max:200',
-            'status' => 'required|in:scheduled,cancelled,pending',
         ]);
-
-        // Get the timeslot to update day, start_time, and end_time
-        $timeslot = Timeslot::find($validated['timeslot_id']);
-        $validated['day'] = $timeslot->day_of_week;
-        $validated['start_time'] = $timeslot->start_time;
-        $validated['end_time'] = $timeslot->end_time;
 
         $schedule->update($validated);
 

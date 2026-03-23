@@ -32,13 +32,9 @@ class CourseController extends Controller
     public function create()
     {
         $departments = Department::all();
-        $semesters = Semester::all();
-        $teachers = Teacher::all();
         
         return Inertia::render('Courses/Create', [
-            'departments' => $departments,
-            'semesters' => $semesters,
-            'teachers' => $teachers
+            'departments' => $departments
         ]);
     }
 
@@ -51,8 +47,6 @@ class CourseController extends Controller
             'credits' => 'required|integer|min:1|max:6',
             'hours_per_week' => 'required|integer|min:1|max:6',
             'department_id' => 'required|exists:departments,id',
-            'semester_id' => 'required|exists:semesters,id',
-            'teacher_id' => 'nullable|exists:teachers,id',
             'level' => 'required|in:undergraduate,graduate,diploma'
         ]);
 
@@ -65,14 +59,10 @@ class CourseController extends Controller
     public function edit(Course $course)
     {
         $departments = Department::all();
-        $semesters = Semester::all();
-        $teachers = Teacher::all();
         
         return Inertia::render('Courses/Edit', [
             'course' => $course,
-            'departments' => $departments,
-            'semesters' => $semesters,
-            'teachers' => $teachers
+            'departments' => $departments
         ]);
     }
 
@@ -85,8 +75,6 @@ class CourseController extends Controller
             'credits' => 'required|integer|min:1|max:6',
             'hours_per_week' => 'required|integer|min:1|max:6',
             'department_id' => 'required|exists:departments,id',
-            'semester_id' => 'required|exists:semesters,id',
-            'teacher_id' => 'nullable|exists:teachers,id',
             'level' => 'required|in:undergraduate,graduate,diploma'
         ]);
 

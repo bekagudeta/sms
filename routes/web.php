@@ -14,8 +14,10 @@ use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\TimeslotController;
 use App\Http\Controllers\ScheduleController;
+use App\Http\Controllers\SchedulingController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\CourseOfferingController;
 
 use Inertia\Inertia;
 
@@ -115,6 +117,12 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['permission:manage courses'])
         ->resource('courses', CourseController::class);
 
+    Route::middleware(['permission:manage courses'])
+        ->resource('course-offerings', \App\Http\Controllers\CourseOfferingController::class);
+
+    Route::middleware(['permission:manage courses'])
+        ->resource('sections', \App\Http\Controllers\SectionController::class);
+
     Route::middleware(['permission:manage departments'])
         ->resource('departments', DepartmentController::class);
 
@@ -126,6 +134,16 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['permission:manage timeslots'])
         ->resource('timeslots', TimeslotController::class);
+
+    // Advanced Scheduling Engine routes
+    Route::middleware(['permission:generate schedule'])->prefix('scheduling')->group(function () {
+        Route::post('/generate', [SchedulingController::class, 'generate'])
+            ->name('scheduling.generate');
+        Route::get('/validate', [SchedulingController::class, 'validateSchedule'])
+            ->name('scheduling.validate');
+        Route::get('/statistics', [SchedulingController::class, 'statistics'])
+            ->name('scheduling.statistics');
+    });
 
     // Schedule generation routes (should require permission)
     Route::middleware(['permission:generate schedule'])->group(function () {
@@ -178,6 +196,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/import/courses',
             [ImportController::class,'importCourses'])
             ->name('import.courses');
+
+        Route::post('/import/course-offerings',
+            [ImportController::class,'importCourseOfferings'])
+            ->name('import.course-offerings');
+
+        Route::post('/import/sections',
+            [ImportController::class,'importSections'])
+            ->name('import.sections');
 
         Route::post('/import/departments',
             [ImportController::class,'importDepartments'])

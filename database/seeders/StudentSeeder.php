@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use App\Models\User;
 use App\Models\Student;
 use App\Models\Department;
 use Faker\Factory as Faker;
@@ -15,21 +16,25 @@ class StudentSeeder extends Seeder
 
         $departments = Department::pluck('id')->toArray();
 
-        for ($i = 1; $i <= 50; $i++) {
+        for ($i = 1; $i <= 5; $i++) {
             $email = $faker->unique()->safeEmail;
-            $student = Student::firstOrCreate([
-                'student_id' => 'STU' . str_pad($i, 3, '0', STR_PAD_LEFT),
-            ], [
-                'first_name' => $faker->firstName,
-                'last_name' => $faker->lastName,
-                'email' => $email,
-                'phone' => $faker->phoneNumber,
-                'department_id' => $faker->randomElement($departments),
-                'semester' => $faker->numberBetween(1, 8),
-                'enrollment_date' => $faker->date('Y-m-d'),
-            ]);
 
-            $user = \App\Models\User::where('email', $email)->first();
+            $student = Student::firstOrCreate(
+                [
+                    'student_id' => 'STU' . str_pad($i, 3, '0', STR_PAD_LEFT),
+                ], 
+                [
+                    'first_name' => $faker->firstName,
+                    'last_name' => $faker->lastName,
+                    'email' => $email,
+                    'phone' => $faker->phoneNumber,
+                    'department_id' => $faker->randomElement($departments),
+                    'semester' => $faker->numberBetween(1, 8),
+                    'enrollment_date' => $faker->date('Y-m-d'),
+                ]
+            );
+
+            $user = User::where('email', $email)->first();
             if ($user && !$student->user_id) {
                 $student->user_id = $user->id;
                 $student->save();

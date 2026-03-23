@@ -10,33 +10,61 @@ class Schedule extends Model
     use HasFactory;
 
     protected $fillable = [
-        'course_id',
-        'teacher_id',
+        'section_id',
         'room_id',
         'timeslot_id',
-        'semester_id',
-        'day',
-        'start_time',
-        'end_time',
-        'section',
-        'student_group',
-        'max_students',
-        'status'
+        'status',
+    ];
+
+    protected $appends = [
+        'course',
+        'teacher_name',
+        'semester'
     ];
 
     protected $casts = [
-        'max_students' => 'integer',
-        'status' => 'string'
+        'section_id' => 'integer',
+        'room_id' => 'integer',
+        'timeslot_id' => 'integer',
     ];
 
-    public function course()
+    public function section()
     {
-        return $this->belongsTo(Course::class);
+        return $this->belongsTo(Section::class);
     }
 
-    public function teacher()
+    public function getCourseAttribute()
     {
-        return $this->belongsTo(Teacher::class);
+        return $this->section?->courseOffering?->course;
+    }
+
+    public function getTeacherAttribute()
+    {
+        return $this->section?->teachers?->first();
+    }
+
+    public function getTeacherNameAttribute()
+    {
+        $teacher = $this->teacher;
+
+        if ($teacher) {
+            if (!empty($teacher->full_name)) {
+                return $teacher->full_name;
+            }
+            return $teacher->user?->name;
+        }
+
+        return null;
+    }
+
+    public function getSemesterAttribute()
+    {
+        return $this->section?->courseOffering?->semester;
+    }
+
+    public function getTeachersAttribute()
+    {
+        return $this->section?->teachers;
     }
 
     public function room()
@@ -47,10 +75,5 @@ class Schedule extends Model
     public function timeslot()
     {
         return $this->belongsTo(Timeslot::class);
-    }
-
-    public function semester()
-    {
-        return $this->belongsTo(Semester::class);
     }
 }

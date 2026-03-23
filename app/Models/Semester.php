@@ -23,13 +23,8 @@ class Semester extends Model
         'is_active' => 'boolean'
     ];
 
-    public function courses()
+    public function courseOfferings()
     {
-        return $this->hasMany(Course::class);
-    }
-
-    public function schedules()
-    {
-        return $this->hasMany(Schedule::class);
+        return $this->hasMany(CourseOffering::class);
     }
 }

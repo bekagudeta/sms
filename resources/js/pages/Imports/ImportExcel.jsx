@@ -101,6 +101,8 @@ export default function ImportExcel() {
         { value: 'students', label: 'Import Students' },
         { value: 'teachers', label: 'Import Teachers' },
         { value: 'courses', label: 'Import Courses' },
+        { value: 'course-offerings', label: 'Import Course Offerings' },
+        { value: 'sections', label: 'Import Sections' },
         { value: 'departments', label: 'Import Departments' },
         { value: 'timeslots', label: 'Import Timeslots' },
         { value: 'semesters', label: 'Import Semesters' },
@@ -176,15 +178,21 @@ export default function ImportExcel() {
                             </ul>
 
                             <div className="mt-4">
-                                <h4 className="font-semibold mb-2">Required Columns:</h4>
+                                <h4 className="font-semibold mb-2">Required Columns (per type):</h4>
                                 {importType === 'students' && (
-                                    <p className="text-sm">name, email, student_id, department_id, level, section</p>
+                                    <p className="text-sm">student_id, first_name, last_name, email, department_code, department_name, semester, level, section, phone (optional), enrollment_date (optional)</p>
                                 )}
                                 {importType === 'teachers' && (
                                     <p className="text-sm">teacher_id, first_name, last_name, email, department_code, department_name, qualification, max_hours_per_week</p>
                                 )}
                                 {importType === 'courses' && (
-                                    <p className="text-sm">course_code, course_name, credits, hours_per_week, department_code, semester_code, level</p>
+                                    <p className="text-sm">course_code, course_name, credits, hours_per_week, department_id, level</p>
+                                )}
+                                {importType === 'course-offerings' && (
+                                    <p className="text-sm">course_code, semester_id or semester_code, expected_students</p>
+                                )}
+                                {importType === 'sections' && (
+                                    <p className="text-sm">course_code, semester_id or semester_code, section_name, capacity, teacher_ids (comma-separated)</p>
                                 )}
                                 {importType === 'departments' && (
                                     <p className="text-sm">code, name</p>
@@ -196,7 +204,7 @@ export default function ImportExcel() {
                                     <p className="text-sm">room_code, building, floor, capacity, type</p>
                                 )}
                                 {importType === 'semesters' && (
-                                    <p className="text-sm">code, name</p>
+                                    <p className="text-sm">code, name, start_date, end_date, is_active</p>
                                 )}
                                 {!importType && (
                                     <p className="text-sm text-gray-500">Select an import type to see required columns</p>

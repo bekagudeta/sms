@@ -26,7 +26,7 @@ class DashboardController extends Controller
 
         if (!$student) {
             // If no student profile is found, show generic schedule entries
-            $schedules = Schedule::with(['course', 'teacher.user', 'room', 'timeslot'])
+            $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
                 ->latest()
                 ->take(20)
                 ->get();
@@ -37,7 +37,7 @@ class DashboardController extends Controller
 
         // fallback to broader schedule when no exact matches are found
         if ($schedules->isEmpty()) {
-            $schedules = Schedule::with(['course', 'teacher.user', 'room', 'timeslot'])
+            $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
                 ->latest()
                 ->take(20)
                 ->get();
@@ -54,8 +54,10 @@ class DashboardController extends Controller
         if (!$teacher) {
             abort(403, 'Teacher profile missing');
         }
-        $schedules = Schedule::with(['course', 'room', 'timeslot'])
-            ->where('teacher_id', $teacher->id)
+        $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
+            ->whereHas('section.teachers', function($query) use ($teacher) {
+                $query->where('teacher_id', $teacher->id);
+            })
             ->get();
         return view('teacher.schedule', compact('schedules'));
     }
@@ -153,7 +155,7 @@ class DashboardController extends Controller
             'pending_credentials' => $pendingCredentials,
         ];
 
-        $recentSchedules = Schedule::with(['course', 'teacher', 'room', 'timeslot'])
+        $recentSchedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
             ->latest()
             ->take(5)
             ->get();
@@ -171,7 +173,7 @@ class DashboardController extends Controller
         $role = $user->roles->first()?->name;
 
         $stats = ['total_schedules' => Schedule::count()];
-        $recentSchedules = Schedule::with(['course', 'teacher', 'room', 'timeslot'])
+        $recentSchedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
             ->latest()
             ->take(5)
             ->get();
@@ -191,8 +193,10 @@ class DashboardController extends Controller
         $teacher = $user->teacher;
         $recentSchedules = collect();
         if ($teacher) {
-            $recentSchedules = Schedule::where('teacher_id', $teacher->id)
-                ->with(['course', 'teacher', 'room', 'timeslot'])
+            $recentSchedules = Schedule::whereHas('section.teachers', function($query) use ($teacher) {
+                    $query->where('teacher_id', $teacher->id);
+                })
+                ->with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
                 ->latest()
                 ->take(5)
                 ->get();
@@ -224,7 +228,7 @@ class DashboardController extends Controller
                 ->get();
 
             if ($recentSchedules->isEmpty()) {
-                $recentSchedules = Schedule::with(['course', 'teacher', 'room', 'timeslot'])
+                $recentSchedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
                     ->latest()
                     ->take(5)
                     ->get();
@@ -268,10 +272,10 @@ class DashboardController extends Controller
 
     private function buildStudentScheduleQuery(Student $student)
     {
-        $query = Schedule::with(['course', 'teacher.user', 'room', 'timeslot']);
+        $query = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot']);
 
         if ($student->department_id) {
-            $query->whereHas('course', function ($q) use ($student) {
+            $query->whereHas('section.courseOffering.course', function ($q) use ($student) {
                 $q->where('department_id', $student->department_id);
 
                 if (!empty($student->level)) {
@@ -279,7 +283,7 @@ class DashboardController extends Controller
                 }
             });
         } elseif (!empty($student->level)) {
-            $query->whereHas('course', function ($q) use ($student) {
+            $query->whereHas('section.courseOffering.course', function ($q) use ($student) {
                 $q->where('level', $student->level);
             });
         }
@@ -287,7 +291,9 @@ class DashboardController extends Controller
         if (!empty($student->semester)) {
             $semesterModel = Semester::where('name', $student->semester . ' Semester')->first();
             if ($semesterModel) {
-                $query->where('semester_id', $semesterModel->id);
+                $query->whereHas('section.courseOffering', function ($q) use ($semesterModel) {
+                    $q->where('semester_id', $semesterModel->id);
+                });
             } elseif (is_numeric($student->semester)) {
                 $query->where('semester_id', (int) $student->semester);
             }

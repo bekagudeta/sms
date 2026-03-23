@@ -10,22 +10,22 @@ class Student extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
         'student_id',
+        'user_id',
+        'department_id',
         'first_name',
         'last_name',
         'email',
         'phone',
-        'department_id',
         'semester',
         'level',
         'section',
-        'enrollment_date'
+        'enrollment_date',
     ];
 
     protected $casts = [
-        'enrollment_date' => 'date',
-        'semester' => 'integer'
+        'semester' => 'integer',
+        'enrollment_date' => 'datetime:Y-m-d',
     ];
 
     public function department()
@@ -38,8 +38,18 @@ class Student extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function getFullNameAttribute()
+    public function enrollments()
     {
-        return "{$this->first_name} {$this->last_name}";
+        return $this->hasMany(Enrollment::class);
+    }
+
+    public function sections()
+    {
+        return $this->belongsToMany(Section::class, 'enrollments');
+    }
+
+    public function getSchedulesAttribute()
+    {
+        return $this->sections()->with('schedule')->get()->pluck('schedule');
     }
 }
