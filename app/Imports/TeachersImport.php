@@ -21,10 +21,37 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
     public function collection(Collection $rows)
     {
         foreach ($rows as $row) {
-            $department = Department::firstOrCreate(
-                ['code' => $row['department_code'] ?? 'UNK'],
-                ['name' => $row['department_name'] ?? 'Unknown Department']
-            );
+            $departmentInput = trim((string) ($row['department_id'] ?? ''));
+            $departmentName = trim((string) ($row['department_name'] ?? ''));
+
+            if ($departmentInput === '') {
+                throw new \Exception('Import failed: department_id is required for teacher row.');
+            }
+
+            // 1) try numeric db id
+            if (ctype_digit($departmentInput)) {
+                $department = Department::find((int) $departmentInput);
+            } else {
+                $department = null;
+            }
+
+            // 2) if no numeric department, treat as code string
+            if (! $department) {
+                $department = Department::where('code', $departmentInput)->first();
+            }
+
+            // 3) If still not found and department_name is provided, create it
+            if (! $department && $departmentName !== '') {
+                $department = Department::create([
+                    'code' => $departmentInput,
+                    'name' => $departmentName,
+                ]);
+            }
+
+            // 4) final fallback is not allowed (system depends on department relation)
+            if (! $department) {
+                throw new \Exception("Import failed: department '$departmentInput' not found, and department_name is missing.");
+            }
 
             // =========================
             // 1. User handling
@@ -98,8 +125,8 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             'first_name' => 'required|string',
             'last_name' => 'required|string',
             'email' => 'required|email',
-            'department_code' => 'required|string',
-            'department_name' => 'required|string',
+            'department_id' => 'required|string',
+            'department_name' => 'nullable|string',
             'phone' => 'nullable|string',
             'qualification' => 'nullable|string',
             'max_hours_per_week' => 'nullable|integer|min:1|max:40'

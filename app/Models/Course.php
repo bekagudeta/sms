@@ -17,6 +17,7 @@ class Course extends Model
         'hours_per_week',
         'department_id',
         'level',
+        'required_room_type',
     ];
 
     public function department()

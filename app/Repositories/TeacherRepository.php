@@ -46,7 +46,8 @@ class TeacherRepository
 
     {
 
-        return Teacher::with('department', 'courses')->find($id);
+        return Teacher::with(['department', 'sections.courseOffering.course'])
+            ->find($id);
 
     }
 
@@ -90,7 +91,14 @@ class TeacherRepository
 
         $teacher = $this->findById($id);
 
-        return $teacher ? $teacher->delete() : false;
+        if (! $teacher) {
+            return false;
+        }
+
+        // detach related sections to avoid foreign key issues on pivot
+        $teacher->sections()->detach();
+
+        return $teacher->delete();
 
     }
 

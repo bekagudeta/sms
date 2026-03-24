@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
@@ -37,5 +38,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Register UserObserver for integrity enforcement
         User::observe(UserObserver::class);
+        try {
+            DB::connection()->getPdo();
+        } catch (\Exception $e) {
+            abort(500, 'Database is not available');
+        }
     }
 }
