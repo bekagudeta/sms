@@ -39,7 +39,7 @@ class ImportController extends Controller
             );
         }
 
-        return response()->json(['error' => $result['message']], 500);
+        return response()->json(['message' => $result['message']], 500);
     }
 
     public function importTeachers(Request $request)
@@ -57,7 +57,7 @@ class ImportController extends Controller
             );
         }
 
-        return response()->json(['error' => $result['message']], 500);
+        return response()->json(['message' => $result['message']], 500);
     }
 
     public function importCourses(Request $request)
@@ -68,11 +68,7 @@ class ImportController extends Controller
 
         $result = $this->importService->importCourses($request->file('file'));
 
-        if ($result['success']) {
-            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
-        }
-
-        return back()->with('error', $result['message']);
+        return $this->respondImportResult($result);
     }
 
     public function importCourseOfferings(Request $request)
@@ -83,11 +79,7 @@ class ImportController extends Controller
 
         $result = $this->importService->importCourseOfferings($request->file('file'));
 
-        if ($result['success']) {
-            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
-        }
-
-        return back()->with('error', $result['message']);
+        return $this->respondImportResult($result);
     }
 
     public function importSections(Request $request)
@@ -98,11 +90,7 @@ class ImportController extends Controller
 
         $result = $this->importService->importSections($request->file('file'));
 
-        if ($result['success']) {
-            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
-        }
-
-        return back()->with('error', $result['message']);
+        return $this->respondImportResult($result);
     }
 
     public function importDepartments(Request $request)
@@ -113,11 +101,7 @@ class ImportController extends Controller
 
         $result = $this->importService->importDepartments($request->file('file'));
 
-        if ($result['success']) {
-            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
-        }
-
-        return back()->with('error', $result['message']);
+        return $this->respondImportResult($result);
     }
 
     public function importTimeslots(Request $request)
@@ -128,11 +112,7 @@ class ImportController extends Controller
 
         $result = $this->importService->importTimeslots($request->file('file'));
 
-        if ($result['success']) {
-            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
-        }
-
-        return back()->with('error', $result['message']);
+        return $this->respondImportResult($result);
     }
 
     public function importSemesters(Request $request)
@@ -143,11 +123,7 @@ class ImportController extends Controller
 
         $result = $this->importService->importSemesters($request->file('file'));
 
-        if ($result['success']) {
-            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
-        }
-
-        return back()->with('error', $result['message']);
+        return $this->respondImportResult($result);
     }
 
     public function importRooms(Request $request)
@@ -158,8 +134,21 @@ class ImportController extends Controller
 
         $result = $this->importService->importRooms($request->file('file'));
 
+        return $this->respondImportResult($result);
+    }
+
+    private function respondImportResult(array $result)
+    {
+        if (request()->wantsJson() || request()->ajax()) {
+            return response()->json([
+                'success' => $result['success'],
+                'message' => $result['message'],
+                'count' => $result['count'] ?? 0,
+            ], $result['success'] ? 200 : 500);
+        }
+
         if ($result['success']) {
-            return back()->with('success', $result['message'] . ' (' . $result['count'] . ' records)');
+            return back()->with('success', $result['message'] . ' (' . ($result['count'] ?? 0) . ' records)');
         }
 
         return back()->with('error', $result['message']);

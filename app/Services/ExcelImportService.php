@@ -34,9 +34,17 @@ class ExcelImportService
             ];
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             Log::error('Student import validation failed: ' . $e->getMessage());
+            $failures = $e->failures();
+            $messages = array_map(function ($failure) {
+                $row = $failure->row();
+                $attribute = $failure->attribute();
+                $errors = implode(' / ', $failure->errors());
+                return "Row {$row} [{$attribute}]: {$errors}";
+            }, $failures);
+
             return [
                 'success' => false,
-                'message' => 'Validation failed: ' . implode(', ', $e->failures())
+                'message' => 'Validation failed: ' . implode(' | ', $messages)
             ];
         } catch (\Exception $e) {
             Log::error('Student import failed: ' . $e->getMessage());

@@ -18,28 +18,49 @@ export default function ImportExcel() {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
             },
             body: formData,
             credentials: 'same-origin',
         });
 
         if (!response.ok) {
-            const text = await response.text();
-
-            // If JSON is returned, try to extract a message
-            try {
-                const json = JSON.parse(text);
-                if (json?.message) {
-                    throw new Error(json.message);
-                }
-            } catch (e) {
-                // ignore parse errors
+            if (response.status === 419) {
+                throw new Error('Session expired. Please reload the page and log in again.');
+            }
+            if (response.status === 401) {
+                throw new Error('Unauthorized. Please log in again.');
             }
 
-            // Avoid rendering giant HTML error pages; log it instead
+            const text = await response.text();
+
+            // If JSON is returned, extract a message key and use that.
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (parseErr) {
+                json = null;
+            }
+
+            if (json?.message) {
+                throw new Error(json.message);
+            }
+            if (json?.error) {
+                throw new Error(json.error);
+            }
+
+            // Avoid rendering giant HTML error pages; try to extract a meaningful message.
             if (text.trim().startsWith('<')) {
                 console.error('Import error response:', text);
-                throw new Error('Import failed (check console for details)');
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, 'text/html');
+                const heading = doc.querySelector('h1')?.textContent?.trim();
+                const paragraph = doc.querySelector('p')?.textContent?.trim();
+                const useful = heading || paragraph;
+
+                throw new Error(useful || 'Import failed (check console for details)');
             }
 
             throw new Error(text || 'Upload failed');
@@ -71,13 +92,13 @@ export default function ImportExcel() {
         e.preventDefault();
 
         // For students and teachers, use the clean import routes so we can export credentials immediately
+        const routeUrl = route(`import.${importType}`);
+        const formData = new FormData();
+        formData.append('file', data.file);
+
         if (importType === 'students' || importType === 'teachers') {
             try {
                 setIsDownloading(true);
-                const routeUrl = route(`import.${importType}`);
-                const formData = new FormData();
-                formData.append('file', data.file);
-
                 await downloadFile(routeUrl, formData, `${importType}_credentials.xlsx`);
 
                 // Reset the form after successful download
@@ -86,7 +107,14 @@ export default function ImportExcel() {
                 setErrorMessage(null);
             } catch (err) {
                 console.error(err);
-                setErrorMessage(err.message || 'Import failed.');
+                let msg = err?.message || 'Import failed.';
+                try {
+                    const parsed = JSON.parse(msg);
+                    msg = parsed?.message || parsed?.error || msg;
+                } catch (parseErr) {
+                    // if not JSON, keep original string
+                }
+                setErrorMessage(msg);
             } finally {
                 setIsDownloading(false);
             }
@@ -94,7 +122,52 @@ export default function ImportExcel() {
             return;
         }
 
-        post(route(`import.${importType}`));
+        try {
+            setIsDownloading(true);
+            const response = await fetch(routeUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                },
+                body: formData,
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                let msg = 'Import failed.';
+                try {
+                    const json = JSON.parse(text);
+                    msg = json?.message || json?.error || msg;
+                } catch (e) {
+                    if (text.trim().startsWith('<')) {
+                        console.error('Import error response:', text);
+                        msg = 'Import failed (check console for details)';
+                    } else {
+                        msg = text || msg;
+                    }
+                }
+
+                throw new Error(msg);
+            }
+
+            // On success, refresh so flash message from backend is visible
+            window.location.reload();
+        } catch (err) {
+            console.error(err);
+            let msg = err?.message || 'Import failed.';
+            try {
+                const parsed = JSON.parse(msg);
+                msg = parsed?.message || parsed?.error || msg;
+            } catch (_parseErr) {
+                // If error message is not JSON, keep it directly.
+            }
+            setErrorMessage(msg);
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     const importOptions = [
@@ -180,31 +253,31 @@ export default function ImportExcel() {
                             <div className="mt-4">
                                 <h4 className="font-semibold mb-2">Required Columns (per type):</h4>
                                 {importType === 'students' && (
-                                    <p className="text-sm">student_id, first_name, last_name, email, department_code, department_name, semester, level, section, phone (optional), enrollment_date (optional)</p>
+                                    <p className="text-sm">student_id, first_name, last_name, email, department_id OR (department_code, department_name), level, section, phone (optional), enrollment_date (optional)</p>
                                 )}
                                 {importType === 'teachers' && (
-                                    <p className="text-sm">teacher_id, first_name, last_name, email, department_code, department_name, qualification, max_hours_per_week</p>
+                                    <p className="text-sm">teacher_id, first_name, last_name, email, department_id, qualification, max_hours_per_week, phone (optional)</p>
                                 )}
                                 {importType === 'courses' && (
-                                    <p className="text-sm">course_code, course_name, credits, hours_per_week, department_id, level</p>
+                                    <p className="text-sm">course_code, course_name, description (optional), credits, hours_per_week, department_id, level</p>
                                 )}
                                 {importType === 'course-offerings' && (
-                                    <p className="text-sm">course_code, semester_id or semester_code, expected_students</p>
+                                    <p className="text-sm">course_id, semester_id, expected_students</p>
                                 )}
                                 {importType === 'sections' && (
-                                    <p className="text-sm">course_code, semester_id or semester_code, section_name, capacity, teacher_ids (comma-separated)</p>
+                                    <p className="text-sm">course_offering_id, section_name, capacity, teacher_ids (comma-separated, optional)</p>
                                 )}
                                 {importType === 'departments' && (
-                                    <p className="text-sm">code, name</p>
+                                    <p className="text-sm">code, name, description (optional)</p>
                                 )}
                                 {importType === 'timeslots' && (
-                                    <p className="text-sm">day_of_week, start_time, end_time, slot_code</p>
+                                    <p className="text-sm">day_of_week, start_time, end_time, slot_code (optional)</p>
                                 )}
                                 {importType === 'rooms' && (
-                                    <p className="text-sm">room_code, building, floor, capacity, type</p>
+                                    <p className="text-sm">room_code, building, floor, capacity, type, has_projector (optional), has_computers (optional), computer_count (optional)</p>
                                 )}
                                 {importType === 'semesters' && (
-                                    <p className="text-sm">code, name, start_date, end_date, is_active</p>
+                                    <p className="text-sm">name, code, start_date, end_date, is_active (optional, defaults to false)</p>
                                 )}
                                 {!importType && (
                                     <p className="text-sm text-gray-500">Select an import type to see required columns</p>

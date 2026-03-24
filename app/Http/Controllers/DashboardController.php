@@ -33,10 +33,24 @@ class DashboardController extends Controller
             return view('student.schedule', compact('schedules'));
         }
 
-        $schedules = $this->buildStudentScheduleQuery($student)->get();
+        try {
+            $schedules = $this->buildStudentScheduleQuery($student)->get();
 
-        // fallback to broader schedule when no exact matches are found
-        if ($schedules->isEmpty()) {
+            // fallback to broader schedule when no exact matches are found
+            if ($schedules->isEmpty()) {
+                $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
+                    ->latest()
+                    ->take(20)
+                    ->get();
+            }
+        } catch (\Exception $e) {
+            // Log the error for debugging but don't expose it to the user
+            \Log::error('Error in studentSchedule method: ' . $e->getMessage(), [
+                'student_id' => $student->id,
+                'user_id' => $user->id
+            ]);
+            
+            // Fallback to basic schedule query
             $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
                 ->latest()
                 ->take(20)
@@ -222,12 +236,26 @@ class DashboardController extends Controller
 
         $recentSchedules = collect();
         if ($student) {
-            $recentSchedules = $this->buildStudentScheduleQuery($student)
-                ->latest()
-                ->take(5)
-                ->get();
+            try {
+                $recentSchedules = $this->buildStudentScheduleQuery($student)
+                    ->latest()
+                    ->take(5)
+                    ->get();
 
-            if ($recentSchedules->isEmpty()) {
+                if ($recentSchedules->isEmpty()) {
+                    $recentSchedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
+                        ->latest()
+                        ->take(5)
+                        ->get();
+                }
+            } catch (\Exception $e) {
+                // Log the error for debugging but don't expose it to the user
+                \Log::error('Error building student schedule query: ' . $e->getMessage(), [
+                    'student_id' => $student->id,
+                    'user_id' => $user->id
+                ]);
+                
+                // Fallback to basic schedule query
                 $recentSchedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
                     ->latest()
                     ->take(5)
@@ -295,12 +323,15 @@ class DashboardController extends Controller
                     $q->where('semester_id', $semesterModel->id);
                 });
             } elseif (is_numeric($student->semester)) {
-                $query->where('semester_id', (int) $student->semester);
+                // Skip this filter as semester_id is now accessed through section.courseOffering
+                // The semester filtering above should handle this case
             }
         }
 
         if (!empty($student->section)) {
-            $query->where('section', $student->section);
+            $query->whereHas('section', function ($q) use ($student) {
+                $q->where('section_name', $student->section);
+            });
         }
 
         return $query;

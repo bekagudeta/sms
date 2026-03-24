@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Collection;
+use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
@@ -45,17 +46,27 @@ class StudentsImport implements
                 // =========================
                 // 1. Department handling
                 // =========================
+                
+                // Try department_id first, then fallback to department_code
+                $departmentId = $row['department_id'] ?? null;
                 $deptCode = $row['department_code'] ?? 'UNK';
 
-                if (!isset($departmentCache[$deptCode])) {
-
-                    $departmentCache[$deptCode] = Department::firstOrCreate(
-                        ['code' => $deptCode],
-                        ['name' => $row['department_name'] ?? 'Unknown']
-                    );
+                if ($departmentId) {
+                    // Use existing department by ID
+                    $department = Department::find($departmentId);
+                    if (!$department) {
+                        throw new \Exception("Department with ID {$departmentId} not found for student {$row['student_id']}");
+                    }
+                } else {
+                    // Fallback to department_code logic
+                    if (!isset($departmentCache[$deptCode])) {
+                        $departmentCache[$deptCode] = Department::firstOrCreate(
+                            ['code' => $deptCode],
+                            ['name' => $row['department_name'] ?? 'Unknown']
+                        );
+                    }
+                    $department = $departmentCache[$deptCode];
                 }
-
-                $department = $departmentCache[$deptCode];
 
                 // =========================
                 // 2. User handling (SAFE)
@@ -108,19 +119,34 @@ class StudentsImport implements
                 // =========================
                 // 3. Student profile
                 // =========================
+                $rawEnrollmentDate = $row['enrollment_date'] ?? null;
+                if (is_string($rawEnrollmentDate)) {
+                    $rawEnrollmentDate = trim($rawEnrollmentDate);
+                }
+
+                if (empty($rawEnrollmentDate)) {
+                    $enrollmentDate = now();
+                } else {
+                    try {
+                        $enrollmentDate = Carbon::parse($rawEnrollmentDate);
+                    } catch (\Exception $e) {
+                        $enrollmentDate = now();
+                    }
+                }
+
                 Student::updateOrCreate(
                     ['student_id' => $row['student_id']],
                     [
                         'user_id' => $user->id,
-                        'first_name' => $row['first_name'],
-                        'last_name' => $row['last_name'],
-                        'email' => $row['email'],
+                        'first_name' => trim($row['first_name'] ?? ''),
+                        'last_name' => trim($row['last_name'] ?? ''),
+                        'email' => trim($row['email'] ?? ''),
                         'phone' => $row['phone'] ?? null,
                         'department_id' => $department->id,
-                        'semester' => $row['semester'] ?? 1,
-                        'level' => $row['level'] ?? null,
-                        'section' => $row['section'] ?? null,
-                        'enrollment_date' => $row['enrollment_date'] ?? now()
+                        'semester' => isset($row['semester']) ? (int) $row['semester'] : 1,
+                        'level' => (string) ($row['level'] ?? ''),
+                        'section' => (string) ($row['section'] ?? ''),
+                        'enrollment_date' => $enrollmentDate
                     ]
                 );
 
@@ -146,8 +172,11 @@ class StudentsImport implements
             '*.first_name' => 'required|string',
             '*.last_name' => 'required|string',
             '*.email' => 'required|email',
-            '*.department_code' => 'required|string',
-            '*.department_name' => 'required|string',
+            '*.department_id' => 'nullable|integer|exists:departments,id',
+            '*.department_code' => 'required_without:department_id|string',
+            '*.department_name' => 'required_without:department_id|string',
+            '*.level' => 'required',
+            '*.section' => 'required|string',
             '*.semester' => 'nullable|integer',
             '*.enrollment_date' => 'nullable|date',
         ];

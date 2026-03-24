@@ -70,12 +70,12 @@ class ScheduleController extends Controller
 
     public function showGenerateForm()
     {
-        $courseOfferings = \App\Models\CourseOffering::with(['course', 'semester', 'sections.teachers'])->get();
+        $courseOfferings = CourseOffering::with(['course', 'semester', 'sections.teachers'])->get();
         $teachers = Teacher::with('department')->get();
         $rooms = Room::all();
         $semesters = Semester::all();
         $timeslots = Timeslot::orderBy('day_of_week')->orderBy('start_time')->get();
-        $sections = \App\Models\Section::with(['courseOffering.course', 'courseOffering.semester'])->get();
+        $sections = Section::with(['courseOffering.course', 'courseOffering.semester'])->get();
         
         // Debug: Check first section data
         $firstSection = $sections->first();
