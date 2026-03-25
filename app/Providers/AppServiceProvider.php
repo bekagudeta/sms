@@ -37,11 +37,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->alias(RoleOrPermissionMiddleware::class, 'role_or_permission');
 
         // Register UserObserver for integrity enforcement
-        User::observe(UserObserver::class);
-        try {
-            DB::connection()->getPdo();
-        } catch (\Exception $e) {
-            abort(500, 'Database is not available');
-        }
+        // User::observe(UserObserver::class);
+        // try {
+        //     DB::connection()->getPdo();
+        // } catch (\Exception $e) {
+        //     abort(500, 'Database is not available');
+        // }
     }
 }

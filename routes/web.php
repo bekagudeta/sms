@@ -17,8 +17,11 @@ use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SchedulingController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\SectionController;
 use App\Http\Controllers\CourseOfferingController;
-
+use App\Http\Controllers\TeacherImportController;
+use App\Http\Controllers\StudentImportController;
+use App\Http\Controllers\Auth\ChangePasswordController;
 
 use Inertia\Inertia;
 
@@ -102,10 +105,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('profile.destroy');
 
     // Change password routes
-    Route::get('/change-password', [\App\Http\Controllers\Auth\ChangePasswordController::class, 'showForm'])
+    Route::get('/change-password', [ChangePasswordController::class, 'showForm'])
         ->middleware('auth')
         ->name('password.change');
-    Route::post('/change-password', [\App\Http\Controllers\Auth\ChangePasswordController::class, 'update'])
+    Route::post('/change-password', [ChangePasswordController::class, 'update'])
         ->middleware('auth')
         ->name('password.change.update');
 
@@ -119,10 +122,10 @@ Route::middleware(['auth'])->group(function () {
         ->resource('courses', CourseController::class);
 
     Route::middleware(['permission:manage courses'])
-        ->resource('course-offerings', \App\Http\Controllers\CourseOfferingController::class);
+        ->resource('course-offerings', CourseOfferingController::class);
 
     Route::middleware(['permission:manage courses'])
-        ->resource('sections', \App\Http\Controllers\SectionController::class);
+        ->resource('sections', SectionController::class);
 
     Route::middleware(['permission:manage departments'])
         ->resource('departments', DepartmentController::class);
@@ -246,7 +249,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/admin/users', [DashboardController::class, 'store'])->name('admin.users.store');
         
         // Clean import routes (exports credentials immediately)
-        Route::post('/import-students', [\App\Http\Controllers\StudentImportController::class, 'import']);
-        Route::post('/import-teachers', [\App\Http\Controllers\TeacherImportController::class, 'import']);
+        Route::post('/import-students', [StudentImportController::class, 'import']);
+        Route::post('/import-teachers', [TeacherImportController::class, 'import']);
     });
 });
