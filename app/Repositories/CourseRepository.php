@@ -38,7 +38,7 @@ class CourseRepository
 
     public function update($id, array $data): bool
     {
-        $course = $this->findById($id);
+        $course = Course::find($id);
         return $course ? $course->update($data) : false;
     }
 

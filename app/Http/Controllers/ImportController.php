@@ -126,6 +126,28 @@ class ImportController extends Controller
         return $this->respondImportResult($result);
     }
 
+    public function importEnrollments(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv'
+        ]);
+
+        $result = $this->importService->importEnrollments($request->file('file'));
+
+        return $this->respondImportResult($result);
+    }
+
+    public function importSectionTeachers(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv'
+        ]);
+
+        $result = $this->importService->importSectionTeachers($request->file('file'));
+
+        return $this->respondImportResult($result);
+    }
+
     public function importRooms(Request $request)
     {
         $request->validate([
@@ -140,15 +162,27 @@ class ImportController extends Controller
     private function respondImportResult(array $result)
     {
         if (request()->wantsJson() || request()->ajax()) {
-            return response()->json([
+            $response = [
                 'success' => $result['success'],
                 'message' => $result['message'],
                 'count' => $result['count'] ?? 0,
-            ], $result['success'] ? 200 : 500);
+            ];
+            
+            if (isset($result['errors']) && !empty($result['errors'])) {
+                $response['errors'] = $result['errors'];
+            }
+            
+            return response()->json($response, $result['success'] ? 200 : 500);
         }
 
         if ($result['success']) {
-            return back()->with('success', $result['message'] . ' (' . ($result['count'] ?? 0) . ' records)');
+            $message = $result['message'] . ' (' . ($result['count'] ?? 0) . ' records)';
+            
+            if (isset($result['errors']) && !empty($result['errors'])) {
+                $message .= ' with ' . count($result['errors']) . ' errors. Check logs for details.';
+            }
+            
+            return back()->with('success', $message);
         }
 
         return back()->with('error', $result['message']);

@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Course;
 use App\Models\Department;
-use App\Models\Semester;
-use App\Models\Teacher;
 use App\Repositories\CourseRepository;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -22,7 +20,11 @@ class CourseController extends Controller
 
     public function index(Request $request)
     {
-        $courses = $this->repository->paginate(10, $request->input('search'));
+        $courses = $this->repository->paginate(
+            config('app.pagination', 10),
+            $request->input('search')
+        );
+
         return Inertia::render('Courses/Index', [
             'courses' => $courses,
             'filters' => $request->only('search'),
@@ -31,8 +33,8 @@ class CourseController extends Controller
 
     public function create()
     {
-        $departments = Department::all();
-        
+        $departments = Department::select('id', 'name')->get();
+
         return Inertia::render('Courses/Create', [
             'departments' => $departments
         ]);
@@ -41,14 +43,21 @@ class CourseController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'course_code' => 'required|string|unique:courses',
-            'course_name' => 'required|string',
-            'description' => 'nullable|string',
-            'credits' => 'required|integer|min:1|max:6',
-            'hours_per_week' => 'required|integer|min:1|max:6',
-            'department_id' => 'required|exists:departments,id',
-            'level' => 'required|in:undergraduate,graduate,diploma'
+            'course_code'     => 'required|string|max:50|unique:courses,course_code',
+            'course_name'     => 'required|string|max:255',
+            'description'     => 'nullable|string',
+            'credits'         => 'required|integer|min:1|max:15',
+            'hours_per_week'  => 'required|integer|min:1|max:39',
+            'department_id'   => 'required|exists:departments,id',
+            'level'           => 'required|in:undergraduate,graduate,diploma',
         ]);
+
+        // Optional logical constraint (stronger data integrity)
+        if ($validated['hours_per_week'] < $validated['credits']) {
+            return back()->withErrors([
+                'hours_per_week' => 'Hours per week should be greater than or equal to credits.'
+            ])->withInput();
+        }
 
         $this->repository->create($validated);
 
@@ -58,8 +67,10 @@ class CourseController extends Controller
 
     public function edit(Course $course)
     {
-        $departments = Department::all();
-        
+        $course->load('department'); // prevent future N+1
+
+        $departments = Department::select('id', 'name')->get();
+
         return Inertia::render('Courses/Edit', [
             'course' => $course,
             'departments' => $departments
@@ -69,14 +80,21 @@ class CourseController extends Controller
     public function update(Request $request, Course $course)
     {
         $validated = $request->validate([
-            'course_code' => 'required|string|unique:courses,course_code,' . $course->id,
-            'course_name' => 'required|string',
-            'description' => 'nullable|string',
-            'credits' => 'required|integer|min:1|max:6',
-            'hours_per_week' => 'required|integer|min:1|max:6',
-            'department_id' => 'required|exists:departments,id',
-            'level' => 'required|in:undergraduate,graduate,diploma'
+            'course_code'     => 'required|string|max:50|unique:courses,course_code,' . $course->id,
+            'course_name'     => 'required|string|max:255',
+            'description'     => 'nullable|string',
+            'credits'         => 'required|integer|min:1|max:15',
+            'hours_per_week'  => 'required|integer|min:1|max:39',
+            'department_id'   => 'required|exists:departments,id',
+            'level'           => 'required|in:undergraduate,graduate,diploma',
         ]);
+
+        // Optional logical constraint
+        if ($validated['hours_per_week'] < $validated['credits']) {
+            return back()->withErrors([
+                'hours_per_week' => 'Hours per week should be greater than or equal to credits.'
+            ])->withInput();
+        }
 
         $this->repository->update($course->id, $validated);
 

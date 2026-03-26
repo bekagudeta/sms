@@ -1,6 +1,6 @@
 import React from 'react';
 import { Head, useForm } from '@inertiajs/react';
-import AuthLayout from '@/Layouts/AuthLayout';
+import DashboardLayout from '@/Layouts/DashboardLayout';
 import Form from '@/Components/Form';
 
 export default function Edit({ teacher, departments }) {
@@ -39,13 +39,16 @@ export default function Edit({ teacher, departments }) {
     ];
 
     return (
-        <AuthLayout>
+        <DashboardLayout>
             <Head title="Edit Teacher" />
             
-            <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div className="p-6 bg-white border-b border-gray-200">
-                    <h2 className="text-2xl font-bold mb-6">Edit Teacher</h2>
-                    
+            <div className="bg-white overflow-hidden shadow-xl sm:rounded-xl border border-gray-200">
+                <div className="p-6 bg-gradient-to-r from-blue-600 to-purple-700 text-white">
+                    <h2 className="text-2xl font-bold">Edit Teacher</h2>
+                    <p className="text-blue-100">Update teacher information</p>
+                </div>
+                
+                <div className="p-6">
                     <Form
                         fields={fields}
                         data={data}
@@ -57,6 +60,6 @@ export default function Edit({ teacher, departments }) {
                     />
                 </div>
             </div>
-        </AuthLayout>
+        </DashboardLayout>
     );
 }

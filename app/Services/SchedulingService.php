@@ -148,9 +148,13 @@ class SchedulingService
 
     protected function checkTeacherWeeklyLoad($teacher, $semesterId)
     {
-
-        $hours = Schedule::where('teacher_id', $teacher->id)
-            ->where('semester_id', $semesterId)
+        // Count schedules where teacher is assigned through section_teachers relationship
+        $hours = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
+                $q->where('teacher_id', $teacher->id);
+            })
+            ->whereHas('section.courseOffering', function($q) use ($semesterId) {
+                $q->where('semester_id', $semesterId);
+            })
             ->count();
 
         return $hours < $teacher->max_hours_per_week;
@@ -158,15 +162,19 @@ class SchedulingService
 
     protected function checkTeacherDailyLoad($teacher, $timeslot, $semesterId)
     {
-
-        $hours = Schedule::where('teacher_id', $teacher->id)
-            ->where('semester_id', $semesterId)
+        // Count schedules where teacher is assigned through section_teachers on the same day
+        $hours = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
+                $q->where('teacher_id', $teacher->id);
+            })
+            ->whereHas('section.courseOffering', function($q) use ($semesterId) {
+                $q->where('semester_id', $semesterId);
+            })
             ->whereHas('timeslot', function ($q) use ($timeslot) {
-                $q->where('day', $timeslot->day);
+                $q->where('day_of_week', $timeslot->day_of_week ?? $timeslot->day);
             })
             ->count();
 
-        return $hours < $teacher->max_hours_per_day;
+        return $hours < ($teacher->max_hours_per_day ?? 6);
     }
 
     public function assignTeacher($scheduleId, $teacherId)
@@ -238,15 +246,24 @@ class SchedulingService
         $schedule = Schedule::findOrFail($scheduleId);
         $timeslot = Timeslot::findOrFail($timeslotId);
 
-        if ($this->hasTeacherConflict($schedule->teacher, $timeslot, $schedule->semester_id)) {
+        // Check teacher conflicts through section_teachers relationship
+        foreach ($schedule->section->teachers as $teacher) {
+            $conflict = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
+                $q->where('teacher_id', $teacher->id);
+            })
+            ->where('timeslot_id', $timeslot->id)
+            ->where('id', '!=', $schedule->id)
+            ->exists();
 
-            return [
-                'success' => false,
-                'message' => 'Teacher conflict'
-            ];
+            if ($conflict) {
+                return [
+                    'success' => false,
+                    'message' => 'Teacher time conflict'
+                ];
+            }
         }
 
-        if ($this->hasRoomConflict($schedule->room, $timeslot, $schedule->semester_id)) {
+        if ($this->hasRoomConflict($schedule->room, $timeslot)) {
 
             return [
                 'success' => false,
@@ -254,7 +271,8 @@ class SchedulingService
             ];
         }
 
-        if ($this->hasStudentConflict($schedule->course, $timeslot, $schedule->semester_id)) {
+        // Check student conflicts
+        if ($this->hasStudentConflict($schedule->section, $timeslot)) {
 
             return [
                 'success' => false,

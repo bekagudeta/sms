@@ -209,21 +209,21 @@ Route::middleware(['auth'])->group(function () {
             [ImportController::class,'importSections'])
             ->name('import.sections');
 
-        Route::post('/import/departments',
-            [ImportController::class,'importDepartments'])
-            ->name('import.departments');
+        Route::post('/import/section-teachers',
+            [ImportController::class,'importSectionTeachers'])
+            ->name('import.section-teachers');
 
         Route::post('/import/timeslots',
             [ImportController::class,'importTimeslots'])
             ->name('import.timeslots');
 
-        Route::post('/import/semesters',
-            [ImportController::class,'importSemesters'])
-            ->name('import.semesters');
-
         Route::post('/import/rooms',
             [ImportController::class,'importRooms'])
             ->name('import.rooms');
+
+        Route::post('/import/enrollments',
+            [ImportController::class,'importEnrollments'])
+            ->name('import.enrollments');
     });
 
     Route::middleware(['permission:export schedule'])->group(function () {

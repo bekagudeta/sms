@@ -141,7 +141,7 @@ export default function Index({ teachers }) {
                                     <tr key={teacher.id}>
 
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {teacher.user?.name || 'N/A'}
+                                            {teacher.first_name} {teacher.last_name}
                                         </td>
 
                                         <td className="px-6 py-4 whitespace-nowrap">

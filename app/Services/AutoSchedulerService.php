@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\Teacher;
 use App\Models\Room;
 use App\Models\Timeslot;
+use App\Services\SchedulingEngine;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -140,8 +141,39 @@ class AutoSchedulerService
             
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Auto scheduling failed: ' . $e->getMessage());
-            
+            Log::warning('Auto scheduling failed, attempting fallback: ' . $e->getMessage());
+
+            // Fallback using simpler engine when complex auto scheduler fails
+            try {
+                $engine = new SchedulingEngine();
+                $engineResult = $engine->generateSchedule($this->semesterId);
+
+                if ($engineResult['success'] || !empty($engineResult['assignments'])) {
+                    // Clear existing schedules for this semester before fallback persistence
+                    Schedule::whereHas('section.courseOffering', function ($q) {
+                        $q->where('semester_id', $this->semesterId);
+                    })->delete();
+
+                    foreach ($engineResult['assignments'] as $assignment) {
+                        Schedule::create([
+                            'section_id' => $assignment['section_id'],
+                            'room_id' => $assignment['room_id'],
+                            'timeslot_id' => $assignment['timeslot_id'],
+                        ]);
+                    }
+
+                    return [
+                        'success' => true,
+                        'message' => 'Fallback scheduler completed with ' . count($engineResult['assignments']) . ' assignments',
+                        'scheduled' => count($engineResult['assignments']),
+                        'conflicts' => $engineResult['conflicts'] ?? [],
+                        'partial_schedule' => !$engineResult['success']
+                    ];
+                }
+            } catch (\Exception $fallbackException) {
+                Log::error('Fallback scheduling also failed: ' . $fallbackException->getMessage());
+            }
+
             return [
                 'success' => false,
                 'message' => 'Auto scheduling failed: ' . $e->getMessage(),
@@ -588,29 +620,47 @@ class AutoSchedulerService
     }
     
     /**
-     * Apply assignment to in-memory state
+     * Apply assignment to in-memory state - tries ALL teachers to find best fit
      */
     protected function applyAssignment($section, &$assignment)
     {
         $timeslots = $assignment['timeslots'];
         $rooms = $assignment['rooms'];
-        // Assign only one teacher per section (choose by least load)
-        $teacher = $section->teachers->sortBy(function($t) {
-            return $this->teacherHours[$t->id] ?? 0;
-        })->first();
-        $assignment['teacher'] = $teacher;
+        
+        // Try ALL teachers and pick the one with least load that fits
+        $bestTeacher = null;
+        $bestLoad = PHP_INT_MAX;
+        
+        foreach ($section->teachers as $teacher) {
+            $load = $this->teacherHours[$teacher->id] ?? 0;
+            if ($load < $bestLoad) {
+                // Verify this teacher has no conflict with any of the timeslots
+                $hasConflict = false;
+                foreach ($timeslots as $timeslot) {
+                    if (isset($this->teacherTimeslotMap[$teacher->id][$timeslot->id])) {
+                        $hasConflict = true;
+                        break;
+                    }
+                }
+                if (!$hasConflict && $this->hasTeacherHoursAvailable($teacher, $section->courseOffering->course, count($timeslots))) {
+                    $bestLoad = $load;
+                    $bestTeacher = $teacher;
+                }
+            }
+        }
+        
+        $assignment['teacher'] = $bestTeacher;
         foreach ($timeslots as $index => $timeslot) {
             $room = $rooms[$index];
             $this->currentSchedule[] = [
                 'section_id' => $section->id,
                 'room_id' => $room->id,
                 'timeslot_id' => $timeslot->id,
-                'teacher_id' => $teacher ? $teacher->id : null,
             ];
             // Update teacher maps
-            if ($teacher) {
-                $this->teacherTimeslotMap[$teacher->id][$timeslot->id] = true;
-                $this->teacherHours[$teacher->id] = ($this->teacherHours[$teacher->id] ?? 0) + 1;
+            if ($bestTeacher) {
+                $this->teacherTimeslotMap[$bestTeacher->id][$timeslot->id] = true;
+                $this->teacherHours[$bestTeacher->id] = ($this->teacherHours[$bestTeacher->id] ?? 0) + 1;
             }
             // Update room maps
             $this->roomTimeslotMap[$room->id][$timeslot->id] = true;
@@ -719,15 +769,19 @@ class AutoSchedulerService
     
     protected function loadData()
     {
-        $this->sections = Section::with(['courseOffering.course', 'courseOffering.semester', 'teachers', 'enrollments.student'])
+        $this->sections = Section::with(['courseOffering.course', 'courseOffering.semester', 'teachers', 'enrollments:section_id,student_id'])
                                 ->whereHas('courseOffering', function($q) {
                                     $q->where('semester_id', $this->semesterId);
                                 })
-                                ->get();
-        
-        $this->teachers = Teacher::with('department')->get();
+                                ->get()
+                                ->filter(function ($section) {
+                                    return $section->courseOffering && $section->courseOffering->course;
+                                });
+
+        $this->teachers = Teacher::all();
         $this->rooms = Room::all();
         $this->timeslots = Timeslot::whereIn('day_of_week', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])->get();
+
         
         if ($this->timeslots->isEmpty()) {
             $this->timeslots = $this->createDefaultTimeslots();
@@ -773,6 +827,19 @@ class AutoSchedulerService
         if ($this->timeslots->isEmpty()) {
             throw new \Exception('No timeslots found in the system');
         }
+
+        // Ensure every section has at least one teacher; assign fallback if missing.
+        $defaultTeacher = $this->teachers->first();
+        foreach ($this->sections as $section) {
+            if ($section->teachers->isEmpty()) {
+                if ($defaultTeacher) {
+                    $section->setRelation('teachers', collect([$defaultTeacher]));
+                } else {
+                    throw new \Exception('No teachers assigned and no available teachers to fallback.');
+                }
+            }
+        }
+
     }
     
     protected function getEligibleRooms($course)
@@ -814,11 +881,11 @@ class AutoSchedulerService
         return false;
     }
     
-    protected function hasTeacherHoursAvailable($teacher, $course)
+    protected function hasTeacherHoursAvailable($teacher, $course, $slotsNeeded = 1)
     {
         $currentHours = $this->teacherHours[$teacher->id] ?? 0;
         $maxHours = $teacher->max_hours_per_week ?? 20;
-        return ($currentHours + 1) <= $maxHours;
+        return ($currentHours + $slotsNeeded) <= $maxHours;
     }
     
     protected function hasRoomConflictInMemory($room, $timeslot)

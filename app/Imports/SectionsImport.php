@@ -20,31 +20,37 @@ class SectionsImport implements ToCollection, WithHeadingRow, WithValidation
     {
         foreach ($rows as $row) {
 
-            // Skip empty rows
-            if (empty($row['course_code']) || (empty($row['semester_id']) && empty($row['semester_code'])) || empty($row['section_name'])) {
+            // Skip empty rows - check if we have required section name and some way to identify course offering
+            if (empty($row['section_name'])) {
                 continue;
             }
 
-            // Find course offering by course code + semester
-            $course = Course::where('course_code', $row['course_code'])->first();
-            if (!$course) {
-                continue;
+            $courseOffering = null;
+
+            // Option 1: Direct course_offering_id provided (your Excel format)
+            if (!empty($row['course_offering_id'])) {
+                $courseOffering = CourseOffering::find($row['course_offering_id']);
             }
 
-            $semester = null;
-            if (!empty($row['semester_id'])) {
-                $semester = Semester::find($row['semester_id']);
-            }
-            if (!$semester && !empty($row['semester_code'])) {
-                $semester = Semester::where('code', $row['semester_code'])->first();
-            }
-            if (!$semester) {
-                continue;
+            // Option 2: Find course offering by course code + semester (old format)
+            if (!$courseOffering && !empty($row['course_code'])) {
+                $course = Course::where('course_code', $row['course_code'])->first();
+                if ($course) {
+                    $semester = null;
+                    if (!empty($row['semester_id'])) {
+                        $semester = Semester::find($row['semester_id']);
+                    }
+                    if (!$semester && !empty($row['semester_code'])) {
+                        $semester = Semester::where('code', $row['semester_code'])->first();
+                    }
+                    if ($semester) {
+                        $courseOffering = CourseOffering::where('course_id', $course->id)
+                            ->where('semester_id', $semester->id)
+                            ->first();
+                    }
+                }
             }
 
-            $courseOffering = CourseOffering::where('course_id', $course->id)
-                ->where('semester_id', $semester->id)
-                ->first();
             if (!$courseOffering) {
                 continue;
             }
@@ -80,15 +86,37 @@ class SectionsImport implements ToCollection, WithHeadingRow, WithValidation
         }
     }
 
+    public function prepareForValidation($data, $index)
+    {
+        if (empty($data['course_offering_id']) && !empty($data['course_code'])) {
+            $course = Course::where('course_code', $data['course_code'])->first();
+            if ($course) {
+                $semester = null;
+                if (!empty($data['semester_id'])) {
+                    $semester = Semester::find($data['semester_id']);
+                }
+                if (!$semester && !empty($data['semester_code'])) {
+                    $semester = Semester::where('code', $data['semester_code'])->first();
+                }
+                if ($semester) {
+                    $courseOffering = CourseOffering::where('course_id', $course->id)
+                        ->where('semester_id', $semester->id)
+                        ->first();
+                    if ($courseOffering) {
+                        $data['course_offering_id'] = $courseOffering->id;
+                    }
+                }
+            }
+        }
+        return $data;
+    }
+
     public function rules(): array
     {
         return [
-            '*.course_code' => 'required|string',
-            '*.semester_id' => 'nullable|integer',
-            '*.semester_code' => 'nullable|string',
+            '*.course_offering_id' => 'required|integer',
             '*.section_name' => 'required|string',
-            '*.capacity' => 'nullable|integer|min:1',
-            '*.teacher_ids' => 'nullable|string'
+            '*.capacity' => 'nullable|integer|min:1'
         ];
     }
 

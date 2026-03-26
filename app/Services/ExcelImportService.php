@@ -7,9 +7,9 @@ use App\Imports\TeachersImport;
 use App\Imports\CoursesImport;
 use App\Imports\CourseOfferingsImport;
 use App\Imports\SectionsImport;
-use App\Imports\DepartmentsImport;
+use App\Imports\SectionTeachersImport;
+use App\Imports\EnrollmentsImport;
 use App\Imports\TimeslotsImport;
-use App\Imports\SemestersImport;
 use App\Imports\RoomsImport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
@@ -100,26 +100,6 @@ class ExcelImportService
         }
     }
 
-    public function importDepartments($file)
-    {
-        try {
-            $import = new DepartmentsImport();
-            Excel::import($import, $file);
-            
-            return [
-                'success' => true,
-                'message' => 'Departments imported successfully',
-                'count' => $import->getRowCount()
-            ];
-        } catch (\Exception $e) {
-            Log::error('Department import failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Import failed: ' . $e->getMessage()
-            ];
-        }
-    }
-
     public function importTimeslots($file)
     {
         try {
@@ -140,36 +120,24 @@ class ExcelImportService
         }
     }
 
-    public function importSemesters($file)
-    {
-        try {
-            $import = new SemestersImport();
-            Excel::import($import, $file);
-            
-            return [
-                'success' => true,
-                'message' => 'Semesters imported successfully',
-                'count' => $import->getRowCount()
-            ];
-        } catch (\Exception $e) {
-            Log::error('Semester import failed: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Import failed: ' . $e->getMessage()
-            ];
-        }
-    }
-
     public function importCourseOfferings($file)
     {
         try {
             $import = new CourseOfferingsImport();
             Excel::import($import, $file);
 
+            $errors = $import->getErrors();
+            $message = 'Course offerings imported successfully';
+            
+            if (!empty($errors)) {
+                $message .= ' (with ' . count($errors) . ' errors)';
+            }
+
             return [
                 'success' => true,
-                'message' => 'Course offerings imported successfully',
-                'count' => $import->getRowCount()
+                'message' => $message,
+                'count' => $import->getRowCount(),
+                'errors' => $errors
             ];
         } catch (\Exception $e) {
             Log::error('Course offerings import failed: ' . $e->getMessage());
@@ -193,6 +161,70 @@ class ExcelImportService
             ];
         } catch (\Exception $e) {
             Log::error('Sections import failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Import failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    public function importEnrollments($file)
+    {
+        try {
+            $import = new EnrollmentsImport();
+            Excel::import($import, $file);
+
+            $errors = $import->getErrors();
+
+            $failures = $import->failures()->map(function ($failure) {
+                return "Row {$failure->row()} [{$failure->attribute()}]: " . implode(' / ', $failure->errors());
+            })->toArray();
+
+            $errors = array_unique(array_merge($errors, $failures));
+
+            $message = 'Enrollments imported successfully';
+            if (!empty($errors)) {
+                $message .= ' (with ' . count($errors) . ' warnings)';
+            }
+
+            $success = $import->getRowCount() > 0 || empty($errors);
+
+            return [
+                'success' => $success,
+                'message' => $message,
+                'count' => $import->getRowCount(),
+                'errors' => $errors
+            ];
+        } catch (\Exception $e) {
+            Log::error('Enrollments import failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Import failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    public function importSectionTeachers($file)
+    {
+        try {
+            $import = new SectionTeachersImport();
+            Excel::import($import, $file);
+
+            $errors = $import->getErrors();
+            $message = 'Section teachers assigned successfully';
+            
+            if (!empty($errors)) {
+                $message .= ' (with ' . count($errors) . ' warnings)';
+            }
+
+            return [
+                'success' => true,
+                'message' => $message,
+                'count' => $import->getRowCount(),
+                'errors' => $errors
+            ];
+        } catch (\Exception $e) {
+            Log::error('Section teachers import failed: ' . $e->getMessage());
             return [
                 'success' => false,
                 'message' => 'Import failed: ' . $e->getMessage()

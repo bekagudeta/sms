@@ -194,7 +194,7 @@ class ScheduleController extends Controller
         
         // Validate each schedule item has required fields (manual section-based scheduling)
         foreach ($scheduleItems as $index => $item) {
-            $requiredFields = ['course_offering_id', 'section_name', 'teacher_id', 'room_id', 'timeslot_id'];
+            $requiredFields = ['course_offering_id', 'section_name', 'room_id', 'timeslot_id'];
             foreach ($requiredFields as $field) {
                 if (empty($item[$field])) {
                     return ['valid' => false, 'message' => "Schedule item " . ($index + 1) . " is missing required field: $field"];
@@ -234,12 +234,6 @@ class ScheduleController extends Controller
                 return ['success' => false, 'message' => 'Course offering not found'];
             }
 
-            // Validate teacher exists
-            $teacher = Teacher::find($item['teacher_id'] ?? null);
-            if (!$teacher) {
-                return ['success' => false, 'message' => 'Teacher not found'];
-            }
-
             // Validate room exists
             $room = Room::find($item['room_id'] ?? null);
             if (!$room) {
@@ -268,34 +262,15 @@ class ScheduleController extends Controller
                 ]
             );
 
-            // Attach teacher if not assigned for section yet
-            if (!$section->teachers()->where('teacher_id', $teacher->id)->exists()) {
-                $section->teachers()->attach($teacher->id);
-            }
-
-            // Prevent scheduling conflicts for room and teacher at this timeslot
+            // Prevent scheduling conflicts for room at this timeslot
             if (Schedule::where('room_id', $room->id)->where('timeslot_id', $timeslot->id)->exists()) {
                 return ['success' => false, 'message' => 'Room is already booked for this timeslot'];
-            }
-
-            $teacherConflict = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
-                $q->where('teacher_id', $teacher->id);
-            })->where('timeslot_id', $timeslot->id)->exists();
-
-            if ($teacherConflict) {
-                return ['success' => false, 'message' => 'Teacher is already assigned for this timeslot'];
             }
 
             // Enforce student conflict prevention
             $studentConflict = $this->hasStudentConflict($section, $timeslot);
             if ($studentConflict) {
                 return ['success' => false, 'message' => 'One or more students are already enrolled in another section at this timeslot'];
-            }
-
-            // Enforce teacher workload constraints
-            $teacherHoursCheck = $this->checkTeacherWorkload($teacher, $timeslot);
-            if (!$teacherHoursCheck['valid']) {
-                return ['success' => false, 'message' => $teacherHoursCheck['message']];
             }
 
             // Enforce room capacity constraint

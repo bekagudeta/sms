@@ -20,7 +20,11 @@ class StudentController extends Controller
 
     public function index(Request $request)
     {
-        $students = $this->repository->paginate(10, $request->input('search'));
+        $students = $this->repository->paginate(
+            config('app.pagination', 10),
+            $request->input('search')
+        );
+
         return Inertia::render('Students/Index', [
             'students' => $students,
             'filters' => $request->only('search'),
@@ -29,7 +33,8 @@ class StudentController extends Controller
 
     public function create()
     {
-        $departments = Department::all();
+        $departments = Department::select('id', 'name')->get();
+
         return Inertia::render('Students/Create', [
             'departments' => $departments
         ]);
@@ -38,14 +43,14 @@ class StudentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'student_id' => 'required|string|unique:students',
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
-            'email' => 'required|email|unique:students',
-            'phone' => 'nullable|string',
-            'department_id' => 'required|exists:departments,id',
-            'semester' => 'required|integer|min:1|max:12',
-            'enrollment_date' => 'required|date'
+            'student_id'      => 'required|string|max:50|unique:students,student_id',
+            'first_name'      => 'required|string|max:100',
+            'last_name'       => 'required|string|max:100',
+            'email'           => 'required|email|max:255|unique:students,email',
+            'phone'           => 'nullable|string|max:20',
+            'department_id'   => 'required|exists:departments,id',
+            'semester'        => 'required|integer|min:1|max:12',
+            'enrollment_date' => 'required|date',
         ]);
 
         $this->repository->create($validated);
@@ -56,7 +61,10 @@ class StudentController extends Controller
 
     public function edit(Student $student)
     {
-        $departments = Department::all();
+        $student->load('department'); // prevent future N+1
+
+        $departments = Department::select('id', 'name')->get();
+
         return Inertia::render('Students/Edit', [
             'student' => $student,
             'departments' => $departments
@@ -66,12 +74,14 @@ class StudentController extends Controller
     public function update(Request $request, Student $student)
     {
         $validated = $request->validate([
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
-            'email' => 'required|email|unique:students,email,' . $student->id,
-            'phone' => 'nullable|string',
-            'department_id' => 'required|exists:departments,id',
-            'semester' => 'required|integer|min:1|max:12',
+            'student_id'      => 'required|string|max:50|unique:students,student_id,' . $student->id,
+            'first_name'      => 'required|string|max:100',
+            'last_name'       => 'required|string|max:100',
+            'email'           => 'required|email|max:255|unique:students,email,' . $student->id,
+            'phone'           => 'nullable|string|max:20',
+            'department_id'   => 'required|exists:departments,id',
+            'semester'        => 'required|integer|min:1|max:12',
+            'enrollment_date' => 'required|date',
         ]);
 
         $this->repository->update($student->id, $validated);

@@ -77,7 +77,7 @@ class TeacherRepository
 
     {
 
-        $teacher = $this->findById($id);
+        $teacher = Teacher::find($id);
 
         return $teacher ? $teacher->update($data) : false;
 

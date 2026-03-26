@@ -11,17 +11,27 @@ export default function ImportExcel() {
         file: null
     });
 
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
     const downloadFile = async (url, formData, defaultFilename) => {
+        // Get fresh CSRF token before request
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        
+        // Create new FormData with token if not present
+        const formDataWithToken = new FormData();
+        for (let [key, value] of formData.entries()) {
+            formDataWithToken.append(key, value);
+        }
+        if (token && !formDataWithToken.has('_token')) {
+            formDataWithToken.append('_token', token);
+        }
+        
         const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': csrfToken,
+                'X-CSRF-TOKEN': token || '',
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json',
             },
-            body: formData,
+            body: formDataWithToken,
             credentials: 'same-origin',
         });
 
@@ -95,6 +105,12 @@ export default function ImportExcel() {
         const routeUrl = route(`import.${importType}`);
         const formData = new FormData();
         formData.append('file', data.file);
+        
+        // Add CSRF token to form data for Laravel verification
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (csrfToken) {
+            formData.append('_token', csrfToken);
+        }
 
         if (importType === 'students' || importType === 'teachers') {
             try {
@@ -111,6 +127,12 @@ export default function ImportExcel() {
                 try {
                     const parsed = JSON.parse(msg);
                     msg = parsed?.message || parsed?.error || msg;
+                    if (parsed?.errors && Array.isArray(parsed.errors)) {
+                        msg += '\n\nErrors:\n' + parsed.errors.slice(0, 5).join('\n');
+                        if (parsed.errors.length > 5) {
+                            msg += `\n...and ${parsed.errors.length - 5} more errors`;
+                        }
+                    }
                 } catch (parseErr) {
                     // if not JSON, keep original string
                 }
@@ -124,10 +146,14 @@ export default function ImportExcel() {
 
         try {
             setIsDownloading(true);
+            
+            // Get fresh CSRF token before request
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            
             const response = await fetch(routeUrl, {
                 method: 'POST',
                 headers: {
-                    'X-CSRF-TOKEN': csrfToken,
+                    'X-CSRF-TOKEN': token || '',
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json',
                 },
@@ -141,6 +167,12 @@ export default function ImportExcel() {
                 try {
                     const json = JSON.parse(text);
                     msg = json?.message || json?.error || msg;
+                    if (json?.errors && Array.isArray(json.errors)) {
+                        msg += '\n\nErrors:\n' + json.errors.slice(0, 5).join('\n');
+                        if (json.errors.length > 5) {
+                            msg += `\n...and ${json.errors.length - 5} more errors`;
+                        }
+                    }
                 } catch (e) {
                     if (text.trim().startsWith('<')) {
                         console.error('Import error response:', text);
@@ -171,15 +203,15 @@ export default function ImportExcel() {
     };
 
     const importOptions = [
-        { value: 'students', label: 'Import Students' },
-        { value: 'teachers', label: 'Import Teachers' },
-        { value: 'courses', label: 'Import Courses' },
-        { value: 'course-offerings', label: 'Import Course Offerings' },
-        { value: 'sections', label: 'Import Sections' },
-        { value: 'departments', label: 'Import Departments' },
-        { value: 'timeslots', label: 'Import Timeslots' },
-        { value: 'semesters', label: 'Import Semesters' },
-        { value: 'rooms', label: 'Import Rooms' }
+        { value: 'students', label: 'Import Students', category: 'People' },
+        { value: 'teachers', label: 'Import Teachers', category: 'People' },
+        { value: 'courses', label: 'Import Courses', category: 'Core' },
+        { value: 'course-offerings', label: 'Import Course Offerings', category: 'Core' },
+        { value: 'sections', label: 'Import Sections', category: 'Core' },
+        { value: 'section-teachers', label: 'Import Section Teachers', category: 'Core' },
+        { value: 'timeslots', label: 'Import Timeslots', category: 'Core' },
+        { value: 'rooms', label: 'Import Rooms', category: 'Core' },
+        { value: 'enrollments', label: 'Import Enrollments', category: 'Core' }
     ];
 
     return (
@@ -208,6 +240,18 @@ export default function ImportExcel() {
 
                             {importType && (
                                 <form onSubmit={handleSubmit} className="space-y-4">
+                                    {importType === 'enrollments' && (
+                                        <div className="bg-yellow-50 border border-yellow-300 rounded-md p-3 mb-4">
+                                            <p className="text-sm text-yellow-800 font-medium">Required for Student Conflict Detection</p>
+                                            <p className="text-xs text-yellow-700 mt-1">Import enrollments AFTER importing students and sections.</p>
+                                        </div>
+                                    )}
+                                    {importType === 'section-teachers' && (
+                                        <div className="bg-yellow-50 border border-yellow-300 rounded-md p-3 mb-4">
+                                            <p className="text-sm text-yellow-800 font-medium">Assign Teachers to Existing Sections</p>
+                                            <p className="text-xs text-yellow-700 mt-1">Use this to add teachers to sections without re-importing sections. Leave empty append column to REPLACE existing teachers, or set append=yes to ADD teachers.</p>
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Choose Excel File
@@ -252,33 +296,43 @@ export default function ImportExcel() {
 
                             <div className="mt-4">
                                 <h4 className="font-semibold mb-2">Required Columns (per type):</h4>
-                                {importType === 'students' && (
-                                    <p className="text-sm">student_id, first_name, last_name, email, department_id OR (department_code, department_name), level, section, phone (optional), enrollment_date (optional)</p>
-                                )}
-                                {importType === 'teachers' && (
-                                    <p className="text-sm">teacher_id, first_name, last_name, email, department_id, qualification, max_hours_per_week, phone (optional)</p>
-                                )}
-                                {importType === 'courses' && (
-                                    <p className="text-sm">course_code, course_name, description (optional), credits, hours_per_week, department_id, level</p>
-                                )}
-                                {importType === 'course-offerings' && (
-                                    <p className="text-sm">course_id, semester_id, expected_students</p>
-                                )}
-                                {importType === 'sections' && (
-                                    <p className="text-sm">course_offering_id, section_name, capacity, teacher_ids (comma-separated, optional)</p>
-                                )}
-                                {importType === 'departments' && (
-                                    <p className="text-sm">code, name, description (optional)</p>
-                                )}
-                                {importType === 'timeslots' && (
-                                    <p className="text-sm">day_of_week, start_time, end_time, slot_code (optional)</p>
-                                )}
-                                {importType === 'rooms' && (
-                                    <p className="text-sm">room_code, building, floor, capacity, type, has_projector (optional), has_computers (optional), computer_count (optional)</p>
-                                )}
-                                {importType === 'semesters' && (
-                                    <p className="text-sm">name, code, start_date, end_date, is_active (optional, defaults to false)</p>
-                                )}
+                                <div className="mb-3 p-2 bg-green-50 rounded">
+                                    <p className="text-xs font-semibold text-green-700 mb-1">CORE Tables (Required for Scheduling):</p>
+                                    {importType === 'courses' && (
+                                        <p className="text-sm">course_code, course_name, description (optional), credits, hours_per_week, department_id, level</p>
+                                    )}
+                                    {importType === 'course-offerings' && (
+                                        <p className="text-sm">course_name (or course_code/course_id), semester_id, expected_students<br/>
+                                        <span className="text-red-600">Note: course must exist in courses table</span></p>
+                                    )}
+                                    {importType === 'sections' && (
+                                        <p className="text-sm">course_offering_id, section_name, capacity</p>
+                                    )}
+                                    {importType === 'section-teachers' && (
+                                        <p className="text-sm">section_id, teacher_ids (comma-separated), append (optional: yes/no)</p>
+                                    )}
+                                    {importType === 'timeslots' && (
+                                        <p className="text-sm">day_of_week, start_time, end_time, slot_code (optional)</p>
+                                    )}
+                                    {importType === 'rooms' && (
+                                        <p className="text-sm">room_code, building, floor, capacity, type, has_projector (optional), has_computers (optional)</p>
+                                    )}
+                                    {importType === 'enrollments' && (
+                                        <p className="text-sm">student_id, section_id<br/>
+                                        <span className="text-red-600">Note: Links students to sections for conflict detection</span></p>
+                                    )}
+                                </div>
+
+                                <div className="mb-2 p-2 bg-blue-50 rounded">
+                                    <p className="text-xs font-semibold text-blue-700 mb-1">People (Create Users):</p>
+                                    {importType === 'students' && (
+                                        <p className="text-sm">student_id, first_name, last_name, email, department_id OR (department_code, department_name), level, section, phone (optional), enrollment_date (optional)</p>
+                                    )}
+                                    {importType === 'teachers' && (
+                                        <p className="text-sm">teacher_id, first_name, last_name, email, department_id, qualification, max_hours_per_week, phone (optional)</p>
+                                    )}
+                                </div>
+                                
                                 {!importType && (
                                     <p className="text-sm text-gray-500">Select an import type to see required columns</p>
                                 )}

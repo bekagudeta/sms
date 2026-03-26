@@ -11,9 +11,17 @@ class Enrollment extends Model
 
     protected $fillable = [
         'student_id',
+        'student_code',
         'section_id',
         'enrolled_at',
     ];
+
+    protected $appends = ['student_code_value'];
+
+    public function getStudentCodeValueAttribute()
+    {
+        return $this->student ? $this->student->student_id : $this->student_code;
+    }
 
     protected $casts = [
         'enrolled_at' => 'datetime',

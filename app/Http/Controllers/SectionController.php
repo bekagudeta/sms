@@ -74,7 +74,7 @@ class SectionController extends Controller
 
     public function show(Section $section)
     {
-        $section->load(['courseOffering.course', 'courseOffering.semester', 'teachers', 'schedules.room', 'schedules.timeslot', 'enrollments.student.user']);
+        $section->load(['courseOffering.course', 'courseOffering.semester', 'teachers', 'schedules.room', 'schedules.timeslot', 'enrollments:section_id,student_id']);
 
         return Inertia::render('Sections/Show', [
             'section' => $section

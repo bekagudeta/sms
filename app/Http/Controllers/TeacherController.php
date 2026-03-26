@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Teacher;
 use App\Models\Department;
 use App\Repositories\TeacherRepository;
+use App\Http\Requests\TeacherRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -20,7 +21,11 @@ class TeacherController extends Controller
 
     public function index(Request $request)
     {
-        $teachers = $this->repository->paginate(10, $request->input('search'));
+        $teachers = $this->repository->paginate(
+            config('app.pagination', 10),
+            $request->input('search')
+        );
+
         return Inertia::render('Teachers/Index', [
             'teachers' => $teachers,
             'filters' => $request->only('search'),
@@ -29,26 +34,16 @@ class TeacherController extends Controller
 
     public function create()
     {
-        $departments = Department::all();
+        $departments = Department::select('id', 'name')->get();
+
         return Inertia::render('Teachers/Create', [
             'departments' => $departments
         ]);
     }
 
-    public function store(Request $request)
+    public function store(TeacherRequest $request)
     {
-        $validated = $request->validate([
-            'teacher_id' => 'required|string|unique:teachers',
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
-            'email' => 'required|email|unique:teachers',
-            'phone' => 'nullable|string',
-            'department_id' => 'required|exists:departments,id',
-            'qualification' => 'nullable|string',
-            'max_hours_per_week' => 'required|integer|min:1|max:40'
-        ]);
-
-        $this->repository->create($validated);
+        $this->repository->create($request->validated());
 
         return redirect()->route('teachers.index')
             ->with('success', 'Teacher created successfully.');
@@ -56,26 +51,19 @@ class TeacherController extends Controller
 
     public function edit(Teacher $teacher)
     {
-        $departments = Department::all();
+        $teacher->load('department');
+
+        $departments = Department::select('id', 'name')->get();
+
         return Inertia::render('Teachers/Edit', [
             'teacher' => $teacher,
             'departments' => $departments
         ]);
     }
 
-    public function update(Request $request, Teacher $teacher)
+    public function update(TeacherRequest $request, Teacher $teacher)
     {
-        $validated = $request->validate([
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
-            'email' => 'required|email|unique:teachers,email,' . $teacher->id,
-            'phone' => 'nullable|string',
-            'department_id' => 'required|exists:departments,id',
-            'qualification' => 'nullable|string',
-            'max_hours_per_week' => 'required|integer|min:1|max:40'
-        ]);
-
-        $this->repository->update($teacher->id, $validated);
+        $this->repository->update($teacher->id, $request->validated());
 
         return redirect()->route('teachers.index')
             ->with('success', 'Teacher updated successfully.');

@@ -163,13 +163,12 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
     const [newLine, setNewLine] = useState({
         course_offering_id: '',
         section_id: '',
-        teacher_id: '',
         room_id: '',
         timeslot_id: ''
     });
 
     const handleAddLine = () => {
-        if (!newLine.course_offering_id || !newLine.section_id || !newLine.teacher_id || !newLine.room_id || !newLine.timeslot_id) {
+        if (!newLine.course_offering_id || !newLine.section_id || !newLine.room_id || !newLine.timeslot_id) {
             alert('Please fill all fields for manual schedule row.');
             return;
         }
@@ -188,7 +187,6 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
             course_offering_id: selectedOffering.id,
             section_id: selectedSection.id,
             section_name: selectedSection.section_name,
-            teacher_id: parseInt(newLine.teacher_id),
             room_id: parseInt(newLine.room_id),
             timeslot_id: parseInt(newLine.timeslot_id),
             course_name: selectedOffering.course.course_name,
@@ -206,7 +204,6 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
         setNewLine({
             course_offering_id: '',
             section_id: '',
-            teacher_id: '',
             room_id: '',
             timeslot_id: ''
         });
@@ -293,21 +290,6 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
                     </select>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Teacher</label>
-                    <select
-                        value={newLine.teacher_id}
-                        onChange={e => setNewLine({ ...newLine, teacher_id: e.target.value })}
-                        className="mt-1 block w-full rounded-md border-gray-300"
-                    >
-                        <option value="">Select</option>
-                        {teachers?.map(teacher => (
-                            <option key={teacher.id} value={teacher.id}>
-                                {teacher.first_name} {teacher.last_name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div>
                     <label className="block text-sm font-medium text-gray-700">Room</label>
                     <select
                         value={newLine.room_id}
@@ -354,7 +336,6 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
                                 <tr>
                                     <th className="px-3 py-2 border">Course</th>
                                     <th className="px-3 py-2 border">Section</th>
-                                    <th className="px-3 py-2 border">Teacher</th>
                                     <th className="px-3 py-2 border">Room</th>
                                     <th className="px-3 py-2 border">Timeslot</th>
                                     <th className="px-3 py-2 border">Action</th>
@@ -365,7 +346,6 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
                                     <tr key={index}>
                                         <td className="px-3 py-2 border">{item.course_name}</td>
                                         <td className="px-3 py-2 border">{item.section_name}</td>
-                                        <td className="px-3 py-2 border">{item.teacher_id}</td>
                                         <td className="px-3 py-2 border">{item.room_code}</td>
                                         <td className="px-3 py-2 border">{item.day} {item.start_time}-{item.end_time}</td>
                                         <td className="px-3 py-2 border">

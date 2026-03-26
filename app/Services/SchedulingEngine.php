@@ -37,7 +37,7 @@ class SchedulingEngine
         $sections = Section::with([
             'courseOffering.course',
             'teachers',
-            'enrollments.student'
+            'enrollments:section_id,student_id'
         ])->get();
 
         $rooms = Room::all();

@@ -20,7 +20,8 @@ class SchedulePolicy
 
         if ($user->can('view schedule')) {
             if ($user->hasRole('teacher')) {
-                return $schedule->teacher_id === $user->teacher?->id;
+                // Check if teacher is assigned to this schedule's section via section_teachers
+                return $schedule->section?->teachers?->contains('id', $user->teacher?->id);
             }
             // students can view any schedule for now
             return true;

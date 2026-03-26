@@ -1,15 +1,15 @@
 import React from 'react';
 import { Head, useForm } from '@inertiajs/react';
-import AuthLayout from '@/Layouts/AuthLayout';
+import DashboardLayout from '@/Layouts/DashboardLayout';
 import Form from '@/Components/Form';
 
-export default function Edit({ student }) {
+export default function Edit({ student, departments }) {
     const { data, setData, put, processing, errors } = useForm({
-        name: student.name || '',
+        first_name: student.first_name || '',
+        last_name: student.last_name || '',
         email: student.email || '',
-        age: student.age || '',
-        date_of_birth: student.date_of_birth || '',
-        user_id: student.user_id || ''
+        phone: student.phone || '',
+        department_id: student.department_id || ''
     });
 
     const handleSubmit = (e) => {
@@ -18,21 +18,24 @@ export default function Edit({ student }) {
     };
 
     const fields = [
-        { name: 'name', label: 'Name', type: 'text', required: true },
+        { name: 'first_name', label: 'First Name', type: 'text', required: true },
+        { name: 'last_name', label: 'Last Name', type: 'text', required: true },
         { name: 'email', label: 'Email', type: 'email', required: true },
-        { name: 'age', label: 'Age', type: 'number', required: true },
-        { name: 'date_of_birth', label: 'Date of Birth', type: 'date' },
-        { name: 'user_id', label: 'User ID', type: 'number', required: true }
+        { name: 'phone', label: 'Phone', type: 'text' },
+        { name: 'department_id', label: 'Department', type: 'select', required: true, options: departments.map(dept => ({ value: dept.id, label: dept.name })) }
     ];
 
     return (
-        <AuthLayout>
+        <DashboardLayout>
             <Head title="Edit Student" />
             
-            <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div className="p-6 bg-white border-b border-gray-200">
-                    <h2 className="text-2xl font-bold mb-6">Edit Student</h2>
-                    
+            <div className="bg-white overflow-hidden shadow-xl sm:rounded-xl border border-gray-200">
+                <div className="p-6 bg-gradient-to-r from-blue-600 to-purple-700 text-white">
+                    <h2 className="text-2xl font-bold">Edit Student</h2>
+                    <p className="text-blue-100">Update student information</p>
+                </div>
+                
+                <div className="p-6">
                     <Form
                         fields={fields}
                         data={data}
@@ -44,6 +47,6 @@ export default function Edit({ student }) {
                     />
                 </div>
             </div>
-        </AuthLayout>
+        </DashboardLayout>
     );
 }
