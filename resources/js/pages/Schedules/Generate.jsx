@@ -8,7 +8,8 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
     const flash = props.flash;
 
     const { data: autoData, setData: setAutoData, post: autoPost, processing: autoProcessing } = useForm({
-        semester_id: ''
+        semester_id: '',
+        algorithm: 'greedy'
     });
 
     const handleAutoGenerate = () => {
@@ -17,7 +18,7 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
             return;
         }
 
-        autoPost('/schedules/generate-auto', { semester_id: autoData.semester_id }, {
+        autoPost('/schedules/generate-auto', { semester_id: autoData.semester_id, algorithm: autoData.algorithm }, {
             onSuccess: () => {
                 // Server will redirect to /schedules with flash message
             },
@@ -104,6 +105,19 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
                                             {semester.name}
                                         </option>
                                     ))}
+                                </select>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700">Algorithm</label>
+                                <select
+                                    value={autoData.algorithm}
+                                    onChange={e => setAutoData('algorithm', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="greedy">Greedy Algorithm (Fast)</option>
+                                    <option value="backtracking">Backtracking Algorithm (Optimal)</option>
+                                    <option value="csp">Constraint Satisfaction Problem (CSP)</option>
                                 </select>
                             </div>
 

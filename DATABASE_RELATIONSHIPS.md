@@ -25,7 +25,7 @@
 - phone (Nullable)
 - department_id (FK → departments.id)
 - qualification (Nullable)
-- max_hours_per_week (Default: 20)
+- max_hours_per_week (Default: 39)
 - created_at, updated_at
 
 **Relations**: 

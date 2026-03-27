@@ -11,7 +11,7 @@ use App\Models\Section;
 use App\Models\Teacher;
 use App\Models\Timeslot;
 use App\Services\SchedulingService;
-use App\Services\AutoSchedulerService;
+use App\Services\AdvancedSchedulerService;
 use App\Repositories\ScheduleRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,13 +23,13 @@ class ScheduleController extends Controller
 {
     protected $schedulingService;
     protected $repository;
-    protected $autoSchedulerService;
+    protected $advancedSchedulerService;
 
-    public function __construct(SchedulingService $schedulingService, ScheduleRepository $repository, AutoSchedulerService $autoSchedulerService)
+    public function __construct(SchedulingService $schedulingService, ScheduleRepository $repository, AdvancedSchedulerService $advancedSchedulerService)
     {
         $this->schedulingService = $schedulingService;
         $this->repository = $repository;
-        $this->autoSchedulerService = $autoSchedulerService;
+        $this->advancedSchedulerService = $advancedSchedulerService;
     }
 
     public function index(Request $request)
@@ -340,34 +340,27 @@ class ScheduleController extends Controller
 
     public function generateAuto(Request $request)
     {
-        // Allow this potentially long-running generation to complete without hitting PHP's default time limit.
-        // If this still takes too long, consider moving the work to a queued job and returning immediately.
-        set_time_limit(0);
-        ini_set('max_execution_time', '0');
-
         $semesterId = $request->input('semester_id');
+        $algorithm = $request->input('algorithm', 'greedy');
         
         if (!$semesterId) {
             return back()->with('error', 'Please select a semester for automatic generation.');
         }
 
-        $result = $this->autoSchedulerService->generateSchedule($semesterId);
+        $result = $this->advancedSchedulerService->generateSchedule($semesterId, $algorithm);
 
         if ($result['success']) {
-            $message = "Automatic schedule generation completed! 
-                       {$result['scheduled']} courses scheduled, 
-                       {$result['conflicts']} courses had conflicts.";
-            
-            if ($result['conflicts'] > 0) {
-                $message .= " Check conflicts below for details.";
-            }
+            $scheduled = $result['scheduled'] ?? 0;
+            $algorithmName = $result['algorithm'] ?? $algorithm;
+
+            $message = "Automatic schedule generation completed using {$algorithmName} algorithm! 
+                       {$scheduled} courses scheduled.";
             
             return redirect()->route('schedules.index')
-                ->with('success', $message)
-                ->with('conflicts', $this->autoSchedulerService->getConflicts());
+                ->with('success', $message);
         }
 
-        return back()->with('error', $result['message']);
+        return back()->with('error', $result['message'] ?? 'Schedule generation failed');
     }
 
     public function show(Schedule $schedule)
