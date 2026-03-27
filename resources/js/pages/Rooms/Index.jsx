@@ -2,12 +2,12 @@ import React from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
 import EntityManager from '@/components/EntityManager';
 
-export default function StudentsIndex({ students, permissions }) {
+export default function RoomsIndex({ rooms, permissions }) {
     return (
         <DashboardLayout>
             <EntityManager
-                entityType="students"
-                initialData={students?.data || students}
+                entityType="rooms"
+                initialData={rooms?.data || rooms}
                 permissions={permissions || {
                     view: true,
                     create: true,

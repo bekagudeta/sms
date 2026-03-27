@@ -22,6 +22,7 @@ use App\Http\Controllers\CourseOfferingController;
 use App\Http\Controllers\TeacherImportController;
 use App\Http\Controllers\StudentImportController;
 use App\Http\Controllers\Auth\ChangePasswordController;
+use App\Http\Controllers\EntityController;
 
 use Inertia\Inertia;
 
@@ -97,47 +98,46 @@ Route::middleware(['auth'])->group(function () {
         ->name('student.schedule');
 
     // profile routes used by Breeze/Jetstream-style UI
-    Route::get('/profile', [ProfileController::class, 'edit'])
-        ->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])
-        ->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])
-        ->name('profile.destroy');
-
-    // Change password routes
-    Route::get('/change-password', [ChangePasswordController::class, 'showForm'])
-        ->middleware('auth')
-        ->name('password.change');
-    Route::post('/change-password', [ChangePasswordController::class, 'update'])
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/password', [ChangePasswordController::class, 'update'])
         ->middleware('auth')
         ->name('password.change.update');
 
-    Route::middleware(['permission:manage students'])
-        ->resource('students', StudentController::class);
+    // Unified Entity Management Routes
+    Route::prefix('entities')->group(function () {
+        Route::get('/{entityType}', [EntityController::class, 'index'])
+            ->name('entities.index');
+            
+        Route::post('/{entityType}', [EntityController::class, 'store'])
+            ->name('entities.store');
+            
+        Route::get('/{entityType}/{id}/edit', [EntityController::class, 'edit'])
+            ->name('entities.edit');
+            
+        Route::put('/{entityType}/{id}', [EntityController::class, 'update'])
+            ->name('entities.update');
+            
+        Route::delete('/{entityType}/{id}', [EntityController::class, 'destroy'])
+            ->name('entities.destroy');
+            
+        Route::post('/{entityType}/bulk-delete', [EntityController::class, 'bulkDelete'])
+            ->name('entities.bulk-delete');
+            
+        Route::get('/{entityType}/export', [EntityController::class, 'export'])
+            ->name('entities.export');
+    });
 
-    Route::middleware(['permission:manage teachers'])
-        ->resource('teachers', TeacherController::class);
-
-    Route::middleware(['permission:manage courses'])
-        ->resource('courses', CourseController::class);
-
-    Route::middleware(['permission:manage courses'])
-        ->resource('course-offerings', CourseOfferingController::class);
-
-    Route::middleware(['permission:manage courses'])
-        ->resource('sections', SectionController::class);
-
-    Route::middleware(['permission:manage departments'])
-        ->resource('departments', DepartmentController::class);
-
-    Route::middleware(['permission:manage semesters'])
-        ->resource('semesters', SemesterController::class);
-
-    Route::middleware(['permission:manage rooms'])
-        ->resource('rooms', RoomController::class);
-
-    Route::middleware(['permission:manage timeslots'])
-        ->resource('timeslots', TimeslotController::class);
+    // Convenience routes that redirect to entity management
+    Route::redirect('/students', '/entities/students');
+    Route::redirect('/teachers', '/entities/teachers');
+    Route::redirect('/courses', '/entities/courses');
+    Route::redirect('/course-offerings', '/entities/course-offerings');
+    Route::redirect('/sections', '/entities/sections');
+    Route::redirect('/rooms', '/entities/rooms');
+    Route::redirect('/timeslots', '/entities/timeslots');
+    Route::redirect('/enrollments', '/entities/enrollments');
+    Route::redirect('/section-teachers', '/entities/section-teachers');
 
     // Advanced Scheduling Engine routes
     Route::middleware(['permission:generate schedule'])->prefix('scheduling')->group(function () {

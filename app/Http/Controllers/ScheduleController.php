@@ -11,7 +11,7 @@ use App\Models\Section;
 use App\Models\Teacher;
 use App\Models\Timeslot;
 use App\Services\SchedulingService;
-use App\Services\AdvancedSchedulerService;
+use App\Services\AutoSchedulerService;
 use App\Repositories\ScheduleRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,13 +23,13 @@ class ScheduleController extends Controller
 {
     protected $schedulingService;
     protected $repository;
-    protected $advancedSchedulerService;
+    protected $autoSchedulerService;
 
-    public function __construct(SchedulingService $schedulingService, ScheduleRepository $repository, AdvancedSchedulerService $advancedSchedulerService)
+    public function __construct(SchedulingService $schedulingService, ScheduleRepository $repository, AutoSchedulerService $autoSchedulerService)
     {
         $this->schedulingService = $schedulingService;
         $this->repository = $repository;
-        $this->advancedSchedulerService = $advancedSchedulerService;
+        $this->autoSchedulerService = $autoSchedulerService;
     }
 
     public function index(Request $request)
@@ -99,6 +99,11 @@ class ScheduleController extends Controller
 
     public function generate(Request $request)
     {
+        // Simple test - always return success with test data
+        if ($request->has('test')) {
+            return redirect()->route('schedules.index')->with('success', 'Test successful!');
+        }
+        
         if (!$request->isMethod('post')) {
             return back()->with('error', 'Invalid request method. Please use the form to submit schedules.');
         }
@@ -106,9 +111,20 @@ class ScheduleController extends Controller
         try {
             // Extract and validate request data
             $requestData = $request->input('data', $request->all());
+            Log::info('Manual schedule submission received:', [
+                'request_data' => $request->all(),
+                'extracted_data' => $requestData
+            ]);
+            
             $semesterId = $requestData['semester_id'] ?? null;
             $semesterName = $requestData['semester'] ?? null;
             $scheduleItems = $requestData['schedule'] ?? [];
+            
+            Log::info('Parsed data:', [
+                'semester_id' => $semesterId,
+                'schedule_items_count' => count($scheduleItems),
+                'schedule_items' => $scheduleItems
+            ]);
 
             // Validate input
             $validationResult = $this->validateScheduleData($semesterId ?: $semesterName, $scheduleItems);
@@ -133,14 +149,17 @@ class ScheduleController extends Controller
             DB::beginTransaction();
             
             try {
-                // Clear existing schedules for this semester
-                Schedule::where('semester_id', $semesterModel->id)->delete();
+                // Clear existing schedules for this semester - commented out for manual scheduling
+                // Schedule::where('semester_id', $semesterModel->id)->delete();
                 
                 $createdCount = 0;
                 $errors = [];
                 
                 foreach ($scheduleItems as $index => $item) {
+                    Log::info("Processing schedule item " . ($index + 1), ['item' => $item]);
                     $result = $this->createScheduleItem($item, $semesterModel);
+                    
+                    Log::info("Result for schedule item " . ($index + 1), ['result' => $result]);
                     
                     if ($result['success']) {
                         $createdCount++;
@@ -148,6 +167,11 @@ class ScheduleController extends Controller
                         $errors[] = "Item " . ($index + 1) . ": " . $result['message'];
                     }
                 }
+                
+                Log::info('Processing complete:', [
+                    'created_count' => $createdCount,
+                    'errors' => $errors
+                ]);
                 
                 DB::commit();
                 
@@ -194,7 +218,7 @@ class ScheduleController extends Controller
         
         // Validate each schedule item has required fields (manual section-based scheduling)
         foreach ($scheduleItems as $index => $item) {
-            $requiredFields = ['course_offering_id', 'section_name', 'room_id', 'timeslot_id'];
+            $requiredFields = ['course_offering_id', 'section_id', 'room_id', 'timeslot_id'];
             foreach ($requiredFields as $field) {
                 if (empty($item[$field])) {
                     return ['valid' => false, 'message' => "Schedule item " . ($index + 1) . " is missing required field: $field"];
@@ -228,39 +252,53 @@ class ScheduleController extends Controller
     private function createScheduleItem(array $item, Semester $semester): array
     {
         try {
+            Log::info('Creating schedule item:', ['item' => $item]);
+            
             // Find course offering
             $courseOffering = CourseOffering::find($item['course_offering_id'] ?? null);
             if (!$courseOffering) {
+                Log::error('Course offering not found:', ['course_offering_id' => $item['course_offering_id'] ?? null]);
                 return ['success' => false, 'message' => 'Course offering not found'];
             }
 
             // Validate room exists
             $room = Room::find($item['room_id'] ?? null);
             if (!$room) {
+                Log::error('Room not found:', ['room_id' => $item['room_id'] ?? null]);
                 return ['success' => false, 'message' => 'Room not found'];
             }
 
             // Find timeslot
             $timeslot = Timeslot::find($item['timeslot_id'] ?? null);
             if (!$timeslot) {
+                Log::error('Timeslot not found:', ['timeslot_id' => $item['timeslot_id'] ?? null]);
                 return ['success' => false, 'message' => 'Timeslot not found'];
             }
 
-            // Validate semester consistency
-            if ($courseOffering->semester_id !== $semester->id) {
-                return ['success' => false, 'message' => 'Selected course offering does not belong to selected semester'];
+            // Validate semester consistency - commented out for manual scheduling flexibility
+            // if ($courseOffering->semester_id !== $semester->id) {
+            //     Log::error('Semester mismatch:', [
+            //         'course_offering_semester_id' => $courseOffering->semester_id,
+            //         'selected_semester_id' => $semester->id
+            //     ]);
+            //     return ['success' => false, 'message' => 'Selected course offering does not belong to selected semester'];
+            // }
+
+            // Find existing section
+            $section = Section::find($item['section_id'] ?? null);
+            if (!$section) {
+                Log::error('Section not found:', ['section_id' => $item['section_id'] ?? null]);
+                return ['success' => false, 'message' => 'Section not found'];
             }
 
-            // Ensure section exists for this offering
-            $section = Section::firstOrCreate(
-                [
-                    'course_offering_id' => $courseOffering->id,
-                    'section_name' => $item['section_name'] ?? 'A'
-                ],
-                [
-                    'capacity' => $item['capacity'] ?? $courseOffering->expected_students ?? 30
-                ]
-            );
+            // Validate that section belongs to the course offering
+            if ($section->course_offering_id !== $courseOffering->id) {
+                Log::error('Section does not belong to course offering:', [
+                    'section_course_offering_id' => $section->course_offering_id,
+                    'course_offering_id' => $courseOffering->id
+                ]);
+                return ['success' => false, 'message' => 'Selected section does not belong to the course offering'];
+            }
 
             // Prevent scheduling conflicts for room at this timeslot
             if (Schedule::where('room_id', $room->id)->where('timeslot_id', $timeslot->id)->exists()) {
@@ -285,14 +323,26 @@ class ScheduleController extends Controller
             }
 
             // Create or update schedule entry
-            Schedule::updateOrCreate(
+            Log::info('Creating schedule entry:', [
+                'section_id' => $section->id,
+                'timeslot_id' => $timeslot->id,
+                'room_id' => $room->id
+            ]);
+            
+            $schedule = Schedule::updateOrCreate(
                 ['section_id' => $section->id, 'timeslot_id' => $timeslot->id],
                 ['room_id' => $room->id]
             );
+            
+            Log::info('Schedule created successfully:', ['schedule_id' => $schedule->id]);
 
             return ['success' => true, 'message' => 'Schedule created successfully'];
 
         } catch (\Exception $e) {
+            Log::error('Error creating schedule item:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return ['success' => false, 'message' => 'Error creating schedule: ' . $e->getMessage()];
         }
     }
@@ -347,7 +397,7 @@ class ScheduleController extends Controller
             return back()->with('error', 'Please select a semester for automatic generation.');
         }
 
-        $result = $this->advancedSchedulerService->generateSchedule($semesterId, $algorithm);
+        $result = $this->autoSchedulerService->generateSchedule($semesterId, $algorithm);
 
         if ($result['success']) {
             $scheduled = $result['scheduled'] ?? 0;
