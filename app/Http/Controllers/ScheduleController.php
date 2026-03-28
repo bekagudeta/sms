@@ -391,20 +391,16 @@ class ScheduleController extends Controller
     public function generateAuto(Request $request)
     {
         $semesterId = $request->input('semester_id');
-        $algorithm = $request->input('algorithm', 'greedy');
         
         if (!$semesterId) {
             return back()->with('error', 'Please select a semester for automatic generation.');
         }
 
-        $result = $this->autoSchedulerService->generateSchedule($semesterId, $algorithm);
+        $result = $this->autoSchedulerService->generateSchedule($semesterId);
 
         if ($result['success']) {
             $scheduled = $result['scheduled'] ?? 0;
-            $algorithmName = $result['algorithm'] ?? $algorithm;
-
-            $message = "Automatic schedule generation completed using {$algorithmName} algorithm! 
-                       {$scheduled} courses scheduled.";
+            $message = "Automatic schedule generation completed using AutoSchedulerService (integrated engines)! {$scheduled} courses scheduled.";
             
             return redirect()->route('schedules.index')
                 ->with('success', $message);

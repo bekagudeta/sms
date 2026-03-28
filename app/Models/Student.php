@@ -19,8 +19,12 @@ class Student extends Model
         'phone',
         'level',
         'section',
+        'grade',
+        'status',
         'enrollment_date',
     ];
+
+    protected $appends = ['name'];
 
     protected $casts = [
         'enrollment_date' => 'datetime:Y-m-d',
@@ -34,6 +38,11 @@ class Student extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function getNameAttribute()
+    {
+        return trim("{$this->first_name} {$this->last_name}");
     }
 
     public function enrollments()

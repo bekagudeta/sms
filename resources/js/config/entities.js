@@ -6,13 +6,16 @@ export const ENTITY_CONFIG = {
     category: "People",
     columns: [
       { key: "id", label: "ID", sortable: true },
-      { key: "name", label: "Name", sortable: true, searchable: true },
+      { key: "student_id", label: "Student ID", sortable: true, searchable: true },
+      { key: "first_name", label: "First Name", sortable: true, searchable: true },
+      { key: "last_name", label: "Last Name", sortable: true, searchable: true },
       { key: "email", label: "Email", sortable: true, searchable: true },
-      { key: "grade", label: "Grade", sortable: true },
-      { key: "status", label: "Status", sortable: true, filterable: true }
+      { key: "level", label: "Level", sortable: true },
+      { key: "section", label: "Section", sortable: true },
+      { key: "phone", label: "Phone", sortable: true }
     ],
-    requiredColumns: ["student_id", "name", "email"],
-    optionalColumns: ["grade", "status", "phone", "address"],
+    requiredColumns: ["student_id", "first_name", "last_name", "email"],
+    optionalColumns: ["level", "section", "phone", "department_id"],
     apiEndpoint: "/api/students",
     routePrefix: "students",
     permissions: {
@@ -30,13 +33,15 @@ export const ENTITY_CONFIG = {
     category: "People",
     columns: [
       { key: "id", label: "ID", sortable: true },
-      { key: "name", label: "Name", sortable: true, searchable: true },
+      { key: "teacher_id", label: "Teacher ID", sortable: true, searchable: true },
+      { key: "first_name", label: "First Name", sortable: true, searchable: true },
+      { key: "last_name", label: "Last Name", sortable: true, searchable: true },
       { key: "email", label: "Email", sortable: true, searchable: true },
-      { key: "department", label: "Department", sortable: true, filterable: true },
-      { key: "status", label: "Status", sortable: true, filterable: true }
+      { key: "qualification", label: "Qualification", sortable: true },
+      { key: "max_hours_per_week", label: "Max Hours", sortable: true }
     ],
-    requiredColumns: ["teacher_id", "name", "email"],
-    optionalColumns: ["department", "status", "phone", "address", "max_hours_per_week"],
+    requiredColumns: ["teacher_id", "first_name", "last_name", "email"],
+    optionalColumns: ["qualification", "phone", "max_hours_per_week", "department_id"],
     apiEndpoint: "/api/teachers",
     routePrefix: "teachers",
     permissions: {
@@ -71,7 +76,7 @@ export const ENTITY_CONFIG = {
       import: "import courses"
     }
   },
-  courseOfferings: {
+  "course-offerings": {
     title: "Course Offerings",
     singular: "Offering",
     icon: "Calendar",
@@ -79,13 +84,12 @@ export const ENTITY_CONFIG = {
     columns: [
       { key: "id", label: "ID", sortable: true },
       { key: "course.course_code", label: "Course", sortable: true, searchable: true },
-      { key: "semester.name", label: "Semester", sortable: true, filterable: true },
-      { key: "year", label: "Year", sortable: true },
+      { key: "semester.name", label: "Semester", sortable: true, searchable: true },
       { key: "expected_students", label: "Expected Students", sortable: true },
-      { key: "status", label: "Status", sortable: true, filterable: true }
+      { key: "created_at", label: "Created", sortable: true }
     ],
-    requiredColumns: ["course_id", "semester_id", "year"],
-    optionalColumns: ["expected_students", "status", "description"],
+    requiredColumns: ["course_id", "semester_id", "expected_students"],
+    optionalColumns: ["created_at", "updated_at"],
     apiEndpoint: "/api/course-offerings",
     routePrefix: "course-offerings",
     permissions: {
@@ -107,10 +111,10 @@ export const ENTITY_CONFIG = {
       { key: "courseOffering.course.course_name", label: "Course", sortable: true, searchable: true },
       { key: "capacity", label: "Capacity", sortable: true },
       { key: "enrolled_count", label: "Enrolled", sortable: true },
-      { key: "status", label: "Status", sortable: true, filterable: true }
+      { key: "created_at", label: "Created", sortable: true }
     ],
     requiredColumns: ["course_offering_id", "section_name", "capacity"],
-    optionalColumns: ["status", "description", "room_id"],
+    optionalColumns: ["created_at", "updated_at", "room_id"],
     apiEndpoint: "/api/sections",
     routePrefix: "sections",
     permissions: {
@@ -130,12 +134,15 @@ export const ENTITY_CONFIG = {
       { key: "id", label: "ID", sortable: true },
       { key: "room_code", label: "Room Code", sortable: true, searchable: true },
       { key: "building", label: "Building", sortable: true, filterable: true },
+      { key: "floor", label: "Floor", sortable: true },
       { key: "capacity", label: "Capacity", sortable: true },
       { key: "type", label: "Type", sortable: true, filterable: true },
-      { key: "status", label: "Status", sortable: true, filterable: true }
+      { key: "has_projector", label: "Projector", sortable: true },
+      { key: "has_computers", label: "Computers", sortable: true },
+      { key: "computer_count", label: "Computers #", sortable: true }
     ],
-    requiredColumns: ["room_code", "capacity", "type"],
-    optionalColumns: ["building", "status", "description", "equipment"],
+    requiredColumns: ["room_code", "building", "floor", "capacity", "type"],
+    optionalColumns: ["has_projector", "has_computers", "computer_count"],
     apiEndpoint: "/api/rooms",
     routePrefix: "rooms",
     permissions: {
@@ -156,11 +163,10 @@ export const ENTITY_CONFIG = {
       { key: "day_of_week", label: "Day", sortable: true, filterable: true },
       { key: "start_time", label: "Start Time", sortable: true },
       { key: "end_time", label: "End Time", sortable: true },
-      { key: "slot_code", label: "Slot Code", sortable: true, searchable: true },
-      { key: "type", label: "Type", sortable: true, filterable: true }
+      { key: "slot_code", label: "Slot Code", sortable: true, searchable: true }
     ],
     requiredColumns: ["day_of_week", "start_time", "end_time"],
-    optionalColumns: ["slot_code", "type", "description"],
+    optionalColumns: ["slot_code"],
     apiEndpoint: "/api/timeslots",
     routePrefix: "timeslots",
     permissions: {
@@ -180,11 +186,11 @@ export const ENTITY_CONFIG = {
       { key: "id", label: "ID", sortable: true },
       { key: "student.name", label: "Student", sortable: true, searchable: true },
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
-      { key: "enrollment_date", label: "Enrolled Date", sortable: true },
-      { key: "status", label: "Status", sortable: true, filterable: true }
+      { key: "enrolled_at", label: "Enrolled Date", sortable: true },
+      { key: "student_code_value", label: "Student Code", sortable: true }
     ],
-    requiredColumns: ["student_id", "section_id"],
-    optionalColumns: ["enrollment_date", "status", "grade"],
+    requiredColumns: ["student_id", "section_id", "enrolled_at"],
+    optionalColumns: ["student_code_value", "created_at", "updated_at"],
     apiEndpoint: "/api/enrollments",
     routePrefix: "enrollments",
     permissions: {
@@ -195,7 +201,7 @@ export const ENTITY_CONFIG = {
       import: "import enrollments"
     }
   },
-  sectionTeachers: {
+  "section-teachers": {
     title: "Section Teachers",
     singular: "Assignment",
     icon: "Users",
@@ -203,13 +209,10 @@ export const ENTITY_CONFIG = {
     columns: [
       { key: "id", label: "ID", sortable: true },
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
-      { key: "teacher.name", label: "Teacher", sortable: true, searchable: true },
-      { key: "role", label: "Role", sortable: true, filterable: true },
-      { key: "assigned_date", label: "Assigned Date", sortable: true },
-      { key: "status", label: "Status", sortable: true, filterable: true }
+      { key: "teacher.full_name", label: "Teacher", sortable: true, searchable: true }
     ],
     requiredColumns: ["section_id", "teacher_id"],
-    optionalColumns: ["role", "assigned_date", "status"],
+    optionalColumns: [],
     apiEndpoint: "/api/section-teachers",
     routePrefix: "section-teachers",
     permissions: {

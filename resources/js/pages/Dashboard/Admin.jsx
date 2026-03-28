@@ -4,118 +4,114 @@ import { Link } from '@inertiajs/react';
 export default function AdminDashboard({ stats, recentSchedules }) {
     return (
         <>
-            <div className="py-12 bg-gray-50 min-h-screen" style={{ backgroundImage: 'url(https://source.unsplash.com/PG8NyM_Mcts)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
+            <div className="py-12 bg-rich-black bg-opacity-90 min-h-screen" style={{ backgroundImage: 'linear-gradient(135deg, rgba(0,23,34,0.9) 0%, rgba(8,74,72,0.75) 50%, rgba(254,88,11,0.65) 100%)' }}>
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    <div className="bg-white overflow-hidden shadow-xl sm:rounded-xl border border-gray-200">
-                        <div className="p-8 bg-gradient-to-r from-blue-600 to-purple-700 text-white">
-                            <h2 className="text-3xl font-bold mb-2">Welcome to SMS Dashboard</h2>
-                            <p className="text-blue-100">Manage students, teachers, courses, and schedules efficiently</p>
+                    <div className="bg-slate-950/80 backdrop-blur-md overflow-hidden shadow-2xl sm:rounded-2xl border border-deep-jungle-green/40">
+                        <div className="p-8 bg-gradient-to-r from-deep-jungle-green to-rich-black text-pearl-aqua">
+                            <h2 className="text-3xl font-extrabold mb-2">Welcome to SMS Dashboard</h2>
+                            <p className="text-pearl-aqua/90">Manage students, teachers, courses, and schedules with a vibrant and modern interface</p>
                         </div>
                         <div className="p-8">
                             {/* Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+                                <div className="bg-gradient-to-br from-deep-jungle-green to-rich-black text-white p-6 rounded-2xl shadow-2xl shadow-deep-jungle-green/25 hover:shadow-deep-jungle-green/45 transition-shadow duration-300">
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h3 className="text-lg font-semibold mb-2">Total Students</h3>
-                                            <p className="text-3xl font-bold">{stats.total_students}</p>
+                                            <p className="text-3xl font-bold text-pearl-aqua">{stats.total_students}</p>
                                         </div>
-                                        <div className="text-4xl opacity-80">👨‍🎓</div>
+                                        <div className="text-4xl opacity-90">👨‍🎓</div>
                                     </div>
                                 </div>
-                                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+                                <div className="bg-gradient-to-br from-pearl-aqua to-deep-jungle-green text-rich-black p-6 rounded-2xl shadow-2xl shadow-pearl-aqua/20 hover:shadow-pearl-aqua/40 transition-shadow duration-300">
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h3 className="text-lg font-semibold mb-2">Total Teachers</h3>
                                             <p className="text-3xl font-bold">{stats.total_teachers}</p>
                                         </div>
-                                        <div className="text-4xl opacity-80">👨‍🏫</div>
+                                        <div className="text-4xl opacity-90">👨‍🏫</div>
                                     </div>
                                 </div>
-                                <div className="bg-gradient-to-br from-yellow-500 to-orange-500 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+                                <div className="bg-gradient-to-br from-vivid-orange via-pearl-aqua to-deep-jungle-green text-white p-6 rounded-2xl shadow-2xl shadow-vivid-orange/25 hover:shadow-vivid-orange/45 transition-shadow duration-300">
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h3 className="text-lg font-semibold mb-2">Total Courses</h3>
                                             <p className="text-3xl font-bold">{stats.total_courses}</p>
                                         </div>
-                                        <div className="text-4xl opacity-80">📚</div>
+                                        <div className="text-4xl opacity-90">📚</div>
                                     </div>
                                 </div>
-                                <div className="bg-gradient-to-br from-purple-500 to-pink-500 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+                                <div className="bg-gradient-to-br from-rich-black to-deep-jungle-green text-white p-6 rounded-2xl shadow-2xl shadow-rich-black/25 hover:shadow-rich-black/45 transition-shadow duration-300">
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h3 className="text-lg font-semibold mb-2">Total Schedules</h3>
                                             <p className="text-3xl font-bold">{stats.total_schedules}</p>
                                         </div>
-                                        <div className="text-4xl opacity-80">📅</div>
+                                        <div className="text-4xl opacity-90">📅</div>
                                     </div>
                                 </div>
-                                <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+                                <div className="bg-gradient-to-br from-deep-jungle-green to-pearl-aqua text-rich-black p-6 rounded-2xl shadow-2xl shadow-deep-jungle-green/25 hover:shadow-deep-jungle-green/45 transition-shadow duration-300">
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h3 className="text-lg font-semibold mb-2">Pending Credentials</h3>
                                             <p className="text-3xl font-bold">{stats.pending_credentials || 0}</p>
                                         </div>
-                                        <div className="text-4xl opacity-80">🔑</div>
+                                        <div className="text-4xl opacity-90">🔑</div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Recent Schedules */}
                             <div className="mb-10">
-                                <h3 className="text-2xl font-bold mb-6 text-gray-800">Recent Schedules</h3>
-                                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg">
+                                <h3 className="text-2xl font-bold mb-6 text-pearl-aqua">Recent Schedules</h3>
+                                <div className="bg-slate-900/80 border border-deep-jungle-green/40 rounded-2xl overflow-hidden shadow-2xl shadow-deep-jungle-green/25">
                                     <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                                        <table className="min-w-full divide-y divide-deep-jungle-green/40">
+                                            <thead className="bg-gradient-to-r from-deep-jungle-green/85 to-rich-black/85 text-white">
                                                 <tr>
-                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
-                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Teacher</th>
-                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Room</th>
-                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Day</th>
-                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Time</th>
-                                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Course</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Teacher</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Room</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Day</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Time</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Action</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                {recentSchedules.length > 0 ? recentSchedules.map((schedule) => (
-                                                    <tr key={schedule.id} className="hover:bg-gray-50 transition-colors duration-200">
+                                            <tbody className="bg-slate-950/80 divide-y divide-deep-jungle-green/30">
+                                                {recentSchedules?.length > 0 ? recentSchedules.map((schedule) => (
+                                                    <tr key={schedule.id} className="hover:bg-slate-800 transition-colors duration-200">
                                                         <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="text-sm font-medium text-gray-900">
+                                                            <div className="text-sm font-semibold text-pearl-aqua">
                                                                 {schedule.course ? schedule.course.course_code : 'Not assigned'}
                                                             </div>
-                                                            <div className="text-sm text-gray-500">
+                                                            <div className="text-xs text-slate-300">
                                                                 {schedule.course ? schedule.course.course_name : 'Not assigned'}
                                                             </div>
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            {schedule.teacher?.user?.name 
-                                                                ? schedule.teacher.user.name 
-                                                                : 'Not assigned'}
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
+                                                            {schedule.teacher?.user?.name || 'Not assigned'}
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
                                                             {schedule.room?.room_code || 'Not assigned'}
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
                                                             {schedule.timeslot?.day_of_week || 'Not assigned'}
                                                         </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            {schedule.timeslot ? 
-                                                                `${schedule.timeslot.start_time} - ${schedule.timeslot.end_time}` : 
-                                                                'Not assigned'}
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
+                                                            {schedule.timeslot ? `${schedule.timeslot.start_time} - ${schedule.timeslot.end_time}` : 'Not assigned'}
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             <Link
                                                                 href={`/schedules/${schedule.id}`}
-                                                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-200"
+                                                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-pearl-aqua text-rich-black hover:bg-vivid-orange hover:text-white transition-colors duration-200"
                                                             >
-                                                                View Details
+                                                                View
                                                             </Link>
                                                         </td>
                                                     </tr>
                                                 )) : (
                                                     <tr>
-                                                        <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                                        <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
                                                             No schedules found. Generate a schedule to get started.
                                                         </td>
                                                     </tr>
@@ -128,56 +124,56 @@ export default function AdminDashboard({ stats, recentSchedules }) {
 
                             {/* Quick Actions */}
                             <div>
-                                <h3 className="text-2xl font-bold mb-6 text-gray-800">Quick Actions</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <h3 className="text-2xl font-bold mb-6 text-pearl-aqua">Quick Actions</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                                     <Link
                                         href="/admin/users/create"
-                                        className="group bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                        className="group bg-gradient-to-r from-deep-jungle-green to-pearl-aqua text-rich-black p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
                                     >
                                         <div className="text-center">
                                             <div className="text-4xl mb-3">👤</div>
                                             <h4 className="text-lg font-semibold mb-2">Create User</h4>
-                                            <p className="text-blue-100 text-sm">Add new students, teachers, or admin users</p>
+                                            <p className="text-rich-black/80 text-sm">Add new students, teachers, or admin users</p>
                                         </div>
                                     </Link>
                                     <Link
                                         href="/schedules/generate"
-                                        className="group bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                        className="group bg-gradient-to-r from-vivid-orange to-deep-jungle-green text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
                                     >
                                         <div className="text-center">
                                             <div className="text-4xl mb-3">⚡</div>
                                             <h4 className="text-lg font-semibold mb-2">Generate Schedule</h4>
-                                            <p className="text-indigo-100 text-sm">Automatically create schedules for courses</p>
+                                            <p className="text-pearl-aqua/90 text-sm">Automatically create schedules for courses</p>
                                         </div>
                                     </Link>
                                     <Link
                                         href="/import"
-                                        className="group bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                        className="group bg-gradient-to-r from-pearl-aqua to-deep-jungle-green text-rich-black p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
                                     >
                                         <div className="text-center">
                                             <div className="text-4xl mb-3">📥</div>
                                             <h4 className="text-lg font-semibold mb-2">Import Data</h4>
-                                            <p className="text-green-100 text-sm">Upload Excel files to import data</p>
+                                            <p className="text-rich-black/80 text-sm">Upload Excel files to import data</p>
                                         </div>
                                     </Link>
                                     <a
                                         href="/export/schedule"
-                                        className="group bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 block"
+                                        className="group bg-gradient-to-r from-deep-jungle-green to-vivid-orange text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 block"
                                     >
                                         <div className="text-center">
                                             <div className="text-4xl mb-3">📤</div>
                                             <h4 className="text-lg font-semibold mb-2">Export Schedule</h4>
-                                            <p className="text-purple-100 text-sm">Download schedules as Excel file</p>
+                                            <p className="text-pearl-aqua/90 text-sm">Download schedules as Excel file</p>
                                         </div>
                                     </a>
                                     <a
                                         href="/export/credentials"
-                                        className={`group bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-6 rounded-xl shadow-lg transition-all duration-300 hover:scale-105 block ${stats.pending_credentials <= 0 ? 'opacity-50 pointer-events-none' : 'hover:shadow-xl'}`}
+                                        className={`group bg-gradient-to-r from-deep-jungle-green to-vivid-orange text-white p-6 rounded-2xl shadow-lg transition-all duration-300 hover:scale-105 block ${stats.pending_credentials <= 0 ? 'opacity-50 pointer-events-none' : 'hover:shadow-2xl'}`}
                                     >
                                         <div className="text-center">
                                             <div className="text-4xl mb-3">🔑</div>
                                             <h4 className="text-lg font-semibold mb-2">Export Credentials</h4>
-                                            <p className="text-indigo-100 text-sm">
+                                            <p className="text-pearl-aqua/90 text-sm">
                                                 {stats.pending_credentials > 0 ?
                                                     'Download new login credentials' :
                                                     'No pending credentials to export'

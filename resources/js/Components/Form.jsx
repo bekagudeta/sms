@@ -70,8 +70,9 @@ export default function Form({
 
     return (
         <form onSubmit={onSubmit} className="space-y-6">
-            {fields.map((field) => (
-                <div key={field.name} className="mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {fields.map((field) => (
+                    <div key={field.name} className="mb-4">
                     <label 
                         htmlFor={field.name} 
                         className="block text-sm font-medium text-gray-700"
@@ -89,6 +90,7 @@ export default function Form({
                     )}
                 </div>
             ))}
+            </div>
 
             <div className="flex items-center justify-end mt-6">
                 <button

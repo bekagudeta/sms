@@ -8,8 +8,7 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
     const flash = props.flash;
 
     const { data: autoData, setData: setAutoData, post: autoPost, processing: autoProcessing } = useForm({
-        semester_id: '',
-        algorithm: 'greedy'
+        semester_id: ''
     });
 
     const handleAutoGenerate = () => {
@@ -18,7 +17,7 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
             return;
         }
 
-        autoPost('/schedules/generate-auto', { semester_id: autoData.semester_id, algorithm: autoData.algorithm }, {
+        autoPost('/schedules/generate-auto', { semester_id: autoData.semester_id }, {
             onSuccess: () => {
                 // Server will redirect to /schedules with flash message
             },
@@ -33,17 +32,17 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
         <DashboardLayout>
             <Head title="Generate Schedule" />
             
-            <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div className="p-6 bg-white border-b border-gray-200">
-                    <h2 className="text-2xl font-bold mb-6">Schedule Generation</h2>
+            <div className="bg-deep-jungle-green overflow-hidden shadow-2xl sm:rounded-lg border border-pearl-aqua/20">
+                <div className="p-6 bg-rich-black/80 border-b border-pearl-aqua/20">
+                    <h2 className="text-2xl font-bold mb-6 text-pearl-aqua">Schedule Generation</h2>
 
                     {flash?.success && (
-                        <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded">
+                        <div className="mb-4 bg-pearl-aqua/20 border border-pearl-aqua text-rich-black px-4 py-3 rounded">
                             {flash.success}
                         </div>
                     )}
                     {flash?.error && (
-                        <div className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+                        <div className="mb-4 bg-vivid-orange/20 border border-vivid-orange text-rich-black px-4 py-3 rounded">
                             {flash.error}
                         </div>
                     )}
@@ -108,18 +107,7 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
                                 </select>
                             </div>
 
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700">Algorithm</label>
-                                <select
-                                    value={autoData.algorithm}
-                                    onChange={e => setAutoData('algorithm', e.target.value)}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value="greedy">Greedy Algorithm (Fast)</option>
-                                    <option value="backtracking">Backtracking Algorithm (Optimal)</option>
-                                    <option value="csp">Constraint Satisfaction Problem (CSP)</option>
-                                </select>
-                            </div>
+
 
                             <div className="mb-6">
                                 <button
@@ -345,7 +333,7 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
                 <div className="mb-6">
                     <h4 className="font-semibold mb-2">Manual Schedule Rows</h4>
                     <div className="overflow-x-auto">
-                        <table className="min-w-full bg-white border border-gray-200">
+                        <table className="min-w-full bg-rich-black/80 border border-pearl-aqua/30 text-pearl-aqua">
                             <thead>
                                 <tr>
                                     <th className="px-3 py-2 border">Course</th>

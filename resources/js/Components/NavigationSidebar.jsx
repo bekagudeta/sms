@@ -121,8 +121,8 @@ export default function NavigationSidebar({ currentRoute }) {
                 href="/dashboard"
                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                     isActive('/dashboard')
-                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-pearl-aqua text-rich-black border-r-2 border-vivid-orange'
+                        : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua'
                 }`}
             >
                 {getIcon('Dashboard')}
@@ -134,8 +134,8 @@ export default function NavigationSidebar({ currentRoute }) {
                 href="/schedules"
                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                     isActive('/schedules')
-                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-gradient-to-r from-vivid-orange to-pearl-aqua text-rich-black border-r-2 border-vivid-orange shadow-lg shadow-vivid-orange/40'
+                        : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua hover:shadow-inner hover:shadow-deep-jungle-green/30'
                 }`}
             >
                 {getIcon('CalendarAlt')}
@@ -156,7 +156,7 @@ export default function NavigationSidebar({ currentRoute }) {
                     <div key={category.category}>
                         <button
                             onClick={() => toggleCategory(category.category)}
-                            className="w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                            className="w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua"
                         >
                             {getIcon(category.icon)}
                             <span className="ml-3">{category.category}</span>
@@ -176,7 +176,7 @@ export default function NavigationSidebar({ currentRoute }) {
                             <div className="mt-1 space-y-1">
                                 {category.items.map((item) => {
                                     const config = getEntityConfig(item.key);
-                                    if (!hasPermission(config.permissions.view)) return null;
+                                    if (!config || !config.permissions || !hasPermission(config.permissions.view)) return null;
 
                                     const route = `/${config.routePrefix}`;
 
@@ -186,8 +186,8 @@ export default function NavigationSidebar({ currentRoute }) {
                                             href={route}
                                             className={`group flex items-center pl-10 pr-3 py-2 text-sm font-medium rounded-md ${
                                                 isActive(route)
-                                                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                                    ? 'bg-pearl-aqua text-rich-black border-r-2 border-vivid-orange'
+                                                    : 'text-pearl-aqua/80 hover:bg-deep-jungle-green hover:text-pearl-aqua'
                                             }`}
                                         >
                                             {getIcon(item.icon)}
@@ -200,6 +200,19 @@ export default function NavigationSidebar({ currentRoute }) {
                     </div>
                 );
             })}
+
+            {/* Settings */}
+            <Link
+                href="/settings"
+                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                    isActive('/settings')
+                        ? 'bg-gradient-to-r from-deep-jungle-green via-pearl-aqua to-vivid-orange text-rich-black border-r-2 border-vivid-orange shadow-lg shadow-vivid-orange/40'
+                        : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua hover:shadow-inner hover:shadow-deep-jungle-green/30'
+                }`}
+            >
+                {getIcon('Cog')}
+                <span className="ml-3">Settings</span>
+            </Link>
         </nav>
     );
 }

@@ -37,7 +37,8 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        return Redirect::route('profile.edit');
+        // Keep user in the settings dashboard path so we do not land on a blank (non-dashboard) layout.
+        return Redirect::route('settings.profile');
     }
 
     /**

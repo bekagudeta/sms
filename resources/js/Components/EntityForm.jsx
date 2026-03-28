@@ -201,8 +201,10 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
             },
             rooms: {
                 room_code: { label: 'Room Code' },
+                building: { label: 'Building' },
+                floor: { type: 'number', min: 0, label: 'Floor' },
                 capacity: { type: 'number', min: 1, label: 'Capacity' },
-                type: { 
+                type: {
                     type: 'select',
                     options: [
                         { value: 'lecture', label: 'Lecture' },
@@ -210,7 +212,10 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                         { value: 'seminar', label: 'Seminar' },
                         { value: 'conference', label: 'Conference' }
                     ]
-                }
+                },
+                has_projector: { type: 'checkbox', label: 'Has Projector' },
+                has_computers: { type: 'checkbox', label: 'Has Computers' },
+                computer_count: { type: 'number', min: 0, label: 'Computer Count' }
             },
             timeslots: {
                 day_of_week: { 

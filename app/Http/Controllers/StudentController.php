@@ -48,14 +48,15 @@ class StudentController extends Controller
             'last_name'       => 'required|string|max:100',
             'email'           => 'required|email|max:255|unique:students,email',
             'phone'           => 'nullable|string|max:20',
-            'department_id'   => 'required|exists:departments,id',
-            'semester'        => 'required|integer|min:1|max:12',
-            'enrollment_date' => 'required|date',
+            'department_id'   => 'nullable|exists:departments,id',
+            'grade'           => 'nullable|integer|min:1|max:12',
+            'status'          => 'nullable|string|in:active,inactive,pending,graduated,suspended',
+            'enrollment_date' => 'nullable|date',
         ]);
 
         $this->repository->create($validated);
 
-        return redirect()->route('students.index')
+        return redirect()->route('entities.index', ['entityType' => 'students'])
             ->with('success', 'Student created successfully.');
     }
 
@@ -79,14 +80,15 @@ class StudentController extends Controller
             'last_name'       => 'required|string|max:100',
             'email'           => 'required|email|max:255|unique:students,email,' . $student->id,
             'phone'           => 'nullable|string|max:20',
-            'department_id'   => 'required|exists:departments,id',
-            'semester'        => 'required|integer|min:1|max:12',
-            'enrollment_date' => 'required|date',
+            'department_id'   => 'nullable|exists:departments,id',
+            'grade'           => 'nullable|integer|min:1|max:12',
+            'status'          => 'nullable|string|in:active,inactive,pending,graduated,suspended',
+            'enrollment_date' => 'nullable|date',
         ]);
 
         $this->repository->update($student->id, $validated);
 
-        return redirect()->route('students.index')
+        return redirect()->route('entities.index', ['entityType' => 'students'])
             ->with('success', 'Student updated successfully.');
     }
 
@@ -94,7 +96,7 @@ class StudentController extends Controller
     {
         $this->repository->delete($student->id);
 
-        return redirect()->route('students.index')
+        return redirect()->route('entities.index', ['entityType' => 'students'])
             ->with('success', 'Student deleted successfully.');
     }
 }

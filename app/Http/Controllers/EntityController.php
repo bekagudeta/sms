@@ -104,10 +104,10 @@ class EntityController extends Controller
             'model' => 'App\Models\SectionTeacher',
             'controller' => null, // Handle directly in this controller
             'permissions' => [
-                'view' => 'view enrollments',
-                'create' => 'create enrollments',
-                'edit' => 'edit enrollments',
-                'delete' => 'delete enrollments',
+                'view' => 'view section-teachers',
+                'create' => 'create section-teachers',
+                'edit' => 'edit section-teachers',
+                'delete' => 'delete section-teachers',
                 'import' => 'import section-teachers'
             ]
         ]
@@ -139,18 +139,41 @@ class EntityController extends Controller
         // Try to get actual data if model exists and has a table
         if (class_exists($model)) {
             try {
-                $data = $model::paginate(15)->withQueryString();
+                $query = $model::query();
+
+                // Load relationships for nested columns in generic list views
+                $relationIncludes = [];
+                switch ($entityType) {
+                    case 'enrollments':
+                        $relationIncludes = ['student', 'section'];
+                        break;
+                    case 'section-teachers':
+                        $relationIncludes = ['section', 'teacher'];
+                        break;
+                    case 'course-offerings':
+                        $relationIncludes = ['course', 'semester'];
+                        break;
+                    case 'sections':
+                        $relationIncludes = ['courseOffering.course', 'courseOffering.semester'];
+                        break;
+                }
+
+                if (!empty($relationIncludes)) {
+                    $query = $query->with($relationIncludes);
+                }
+
+                $data = $query->paginate(15)->withQueryString();
             } catch (\Exception $e) {
                 // If there's any error, use empty collection
                 $data = collect([]);
             }
         }
 
-        // Determine the correct view to render
-        $viewName = str_replace('-', '', ucwords($entityType, '-')) . '/Index';
-        
-        $data = [
-            strtolower(str_replace('-', '', $entityType)) => $data,
+        // Always render the Entities/Index view with the entity data
+        return Inertia::render('Entities/Index', [
+            'entityType' => $entityType,
+            'data' => $data,
+            'filters' => $request->only(['search', 'status', 'department']),
             'permissions' => [
                 'view' => $isAdmin || auth()->user()->can($permissions['view']),
                 'create' => $isAdmin || auth()->user()->can($permissions['create']),
@@ -158,17 +181,7 @@ class EntityController extends Controller
                 'delete' => $isAdmin || auth()->user()->can($permissions['delete']),
                 'import' => $isAdmin || auth()->user()->can($permissions['import']),
             ]
-        ];
-        
-        // Debug logging
-        \Log::debug('EntityController Debug:', [
-            'entityType' => $entityType,
-            'viewName' => $viewName,
-            'dataKeys' => array_keys($data),
-            'dataCount' => is_countable($data[strtolower(str_replace('-', '', $entityType))]) ? count($data[strtolower(str_replace('-', '', $entityType))]) : 'not countable'
         ]);
-        
-        return Inertia::render($viewName, $data);
     }
 
     public function store(Request $request, $entityType)
@@ -188,14 +201,6 @@ class EntityController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        // Delegate to existing controller if available
-        if ($entityConfig['controller'] && class_exists($entityConfig['controller'])) {
-            $controllerClass = $entityConfig['controller'];
-            $controller = app($controllerClass);
-            return $controller->store($request);
-        }
-
-        // Handle entities without dedicated controllers
         return $this->handleEntityStore($request, $entityType);
     }
 
@@ -216,14 +221,6 @@ class EntityController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        // Delegate to existing controller if available
-        if ($entityConfig['controller'] && class_exists($entityConfig['controller'])) {
-            $controllerClass = $entityConfig['controller'];
-            $controller = app($controllerClass);
-            return $controller->update($request, $id);
-        }
-
-        // Handle entities without dedicated controllers
         return $this->handleEntityUpdate($request, $entityType, $id);
     }
 
@@ -244,14 +241,6 @@ class EntityController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        // Delegate to existing controller if available
-        if ($entityConfig['controller'] && class_exists($entityConfig['controller'])) {
-            $controllerClass = $entityConfig['controller'];
-            $controller = app($controllerClass);
-            return $controller->destroy($id);
-        }
-
-        // Handle entities without dedicated controllers
         return $this->handleEntityDestroy($entityType, $id);
     }
 
@@ -307,7 +296,7 @@ class EntityController extends Controller
         $model = $this->entityMap[$entityType]['model'];
         $entity = $model::findOrFail($id);
 
-        $validationRules = $this->getValidationRules($entityType);
+        $validationRules = $this->getValidationRules($entityType, $id);
         $validated = $request->validate($validationRules);
 
         $entity->update($validated);
@@ -325,15 +314,29 @@ class EntityController extends Controller
         return back()->with('success', ucfirst($entityType) . ' deleted successfully.');
     }
 
-    private function getValidationRules($entityType)
+    private function getValidationRules($entityType, $id = null)
     {
         $rules = [
             'students' => [
-                'name' => 'required|string|max:255',
-                'email' => 'required|email|unique:students,email',
-                'student_id' => 'required|string|unique:students,student_id',
+                'student_id' => 'required|string|max:50|unique:students,student_id' . ($id ? ",{$id}" : ''),
+                'first_name' => 'required|string|max:100',
+                'last_name' => 'required|string|max:100',
+                'email' => 'required|email|max:255|unique:students,email' . ($id ? ",{$id}" : ''),
+                'phone' => 'nullable|string|max:20',
+                'department_id' => 'nullable|exists:departments,id',
                 'grade' => 'nullable|integer|min:1|max:12',
-                'status' => 'nullable|string|in:active,inactive'
+                'status' => 'nullable|string|in:active,inactive,pending,graduated,suspended',
+                'enrollment_date' => 'nullable|date'
+            ],
+            'rooms' => [
+                'room_code' => 'required|string|max:50|unique:rooms,room_code' . ($id ? ",{$id}" : ''),
+                'building' => 'required|string|max:100',
+                'floor' => 'required|integer|min:0',
+                'capacity' => 'required|integer|min:1',
+                'type' => 'required|string|in:lecture,lab,seminar,conference',
+                'has_projector' => 'sometimes|boolean',
+                'has_computers' => 'sometimes|boolean',
+                'computer_count' => 'sometimes|integer|min:0'
             ],
             'enrollments' => [
                 'student_id' => 'required|exists:students,id',

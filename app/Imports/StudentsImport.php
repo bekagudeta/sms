@@ -143,7 +143,8 @@ class StudentsImport implements
                         'email' => trim($row['email'] ?? ''),
                         'phone' => $row['phone'] ?? null,
                         'department_id' => $department->id,
-                        'semester' => isset($row['semester']) ? (int) $row['semester'] : 1,
+                        'grade' => isset($row['grade']) ? (int) $row['grade'] : null,
+                        'status' => $row['status'] ?? 'active',
                         'level' => (string) ($row['level'] ?? ''),
                         'section' => (string) ($row['section'] ?? ''),
                         'enrollment_date' => $enrollmentDate

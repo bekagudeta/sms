@@ -12,6 +12,12 @@ export default {
 
     theme: {
         extend: {
+            colors: {
+                'rich-black': '#001722',
+                'deep-jungle-green': '#084A48',
+                'pearl-aqua': '#6BCFCB',
+                'vivid-orange': '#FE580B',
+            },
             fontFamily: {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
             },

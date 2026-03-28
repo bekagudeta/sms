@@ -73,6 +73,16 @@ Route::get('/', function () {
     }
 });
 
+// Auto-login route for development
+Route::get('/auto-login', function () {
+    $user = \App\Models\User::first();
+    if ($user) {
+        Auth::login($user);
+        return redirect('/admin/dashboard');
+    }
+    return 'No users found in database';
+});
+
 // authentication routes (login, register, password reset, etc.)
 require __DIR__.'/auth.php';
 
@@ -179,6 +189,22 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/schedules',
             [ScheduleController::class,'index'])
             ->name('schedules.index');
+
+    Route::get('/settings', function () {
+        return Inertia::render('Settings/Index');
+    })->name('settings');
+
+    Route::get('/settings/profile', function () {
+        return Inertia::render('Settings/Profile');
+    })->name('settings.profile');
+
+    Route::get('/settings/system', function () {
+        return Inertia::render('Settings/System');
+    })->name('settings.system');
+
+    Route::get('/settings/security', function () {
+        return Inertia::render('Settings/Security');
+    })->name('settings.security');
 
     Route::get('/schedules/{schedule}',
             [ScheduleController::class,'show'])

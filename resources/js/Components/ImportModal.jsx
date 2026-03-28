@@ -114,7 +114,9 @@ export default function ImportModal({ isOpen, onClose, entityType, config, onSuc
     const handleClose = () => {
         setStep(1);
         setPreviewData([]);
-        setSelectedFile(null);
+        setData('file', null);
+        setData('mappings', {});
+        setData('skip_header', true);
         reset();
         onClose();
     };
