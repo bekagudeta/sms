@@ -6,6 +6,8 @@ export default function NavigationSidebar({ currentRoute }) {
     const [expandedCategories, setExpandedCategories] = useState(new Set(['People', 'Academics', 'Resources', 'Assignments']));
     const { props } = usePage();
     const user = props.auth?.user;
+    const userRoles = user?.roles || [];
+    const userPermissions = user?.permissions || [];
 
     const toggleCategory = (category) => {
         const newExpanded = new Set(expandedCategories);
@@ -22,13 +24,41 @@ export default function NavigationSidebar({ currentRoute }) {
         if (!user) return false;
         
         // Admin has all permissions
-        if (user.roles && user.roles.some(role => role.name === 'admin')) {
+        if (userRoles.some(role => role.name === 'admin')) {
             return true;
         }
         
-        // For now, grant all permissions to authenticated users for testing
-        // TODO: Implement proper permission system
-        return true;
+        // Check specific role-based permissions
+        if (userRoles.some(role => role.name === 'scheduler')) {
+            const schedulerPermissions = [
+                'view students', 'create students', 'edit students', 'delete students', 'import students',
+                'view teachers', 'create teachers', 'edit teachers', 'delete teachers', 'import teachers',
+                'view courses', 'create courses', 'edit courses', 'delete courses', 'import courses', 'import course-offerings', 'import sections',
+                'view rooms', 'create rooms', 'edit rooms', 'delete rooms', 'import rooms',
+                'view timeslots', 'create timeslots', 'edit timeslots', 'delete timeslots', 'import timeslots',
+                'view enrollments', 'create enrollments', 'edit enrollments', 'delete enrollments', 'import enrollments', 'import section-teachers',
+                'view schedules', 'create schedules', 'edit schedules', 'delete schedules',
+                'import data', 'export schedule', 'generate schedule'
+            ];
+            return schedulerPermissions.includes(permission) || userPermissions.includes(permission);
+        }
+        
+        if (userRoles.some(role => role.name === 'teacher')) {
+            const teacherPermissions = [
+                'view schedules', 'view own schedule', 'view courses', 'view rooms', 'view timeslots'
+            ];
+            return teacherPermissions.includes(permission) || userPermissions.includes(permission);
+        }
+        
+        if (userRoles.some(role => role.name === 'student')) {
+            const studentPermissions = [
+                'view schedules', 'view own schedule', 'view courses', 'view rooms', 'view timeslots'
+            ];
+            return studentPermissions.includes(permission) || userPermissions.includes(permission);
+        }
+        
+        // Check direct permissions
+        return userPermissions.includes(permission);
     };
 
     const getIcon = (iconName) => {
@@ -130,20 +160,72 @@ export default function NavigationSidebar({ currentRoute }) {
             </Link>
 
             {/* Schedules */}
-            <Link
-                href="/schedules"
-                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                    isActive('/schedules')
-                        ? 'bg-gradient-to-r from-vivid-orange to-pearl-aqua text-rich-black border-r-2 border-vivid-orange shadow-lg shadow-vivid-orange/40'
-                        : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua hover:shadow-inner hover:shadow-deep-jungle-green/30'
-                }`}
-            >
-                {getIcon('CalendarAlt')}
-                <span className="ml-3">Schedules</span>
-            </Link>
+            {(hasPermission('view schedules') || hasPermission('generate schedule')) && (
+                <Link
+                    href="/schedules"
+                    className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                        isActive('/schedules')
+                            ? 'bg-gradient-to-r from-vivid-orange to-pearl-aqua text-rich-black border-r-2 border-vivid-orange shadow-lg shadow-vivid-orange/40'
+                            : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua hover:shadow-inner hover:shadow-deep-jungle-green/30'
+                    }`}
+                >
+                    {getIcon('CalendarAlt')}
+                    <span className="ml-3">Schedules</span>
+                </Link>
+            )}
 
-            {/* Entity Categories */}
-            {NAVIGATION_STRUCTURE.map((category) => {
+            {/* Schedule Generation - Scheduler specific */}
+            {hasPermission('generate schedule') && (
+                <Link
+                    href="/schedules/generate"
+                    className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                        isActive('/schedules/generate')
+                            ? 'bg-gradient-to-r from-vivid-orange to-pearl-aqua text-rich-black border-r-2 border-vivid-orange shadow-lg shadow-vivid-orange/40'
+                            : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua hover:shadow-inner hover:shadow-deep-jungle-green/30'
+                    }`}
+                >
+                    {getIcon('Calendar')}
+                    <span className="ml-3">Generate Schedule</span>
+                </Link>
+            )}
+
+            {/* Import/Export - Scheduler specific */}
+            {(hasPermission('import data') || hasPermission('export schedule')) && (
+                <div className="space-y-1">
+                    <div className="px-3 py-1 text-xs font-semibold text-pearl-aqua/60 uppercase tracking-wider">
+                        Data Management
+                    </div>
+                    {hasPermission('import data') && (
+                        <Link
+                            href="/import"
+                            className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                                isActive('/import')
+                                    ? 'bg-pearl-aqua text-rich-black border-r-2 border-vivid-orange'
+                                    : 'text-pearl-aqua/80 hover:bg-deep-jungle-green hover:text-pearl-aqua'
+                            }`}
+                        >
+                            {getIcon('BookOpen')}
+                            <span className="ml-3">Import Data</span>
+                        </Link>
+                    )}
+                    {hasPermission('export schedule') && (
+                        <a
+                            href="/export/schedule"
+                            className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                                isActive('/export')
+                                    ? 'bg-pearl-aqua text-rich-black border-r-2 border-vivid-orange'
+                                    : 'text-pearl-aqua/80 hover:bg-deep-jungle-green hover:text-pearl-aqua'
+                            }`}
+                        >
+                            {getIcon('Book')}
+                            <span className="ml-3">Export Schedule</span>
+                        </a>
+                    )}
+                </div>
+            )}
+
+            {/* Entity Categories - Only show for admin */}
+            {userRoles.some(role => role.name === 'admin') && NAVIGATION_STRUCTURE.map((category) => {
                 const isExpanded = expandedCategories.has(category.category);
                 const hasVisibleItems = category.items.some(item => {
                     const config = getEntityConfig(item.key);

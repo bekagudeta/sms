@@ -51,10 +51,15 @@ class Handler extends ExceptionHandler
             $errorCode = $e->getCode();
 
             if (in_array($errorCode, [2002, 2006, 1045, 1049])) {
+                // If the error occurred while attempting login, send user back to login with a friendly message
+                if ($request->is('login')) {
+                    return redirect()->route('login')
+                        ->withErrors(['email' => 'Cannot connect to authentication database. Please try again shortly.'])
+                        ->withInput($request->only('email'));
+                }
 
-                // IMPORTANT: don't redirect → render a safe view
                 return response()->view('errors.db_connection', [
-                    'message' => 'Database connection failed. Please try again later.'
+                    'message' => 'We are currently unable to process your request. Please try again shortly.'
                 ], 503);
             }
         }

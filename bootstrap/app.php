@@ -25,7 +25,16 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->renderable(function (QueryException|\PDOException $e, $request) {
-            $message = 'Database connection failed. Please check your database settings and ensure the database server is online.';
+            // Check if we're on an auth route - if so, don't show database error
+            $path = $request->path();
+            
+            if (str_starts_with($path, 'login') || str_starts_with($path, 'register') || str_starts_with($path, 'password')) {
+                // For auth routes, don't intercept database errors - let them fail normally
+                // This will allow the login page to load even without database
+                return null;
+            }
+            
+            $message = 'We are currently unable to process your request due to temporary system availability. Please try again shortly.';
 
             if ($request->expectsJson()) {
                 return response()->json(['error' => $message], 503);

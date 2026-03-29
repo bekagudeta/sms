@@ -18,17 +18,10 @@
 <body>
     <div class="container">
         <div class="card">
-            <h1 class="title">Database Connection Error</h1>
-            <p class="message">{{ $message }}</p>
-            <p>Please verify that your database server is reachable and that your .env database settings are correct:</p>
-            <ul>
-                <li>DB_HOST</li>
-                <li>DB_PORT</li>
-                <li>DB_DATABASE</li>
-                <li>DB_USERNAME</li>
-                <li>DB_PASSWORD</li>
+            <h1 class="title">Service Temporarily Unavailable</h1>
+            <p class="message">{{ $message }} If this persists, please contact support or try again later.</p>
             </ul>
-            <a href="{{ url('/') }}" class="btn">Retry</a>
+            <a href="{{ route('login') }}" class="btn">Back to Login</a>
         </div>
     </div>
 </body>

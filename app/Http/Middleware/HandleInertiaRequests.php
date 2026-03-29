@@ -41,13 +41,17 @@ class HandleInertiaRequests extends Middleware
             $roles = $user->getRoleNames()->toArray();
         }
 
-        return [
-            ...parent::share($request),
+        return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $user ? $user->load('roles', 'permissions') : null,
                 'roles' => $roles,
                 'permissions' => $permissions,
             ],
-        ];
+            'errors' => function () use ($request) {
+                return $request->session()->get('errors') 
+                    ? $request->session()->get('errors')->getBag('default')->getMessages() 
+                    : (object) [];
+            },
+        ]);
     }
 }

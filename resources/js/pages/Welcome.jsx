@@ -25,7 +25,7 @@ export default function Welcome({ auth }) {
           </button>
 
           <nav className="hidden items-center gap-8 text-base font-medium text-slate-700 md:flex">
-            <Link href="#dashboard" className="hover:text-cyan-600">Dashboard</Link>
+            <Link href="#dashboard" className="hover:text-cyan-600">Home</Link>
             <Link href="#features" className="hover:text-cyan-600">Features</Link>
             <Link href="#about" className="hover:text-cyan-600">About</Link>
             <Link href="#contact" className="hover:text-cyan-600">Contact</Link>
