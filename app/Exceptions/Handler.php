@@ -45,34 +45,20 @@ class Handler extends ExceptionHandler
      * @return \Symfony\Component\HttpFoundation\Response
      */
     public function render($request, Throwable $e)
-{
-    // Detect DB connection error specifically
-    if ($e instanceof QueryException || $e instanceof PDOException) {
-        
-        $errorCode = $e->getCode();
+    {
+        if ($e instanceof QueryException || $e instanceof PDOException) {
 
-        // MySQL connection refused / server down
-        if (in_array($errorCode, [2002, 2006, 1049])) {
+            $errorCode = $e->getCode();
 
-            $message = 'Database is currently unavailable. Please try again later.';
+            if (in_array($errorCode, [2002, 2006, 1045, 1049])) {
 
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'error' => $message
-                ], 503);
-            }
-
-            // Safe fallback if view missing
-            if (view()->exists('errors.db_connection')) {
+                // IMPORTANT: don't redirect → render a safe view
                 return response()->view('errors.db_connection', [
-                    'message' => $message
+                    'message' => 'Database connection failed. Please try again later.'
                 ], 503);
             }
-
-            return response($message, 503);
         }
-    }
 
-    return parent::render($request, $e);
-}
+        return parent::render($request, $e);
+    }
 }

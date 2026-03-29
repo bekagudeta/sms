@@ -62,7 +62,7 @@ export const ENTITY_CONFIG = {
       { key: "course_code", label: "Code", sortable: true, searchable: true },
       { key: "course_name", label: "Name", sortable: true, searchable: true },
       { key: "credits", label: "Credits", sortable: true },
-      { key: "department", label: "Department", sortable: true, filterable: true }
+      { key: "department.name", label: "Department", sortable: true, filterable: true }
     ],
     requiredColumns: ["course_code", "course_name", "credits"],
     optionalColumns: ["department", "description", "level", "prerequisites"],
@@ -108,7 +108,7 @@ export const ENTITY_CONFIG = {
     columns: [
       { key: "id", label: "ID", sortable: true },
       { key: "section_name", label: "Section", sortable: true, searchable: true },
-      { key: "courseOffering.course.course_name", label: "Course", sortable: true, searchable: true },
+      { key: "course_name", label: "Course", sortable: true, searchable: true },
       { key: "capacity", label: "Capacity", sortable: true },
       { key: "enrolled_count", label: "Enrolled", sortable: true },
       { key: "created_at", label: "Created", sortable: true }

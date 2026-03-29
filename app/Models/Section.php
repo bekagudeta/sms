@@ -19,6 +19,10 @@ class Section extends Model
         'capacity' => 'integer',
     ];
 
+    protected $appends = ['enrolled_count', 'course_name'];
+
+    protected $with = ['courseOffering.course'];
+
     public function courseOffering()
     {
         return $this->belongsTo(CourseOffering::class);
@@ -71,6 +75,11 @@ class Section extends Model
     public function getEnrolledCountAttribute()
     {
         return $this->enrollments()->count();
+    }
+
+    public function getCourseNameAttribute()
+    {
+        return $this->courseOffering?->course?->course_name ?? $this->course?->course_name ?? null;
     }
 
     public function getAvailableSeatsAttribute()

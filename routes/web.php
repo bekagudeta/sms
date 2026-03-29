@@ -27,50 +27,11 @@ use App\Http\Controllers\EntityController;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    if (!Auth::check()) {
-        return redirect()->route('login');
-    }
-
-    $user = Auth::user();
-    $role = $user->roles->first()?->name;
-
-    if (! $role) {
-        // Try inferring the role from the email prefix for seeded/testing accounts
-        $email = strtolower($user->email);
-        $roleMap = [
-            'admin@' => 'admin',
-            'scheduler@' => 'scheduler',
-            'teacher@' => 'teacher',
-            'student@' => 'student',
-        ];
-
-        foreach ($roleMap as $prefix => $mappedRole) {
-            if (str_starts_with($email, $prefix)) {
-                $user->assignRole($mappedRole);
-                $role = $mappedRole;
-                break;
-            }
-        }
-    }
-
-    if (! $role) {
-        Auth::logout();
-        return redirect()->route('login')
-            ->with('status', 'Your account is not assigned a role. Please contact an administrator.');
-    }
-
-    switch ($role) {
-        case 'admin':
-            return app(DashboardController::class)->admin();
-        case 'scheduler':
-            return app(DashboardController::class)->scheduler();
-        case 'teacher':
-            return app(DashboardController::class)->teacher();
-        case 'student':
-            return app(DashboardController::class)->student();
-        default:
-            return redirect()->route('login');
-    }
+    return Inertia::render('Welcome', [
+        'auth' => [
+            'user' => Auth::user(),
+        ],
+    ]);
 });
 
 // Auto-login route for development

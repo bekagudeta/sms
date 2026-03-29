@@ -58,10 +58,43 @@ export default function EntityManager({ entityType, initialData = [], filters = 
         setShowFormModal(true);
     };
 
+    const toTimeInputValue = (value) => {
+        if (!value) return '';
+
+        // if already HH:MM
+        if (/^\d{2}:\d{2}$/.test(value)) return value;
+
+        // if HH:MM:SS -> HH:MM
+        if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
+            return value.slice(0, 5);
+        }
+
+        // parse 12-hour values like "02:00 AM" into HH:MM
+        const twelve = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (twelve) {
+            let hour = Number(twelve[1]);
+            const minute = twelve[2];
+            const meridian = twelve[3].toUpperCase();
+
+            if (meridian === 'PM' && hour < 12) hour += 12;
+            if (meridian === 'AM' && hour === 12) hour = 0;
+
+            return `${String(hour).padStart(2, '0')}:${minute}`;
+        }
+
+        return value;
+    };
+
     const handleEdit = (item) => {
         setEditingItem(item);
         Object.keys(formData).forEach(key => {
-            setFormData(key, item[key] || '');
+            let value = item[key] ?? '';
+
+            if (['start_time', 'end_time'].includes(key)) {
+                value = toTimeInputValue(value);
+            }
+
+            setFormData(key, value);
         });
         setShowFormModal(true);
     };
@@ -119,18 +152,65 @@ export default function EntityManager({ entityType, initialData = [], filters = 
     const handleFormSubmit = (e) => {
         e.preventDefault();
 
-        const submitData = editingItem 
-            ? put(`/entities/${entityType}/${editingItem.id}`, formData)
-            : post(`/entities/${entityType}`, formData);
+        const payload = { ...formData };
+        if (entityType === 'timeslots') {
+            const formatTime = (t) => {
+                if (!t) return t;
+                if (/^\d{2}:\d{2}$/.test(t)) return t;
+                if (/^\d{2}:\d{2}:\d{2}$/.test(t)) return t.slice(0, 5);
 
-        submitData.then(() => {
+                const twelve = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+                if (twelve) {
+                    let hour = Number(twelve[1]);
+                    const minute = twelve[2];
+                    const meridian = twelve[3].toUpperCase();
+                    if (meridian === 'PM' && hour < 12) hour += 12;
+                    if (meridian === 'AM' && hour === 12) hour = 0;
+                    return `${String(hour).padStart(2, '0')}:${minute}`;
+                }
+
+                return t;
+            };
+
+            payload.start_time = formatTime(payload.start_time);
+            payload.end_time = formatTime(payload.end_time);
+        }
+
+        setLoading(true);
+
+        const handleSuccess = () => {
+            if (editingItem) {
+                setData((prev) => prev.map((item) =>
+                    item.id === editingItem.id ? { ...item, ...payload } : item
+                ));
+            }
+
             setShowFormModal(false);
             reset();
-            // Refresh data
-            router.reload({ only: ['data'] });
-        }).catch(error => {
-            console.error('Form submission error:', error);
-        });
+            router.reload();
+        };
+
+        const handleError = (errorData) => {
+            console.error('Form submission error:', errorData);
+        };
+
+        const handleFinish = () => {
+            setLoading(false);
+        };
+
+        if (editingItem) {
+            put(`/entities/${entityType}/${editingItem.id}`, payload, {
+                onSuccess: handleSuccess,
+                onError: handleError,
+                onFinish: handleFinish
+            });
+        } else {
+            post(`/entities/${entityType}`, payload, {
+                onSuccess: handleSuccess,
+                onError: handleError,
+                onFinish: handleFinish
+            });
+        }
     };
 
     const handleSearch = (term) => {

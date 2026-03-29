@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
@@ -156,6 +157,9 @@ class EntityController extends Controller
                     case 'sections':
                         $relationIncludes = ['courseOffering.course', 'courseOffering.semester'];
                         break;
+                    case 'courses':
+                        $relationIncludes = ['department'];
+                        break;
                 }
 
                 if (!empty($relationIncludes)) {
@@ -288,7 +292,8 @@ class EntityController extends Controller
 
         $entity = $model::create($validated);
 
-        return back()->with('success', ucfirst($entityType) . ' created successfully.');
+        return redirect()->route('entities.index', ['entityType' => $entityType])
+            ->with('success', ucfirst($entityType) . ' created successfully.');
     }
 
     private function handleEntityUpdate(Request $request, $entityType, $id)
@@ -301,7 +306,8 @@ class EntityController extends Controller
 
         $entity->update($validated);
 
-        return back()->with('success', ucfirst($entityType) . ' updated successfully.');
+        return redirect()->route('entities.index', ['entityType' => $entityType])
+            ->with('success', ucfirst($entityType) . ' updated successfully.');
     }
 
     private function handleEntityDestroy($entityType, $id)
@@ -311,7 +317,8 @@ class EntityController extends Controller
         
         $entity->delete();
 
-        return back()->with('success', ucfirst($entityType) . ' deleted successfully.');
+        return redirect()->route('entities.index', ['entityType' => $entityType])
+            ->with('success', ucfirst($entityType) . ' deleted successfully.');
     }
 
     private function getValidationRules($entityType, $id = null)
@@ -347,6 +354,12 @@ class EntityController extends Controller
                 'section_id' => 'required|exists:sections,id',
                 'teacher_id' => 'required|exists:teachers,id',
                 'role' => 'nullable|string|max:255'
+            ],
+            'timeslots' => [
+                'day_of_week' => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+                'start_time' => 'required|date_format:H:i',
+                'end_time' => 'required|date_format:H:i|after:start_time',
+                'slot_code' => 'nullable|string|max:100'
             ]
         ];
 

@@ -38,10 +38,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Register UserObserver for integrity enforcement
         // User::observe(UserObserver::class);
-        // try {
-        //     DB::connection()->getPdo();
-        // } catch (\Exception $e) {
-        //     abort(500, 'Database is not available');
-        // }
+
+        // Do not force a DB health check on every boot; it can prevent the login page
+        // from rendering when the connection is misconfigured (which is what we're
+        // trying to recover from by redirecting to login).
+        // If you want optional DB health checks, do it in a specific admin route.
+
     }
 }
