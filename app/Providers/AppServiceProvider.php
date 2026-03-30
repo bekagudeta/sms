@@ -10,6 +10,8 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 use App\Models\User;
 use App\Observers\UserObserver;
+use App\Services\AutoSchedulerService;
+use App\Services\SchedulingEngine;
 
 
 
@@ -20,7 +22,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(AutoSchedulerService::class, function ($app) {
+            return new AutoSchedulerService();
+        });
+        
+        $this->app->singleton(SchedulingEngine::class, function ($app) {
+            return new SchedulingEngine();
+        });
     }
 
     /**

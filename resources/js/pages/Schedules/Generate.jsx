@@ -17,7 +17,7 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
             return;
         }
 
-        autoPost('/schedules/generate-auto', { semester_id: autoData.semester_id }, {
+        autoPost(route('schedules.generate.auto'), {
             onSuccess: () => {
                 // Server will redirect to /schedules with flash message
             },
