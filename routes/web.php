@@ -27,10 +27,19 @@ use App\Http\Controllers\EntityController;
 use Inertia\Inertia;
 
 Route::get('/', function () {
+    $user = null;
+
+    try {
+        $user = Auth::user();
+    } catch (\Throwable $e) {
+        report($e);
+    }
+
     return Inertia::render('Welcome', [
         'auth' => [
-            'user' => Auth::user(),
+            'user' => $user,
         ],
+        'status' => session('status'),
     ]);
 });
 

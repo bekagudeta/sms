@@ -33,8 +33,8 @@ export default function Welcome({ auth }) {
 
           <div>
             {auth?.user ? (
-              <Link href="/dashboard" className="rounded-full border-2 border-cyan-600 bg-white px-6 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-50">
-                Dashboard
+              <Link href="/" className="rounded-full border-2 border-cyan-600 bg-white px-6 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-50">
+                Home
               </Link>
             ) : (
               <Link href="/login" className="rounded-full border-2 border-cyan-600 bg-white px-6 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-50">

@@ -47,20 +47,25 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $e)
     {
         if ($e instanceof QueryException || $e instanceof PDOException) {
+            $errorCode = (int) $e->getCode();
 
-            $errorCode = $e->getCode();
-
-            if (in_array($errorCode, [2002, 2006, 1045, 1049])) {
-                // If the error occurred while attempting login, send user back to login with a friendly message
-                if ($request->is('login')) {
-                    return redirect()->route('login')
-                        ->withErrors(['email' => 'Cannot connect to authentication database. Please try again shortly.'])
-                        ->withInput($request->only('email'));
+            if (in_array($errorCode, [2002, 2006, 1045, 1049], true)) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'Database is temporarily unavailable. Please try again shortly.',
+                    ], 503);
                 }
 
-                return response()->view('errors.db_connection', [
-                    'message' => 'We are currently unable to process your request. Please try again shortly.'
-                ], 503);
+                if ($request->is('login') || $request->is('register')) {
+                    return redirect()->route('login')
+                        ->withErrors([
+                            'email' => 'Database is temporarily unavailable. Please try again shortly.',
+                        ])
+                        ->withInput($request->only('name', 'email'));
+                }
+
+                return redirect('/')
+                    ->with('status', 'Database is temporarily unavailable. You have been returned to the home page.');
             }
         }
 
