@@ -243,18 +243,18 @@ export default function EntityManager({ entityType, initialData = [], filters = 
             <Head title={config.title} />
 
             {/* Header */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div className="app-panel mb-6 overflow-hidden">
                 <div className="px-6 py-5">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                            <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
-                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-vivid-orange text-rich-black shadow-sm">
+                                <svg className="h-6 w-6 text-rich-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
                                 </svg>
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900">{config.title}</h1>
-                                <p className="text-sm text-gray-500 mt-0.5">
+                                <h1 className="text-2xl font-bold text-deep-jungle-green">{config.title}</h1>
+                                <p className="mt-0.5 text-sm text-deep-jungle-green/65">
                                     Manage {config.title.toLowerCase()} and their properties
                                 </p>
                             </div>
@@ -264,7 +264,7 @@ export default function EntityManager({ entityType, initialData = [], filters = 
                             {canPerformAction('import') && (
                                 <button
                                     onClick={() => setShowImportModal(true)}
-                                    className="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+                                    className="app-secondary-btn"
                                 >
                                     <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -276,7 +276,7 @@ export default function EntityManager({ entityType, initialData = [], filters = 
                             {canPerformAction('create') && (
                                 <button
                                     onClick={handleCreate}
-                                    className="inline-flex items-center px-4 py-2.5 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 hover:shadow-lg"
+                                    className="app-primary-btn"
                                 >
                                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -291,18 +291,18 @@ export default function EntityManager({ entityType, initialData = [], filters = 
 
             {/* Flash Messages */}
             {flash?.success && (
-                <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded">
+                <div className="mb-4 rounded-2xl border border-vivid-orange/30 bg-white px-4 py-3 text-deep-jungle-green shadow-sm">
                     {flash.success}
                 </div>
             )}
             {flash?.error && (
-                <div className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+                <div className="mb-4 rounded-2xl border border-rich-black/20 bg-white px-4 py-3 text-deep-jungle-green shadow-sm">
                     {flash.error}
                 </div>
             )}
 
             {/* Search and Filters */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div className="app-panel mb-6 overflow-hidden">
                 <div className="px-6 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex-1 max-w-lg">
@@ -318,13 +318,13 @@ export default function EntityManager({ entityType, initialData = [], filters = 
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     onKeyPress={(e) => e.key === 'Enter' && handleSearch(searchTerm)}
-                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out sm:text-sm"
+                                    className="app-input block w-full pl-10 pr-3 py-2.5 leading-5 transition duration-150 ease-in-out sm:text-sm"
                                 />
                             </div>
                         </div>
                         
                         <div className="flex items-center space-x-3 ml-4">
-                            <button className="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            <button className="app-secondary-btn">
                                 <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                                 </svg>
@@ -337,7 +337,7 @@ export default function EntityManager({ entityType, initialData = [], filters = 
 
             {/* Bulk Actions */}
             {selectedItems.length > 0 && (
-                <div className="bg-blue-50 border-b">
+                <div className="mb-6 rounded-2xl border border-vivid-orange/20 bg-vivid-orange/10">
                     <div className="px-6 py-3">
                         <BulkActions
                             selectedCount={selectedItems.length}
@@ -351,7 +351,7 @@ export default function EntityManager({ entityType, initialData = [], filters = 
             )}
 
             {/* Data Table */}
-            <div className="bg-white">
+            <div className="app-panel overflow-hidden">
                 <DataTable
                     columns={config.columns}
                     data={data}

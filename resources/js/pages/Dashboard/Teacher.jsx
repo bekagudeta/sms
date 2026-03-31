@@ -3,68 +3,60 @@ import { Link } from '@inertiajs/react';
 
 export default function TeacherDashboard({ recentSchedules }) {
     return (
-        <div className="bg-white overflow-hidden shadow-xl sm:rounded-xl border border-gray-200">
-            <div className="p-8 bg-gradient-to-r from-blue-600 to-purple-700 text-white">
-                <h2 className="text-3xl font-bold mb-2">Teacher Dashboard</h2>
-                <p className="text-blue-100">Here are your upcoming classes</p>
+        <div className="app-panel overflow-hidden">
+            <div className="border-b border-deep-jungle-green/10 bg-deep-jungle-green px-8 py-7 text-platinum">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-vivid-orange">Teaching overview</p>
+                <h2 className="text-3xl font-bold">Teacher Dashboard</h2>
+                <p className="mt-2 text-platinum/80">Review your assigned classes with a cleaner, easier-to-scan schedule table.</p>
             </div>
 
             <div className="p-8">
-                <div className="mb-10">
-                    <h3 className="text-2xl font-bold mb-6 text-gray-800">My Schedules</h3>
-                    {recentSchedules.length > 0 ? (
-                        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                                        <tr>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Room</th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Day</th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Time</th>
-                                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {recentSchedules.map(schedule => (
-                                            <tr key={schedule.id} className="hover:bg-gray-50 transition-colors duration-200">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">
-                                                        {schedule.course ? schedule.course.course_code : 'Not assigned'}
-                                                    </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {schedule.course ? schedule.course.course_name : 'Not assigned'}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    {schedule.room?.room_code || 'Not assigned'}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    {schedule.timeslot?.day_of_week || 'Not assigned'}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    {schedule.timeslot ? 
-                                                        `${schedule.timeslot.start_time} - ${schedule.timeslot.end_time}` : 
-                                                        'Not assigned'}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <Link
-                                                        href={`/schedules/${schedule.id}`}
-                                                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-200"
-                                                    >
-                                                        View
-                                                    </Link>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-gray-600">You don't have any assigned schedules yet.</p>
-                    )}
+                <div className="mb-6 flex items-center justify-between">
+                    <h3 className="text-2xl font-bold text-deep-jungle-green">My Schedules</h3>
+                    <span className="app-badge">{recentSchedules.length} classes</span>
                 </div>
+
+                {recentSchedules.length > 0 ? (
+                    <div className="app-table-shell">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-deep-jungle-green/10">
+                                <thead className="bg-deep-jungle-green text-platinum">
+                                    <tr>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Course</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Room</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Day</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Time</th>
+                                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-deep-jungle-green/10 bg-white">
+                                    {recentSchedules.map((schedule, index) => (
+                                        <tr key={schedule.id} className={index % 2 === 0 ? 'bg-white' : 'bg-platinum/40'}>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-deep-jungle-green">
+                                                <div className="font-semibold">{schedule.course ? schedule.course.course_code : 'Not assigned'}</div>
+                                                <div className="text-deep-jungle-green/65">{schedule.course ? schedule.course.course_name : 'Not assigned'}</div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-deep-jungle-green">{schedule.room?.room_code || 'Not assigned'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-deep-jungle-green">{schedule.timeslot?.day_of_week || 'Not assigned'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-deep-jungle-green">
+                                                {schedule.timeslot ? `${schedule.timeslot.start_time} - ${schedule.timeslot.end_time}` : 'Not assigned'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <Link href={`/schedules/${schedule.id}`} className="app-secondary-btn !px-3 !py-1.5">
+                                                    View
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="app-panel-muted px-6 py-8 text-center text-deep-jungle-green/70">
+                        You do not have any assigned schedules yet.
+                    </div>
+                )}
             </div>
         </div>
     );

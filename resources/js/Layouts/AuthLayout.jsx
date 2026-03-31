@@ -1,59 +1,40 @@
 import React from 'react';
 import { Link } from '@inertiajs/react';
 
+const navLinks = [
+    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/students', label: 'Students' },
+    { href: '/teachers', label: 'Teachers' },
+    { href: '/courses', label: 'Courses' },
+    { href: '/schedules', label: 'Schedules' },
+];
+
 export default function AuthLayout({ children }) {
     return (
-        <div className="min-h-screen bg-gray-100">
-            <nav className="bg-white shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16">
-                        <div className="flex">
-                            <div className="flex-shrink-0 flex items-center">
-                                <h1 className="text-xl font-bold text-gray-800">
-                                    School Management System
-                                </h1>
-                            </div>
-                            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                                <Link
-                                    href="/dashboard"
-                                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                                >
-                                    Dashboard
-                                </Link>
-                                <Link
-                                    href="/students"
-                                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                                >
-                                    Students
-                                </Link>
-                                <Link
-                                    href="/teachers"
-                                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                                >
-                                    Teachers
-                                </Link>
-                                <Link
-                                    href="/courses"
-                                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                                >
-                                    Courses
-                                </Link>
-                                <Link
-                                    href="/schedules"
-                                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                                >
-                                    Schedules
-                                </Link>
-                            </div>
-                        </div>
+        <div className="app-shell">
+            <nav className="border-b border-deep-jungle-green/10 bg-white shadow-sm">
+                <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-vivid-orange">SMS</p>
+                        <h1 className="text-lg font-bold text-deep-jungle-green">School Management System</h1>
+                    </div>
+
+                    <div className="hidden items-center gap-6 sm:flex">
+                        {navLinks.map((link) => (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className="text-sm font-medium text-deep-jungle-green/75 transition hover:text-vivid-orange"
+                            >
+                                {link.label}
+                            </Link>
+                        ))}
                     </div>
                 </div>
             </nav>
 
-            <main className="py-6">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    {children}
-                </div>
+            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                {children}
             </main>
         </div>
     );

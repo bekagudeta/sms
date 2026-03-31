@@ -98,12 +98,12 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
 
         if (column.key === 'status') {
             const statusColors = {
-                active: 'bg-green-100 text-green-800',
-                inactive: 'bg-red-100 text-red-800',
-                pending: 'bg-yellow-100 text-yellow-800',
-                completed: 'bg-blue-100 text-blue-800'
+                active: 'bg-deep-jungle-green text-platinum',
+                inactive: 'bg-rich-black text-platinum',
+                pending: 'bg-vivid-orange text-rich-black',
+                completed: 'bg-platinum text-deep-jungle-green border border-deep-jungle-green/15'
             };
-            const color = statusColors[value?.toLowerCase()] || 'bg-gray-100 text-gray-800';
+            const color = statusColors[value?.toLowerCase()] || 'bg-platinum text-deep-jungle-green border border-deep-jungle-green/15';
             return (
                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${color}`}>
                     {value}
@@ -117,16 +117,16 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
     if (loading) {
         return (
             <div className="flex items-center justify-center py-16">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
-                <span className="ml-3 text-gray-600 font-medium">Loading...</span>
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-vivid-orange border-t-transparent"></div>
+                <span className="ml-3 font-medium text-deep-jungle-green">Loading...</span>
             </div>
         );
     }
 
     if (!data || data.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex flex-col items-center justify-center py-16 text-deep-jungle-green/70">
+                <svg className="mb-4 h-16 w-16 text-vivid-orange/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <p className="text-lg font-medium">No data available</p>
@@ -135,9 +135,9 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
     }
 
     return (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white">
-            <table className="min-w-full table-auto divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+        <div className="app-table-shell">
+            <table className="min-w-full table-auto divide-y divide-deep-jungle-green/10">
+                <thead className="bg-deep-jungle-green">
                     <tr>
                         {onSelect && (
                             <th className="px-4 py-4 text-left w-12">
@@ -152,7 +152,7 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
                         {columns.map((column) => (
                             <th
                                 key={column.key}
-                                className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200/50 transition-colors"
+                                className="cursor-pointer px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-platinum transition-colors hover:bg-white/5"
                                 onClick={() => column.sortable !== false && handleSort(column.key)}
                             >
                                 <div className="flex items-center space-x-1">
@@ -167,17 +167,17 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
                             </th>
                         ))}
                         {(onEdit || onDelete) && (
-                            <th className="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">
+                            <th className="w-24 px-4 py-4 text-right text-xs font-semibold uppercase tracking-wider text-platinum">
                                 Actions
                             </th>
                         )}
                     </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
+                <tbody className="divide-y divide-deep-jungle-green/10 bg-white">
                     {sortedData.map((item, index) => (
                         <tr 
                             key={item.id} 
-                            className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                            className={`transition-colors hover:bg-vivid-orange/5 ${index % 2 === 0 ? 'bg-white' : 'bg-platinum/45'}`}
                         >
                             {onSelect && (
                                 <td className="px-4 py-4">
@@ -190,7 +190,7 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
                                 </td>
                             )}
                             {columns.map((column) => (
-                                <td key={column.key} className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                <td key={column.key} className="whitespace-nowrap px-4 py-4 text-sm text-deep-jungle-green">
                                     {renderCell(item, column)}
                                 </td>
                             ))}
@@ -200,7 +200,7 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
                                         {onEdit && (
                                             <button
                                                 onClick={() => onEdit(item)}
-                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 hover:text-blue-700 transition-all duration-200 shadow-sm"
+                                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-platinum text-deep-jungle-green shadow-sm transition-all duration-200 hover:bg-vivid-orange/15 hover:text-rich-black"
                                                 title="Edit"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +211,7 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
                                         {onDelete && (
                                             <button
                                                 onClick={() => onDelete(item)}
-                                                className="inline-flex items-center justify-center w-8 h-8 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 hover:text-red-700 transition-all duration-200 shadow-sm"
+                                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-vivid-orange/15 text-rich-black shadow-sm transition-all duration-200 hover:bg-vivid-orange hover:text-rich-black"
                                                 title="Delete"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -145,14 +145,14 @@ export default function NavigationSidebar({ currentRoute }) {
     };
 
     return (
-        <nav className="space-y-1">
+        <nav className="space-y-1.5">
             {/* Dashboard */}
             <Link
                 href="/dashboard"
-                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                     isActive('/dashboard')
-                        ? 'bg-pearl-aqua text-rich-black border-r-2 border-vivid-orange'
-                        : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua'
+                        ? 'bg-vivid-orange text-rich-black shadow-sm'
+                        : 'text-platinum/80 hover:bg-white/10 hover:text-white'
                 }`}
             >
                 {getIcon('Dashboard')}
@@ -163,10 +163,10 @@ export default function NavigationSidebar({ currentRoute }) {
             {(hasPermission('view schedules') || hasPermission('generate schedule')) && (
                 <Link
                     href="/schedules"
-                    className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                    className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                         isActive('/schedules')
-                            ? 'bg-gradient-to-r from-vivid-orange to-pearl-aqua text-rich-black border-r-2 border-vivid-orange shadow-lg shadow-vivid-orange/40'
-                            : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua hover:shadow-inner hover:shadow-deep-jungle-green/30'
+                            ? 'bg-vivid-orange text-rich-black shadow-sm'
+                            : 'text-platinum/80 hover:bg-white/10 hover:text-white'
                     }`}
                 >
                     {getIcon('CalendarAlt')}
@@ -178,10 +178,10 @@ export default function NavigationSidebar({ currentRoute }) {
             {hasPermission('generate schedule') && (
                 <Link
                     href="/schedules/generate"
-                    className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                    className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                         isActive('/schedules/generate')
-                            ? 'bg-gradient-to-r from-vivid-orange to-pearl-aqua text-rich-black border-r-2 border-vivid-orange shadow-lg shadow-vivid-orange/40'
-                            : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua hover:shadow-inner hover:shadow-deep-jungle-green/30'
+                            ? 'bg-vivid-orange text-rich-black shadow-sm'
+                            : 'text-platinum/80 hover:bg-white/10 hover:text-white'
                     }`}
                 >
                     {getIcon('Calendar')}
@@ -192,16 +192,16 @@ export default function NavigationSidebar({ currentRoute }) {
             {/* Import/Export - Scheduler specific */}
             {(hasPermission('import data') || hasPermission('export schedule')) && (
                 <div className="space-y-1">
-                    <div className="px-3 py-1 text-xs font-semibold text-pearl-aqua/60 uppercase tracking-wider">
+                    <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-platinum/55">
                         Data Management
                     </div>
                     {hasPermission('import data') && (
                         <Link
                             href="/import"
-                            className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                            className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                                 isActive('/import')
-                                    ? 'bg-pearl-aqua text-rich-black border-r-2 border-vivid-orange'
-                                    : 'text-pearl-aqua/80 hover:bg-deep-jungle-green hover:text-pearl-aqua'
+                                    ? 'bg-vivid-orange text-rich-black shadow-sm'
+                                    : 'text-platinum/75 hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             {getIcon('BookOpen')}
@@ -211,10 +211,10 @@ export default function NavigationSidebar({ currentRoute }) {
                     {hasPermission('export schedule') && (
                         <a
                             href="/export/schedule"
-                            className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                            className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                                 isActive('/export')
-                                    ? 'bg-pearl-aqua text-rich-black border-r-2 border-vivid-orange'
-                                    : 'text-pearl-aqua/80 hover:bg-deep-jungle-green hover:text-pearl-aqua'
+                                    ? 'bg-vivid-orange text-rich-black shadow-sm'
+                                    : 'text-platinum/75 hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             {getIcon('Book')}
@@ -238,7 +238,7 @@ export default function NavigationSidebar({ currentRoute }) {
                     <div key={category.category}>
                         <button
                             onClick={() => toggleCategory(category.category)}
-                            className="w-full group flex items-center px-3 py-2 text-sm font-medium rounded-md text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua"
+                            className="w-full group flex items-center rounded-xl px-3 py-2 text-sm font-medium text-platinum/80 transition hover:bg-white/10 hover:text-white"
                         >
                             {getIcon(category.icon)}
                             <span className="ml-3">{category.category}</span>
@@ -268,8 +268,8 @@ export default function NavigationSidebar({ currentRoute }) {
                                             href={route}
                                             className={`group flex items-center pl-10 pr-3 py-2 text-sm font-medium rounded-md ${
                                                 isActive(route)
-                                                    ? 'bg-pearl-aqua text-rich-black border-r-2 border-vivid-orange'
-                                                    : 'text-pearl-aqua/80 hover:bg-deep-jungle-green hover:text-pearl-aqua'
+                                                    ? 'bg-vivid-orange text-rich-black shadow-sm'
+                                                    : 'text-platinum/75 hover:bg-white/10 hover:text-white'
                                             }`}
                                         >
                                             {getIcon(item.icon)}
@@ -288,8 +288,8 @@ export default function NavigationSidebar({ currentRoute }) {
                 href="/settings"
                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                     isActive('/settings')
-                        ? 'bg-gradient-to-r from-deep-jungle-green via-pearl-aqua to-vivid-orange text-rich-black border-r-2 border-vivid-orange shadow-lg shadow-vivid-orange/40'
-                        : 'text-pearl-aqua/90 hover:bg-deep-jungle-green hover:text-pearl-aqua hover:shadow-inner hover:shadow-deep-jungle-green/30'
+                        ? 'bg-vivid-orange text-rich-black shadow-sm'
+                        : 'text-platinum/80 hover:bg-white/10 hover:text-white'
                 }`}
             >
                 {getIcon('Cog')}

@@ -7,55 +7,46 @@ import NavigationSidebar from '@/components/NavigationSidebar';
 export default function DashboardLayout({ children }) {
     const { props } = usePage();
     const user = props.auth.user || {};
-    const perms = props.auth.permissions || [];
-    const roles = props.auth.roles || [];
     const flash = props.flash || {};
-
     const currentRoute = route().current();
 
     return (
-        <div className="min-h-screen bg-rich-black text-pearl-aqua flex">
-            {/* Sidebar */}
-            <div className="flex flex-shrink-0">
-                <div className="flex flex-col w-64">
-                    <div className="flex flex-col h-0 flex-1 bg-deep-jungle-green text-pearl-aqua shadow-xl">
-                        <div className="flex items-center h-16 flex-shrink-0 px-4 bg-rich-black border-b border-pearl-aqua/20">
-                            <Link href="/dashboard" className="flex items-center space-x-2">
-                                <img 
-                                    src={logo} 
-                                    alt="Logo" 
-                                    className="h-8 w-auto object-contain"
-                                />
-                                <span className="text-white font-semibold">SMS</span>
-                            </Link>
+        <div className="app-shell lg:flex">
+            <aside className="w-full shrink-0 bg-deep-jungle-green text-platinum shadow-2xl lg:min-h-screen lg:w-72">
+                <div className="flex items-center gap-3 border-b border-white/10 bg-rich-black px-5 py-4">
+                    <Link href="/dashboard" className="flex items-center gap-3">
+                        <img src={logo} alt="Logo" className="h-10 w-auto object-contain" />
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-vivid-orange">SMS</p>
+                            <p className="text-sm font-semibold text-platinum">Schedule Management</p>
                         </div>
-                        <div className="flex-1 flex flex-col overflow-y-auto">
-                            <nav className="flex-1 px-2 py-4 space-y-1">
-                                <NavigationSidebar currentRoute={currentRoute} />
-                            </nav>
-                        </div>
-                    </div>
+                    </Link>
                 </div>
-            </div>
 
-            {/* Main content */}
-            <div className="flex flex-col w-0 flex-1 overflow-hidden">
-                {/* Top bar */}
-                <header className="bg-deep-jungle-green shadow-lg border-b border-pearl-aqua/30">
-                    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                        <div className="flex items-center">
-                            <h1 className="text-lg font-semibold text-pearl-aqua">Schedule Management System</h1>
+                <div className="px-3 py-4">
+                    <NavigationSidebar currentRoute={currentRoute} />
+                </div>
+            </aside>
+
+            <div className="flex min-w-0 flex-1 flex-col">
+                <header className="sticky top-0 z-30 border-b border-deep-jungle-green/10 bg-white/95 backdrop-blur">
+                    <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-vivid-orange">Dashboard</p>
+                            <h1 className="text-lg font-bold text-deep-jungle-green">Schedule Management System</h1>
                         </div>
-                        <div className="flex items-center space-x-4">
-                            <span className="text-sm text-pearl-aqua/90">
-                                {user.name}
-                            </span>
+
+                        <div className="flex items-center gap-3">
+                            <div className="hidden text-right sm:block">
+                                <p className="text-sm font-semibold text-deep-jungle-green">{user.name}</p>
+                                <p className="text-xs text-deep-jungle-green/60">Signed in</p>
+                            </div>
                             <Link
                                 href={route('logout')}
                                 method="post"
                                 replace
                                 as="button"
-                                className="inline-flex items-center px-3 py-2 border border-vivid-orange text-sm leading-4 font-medium rounded-md text-rich-black bg-vivid-orange hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-vivid-orange"
+                                className="app-primary-btn !px-3 !py-2"
                             >
                                 Logout
                             </Link>
@@ -63,24 +54,22 @@ export default function DashboardLayout({ children }) {
                     </div>
                 </header>
 
-                {/* Flash Messages */}
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 mt-6">
-                    {flash.success && (
-                        <div className="mb-4 p-4 bg-pearl-aqua/20 border border-pearl-aqua text-rich-black rounded-md shadow-inner">
-                            {flash.success}
-                        </div>
-                    )}
+                <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+                    <div className="mx-auto max-w-7xl space-y-4">
+                        {flash.success && (
+                            <div className="rounded-2xl border border-vivid-orange/30 bg-white px-4 py-3 text-sm text-deep-jungle-green shadow-sm">
+                                <span className="mr-2 font-semibold text-vivid-orange">Success:</span>
+                                {flash.success}
+                            </div>
+                        )}
 
-                    {flash.error && (
-                        <div className="mb-4 p-4 bg-vivid-orange/20 border border-vivid-orange text-rich-black rounded-md shadow-inner">
-                            {flash.error}
-                        </div>
-                    )}
-                </div>
+                        {flash.error && (
+                            <div className="rounded-2xl border border-rich-black/20 bg-white px-4 py-3 text-sm text-deep-jungle-green shadow-sm">
+                                <span className="mr-2 font-semibold text-rich-black">Notice:</span>
+                                {flash.error}
+                            </div>
+                        )}
 
-                {/* Page content */}
-                <main className="flex-1 overflow-y-auto">
-                    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
                         {children}
                     </div>
                 </main>
