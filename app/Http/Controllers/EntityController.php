@@ -255,7 +255,15 @@ class EntityController extends Controller
         }
 
         $entityConfig = $this->entityMap[$entityType];
-        $this->authorize($entityConfig['permissions']['delete']);
+        
+        // Check if user is admin - admins have all permissions
+        $user = auth()->user();
+        $isAdmin = $user && $user->hasRole('admin');
+        
+        // Check delete permission (admin bypass)
+        if (!$isAdmin && !auth()->user()->can($entityConfig['permissions']['delete'])) {
+            abort(403, 'Unauthorized');
+        }
 
         $request->validate([
             'ids' => 'required|array',
@@ -275,7 +283,15 @@ class EntityController extends Controller
         }
 
         $entityConfig = $this->entityMap[$entityType];
-        $this->authorize($entityConfig['permissions']['view']);
+        
+        // Check if user is admin - admins have all permissions
+        $user = auth()->user();
+        $isAdmin = $user && $user->hasRole('admin');
+        
+        // Check view permission (admin bypass)
+        if (!$isAdmin && !auth()->user()->can($entityConfig['permissions']['view'])) {
+            abort(403, 'Unauthorized');
+        }
 
         // Implementation for export functionality
         // This would generate CSV/Excel exports

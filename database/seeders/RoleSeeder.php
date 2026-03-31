@@ -52,7 +52,9 @@ class RoleSeeder extends Seeder
             ['email' => 'admin@admin.com'],
             [
                 'name' => 'Admin',
-                'password' => Hash::make('password')
+                'password' => Hash::make('password'),
+                'plain_password' => 'password',
+                'must_change_password' => false
             ]
         );
 

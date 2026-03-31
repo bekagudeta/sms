@@ -20,7 +20,7 @@ class UserSeeder extends Seeder
                 'name' => 'Admin',
                 'password' => Hash::make('password'),
                 'must_change_password' => false,
-                'plain_password' => null,
+                'plain_password' => 'password',
             ]
         );
         $admin->assignRole('admin');
@@ -32,7 +32,7 @@ class UserSeeder extends Seeder
                 'name' => 'Scheduler',
                 'password' => Hash::make('password'),
                 'must_change_password' => false,
-                'plain_password' => null,
+                'plain_password' => 'password',
             ]
         );
         $scheduler->assignRole('scheduler');
@@ -44,7 +44,7 @@ class UserSeeder extends Seeder
                 'name' => 'Teacher',
                 'password' => Hash::make('password'),
                 'must_change_password' => false,
-                'plain_password' => null,
+                'plain_password' => 'password',
             ]
         );
         $teacher->assignRole('teacher');
@@ -56,7 +56,7 @@ class UserSeeder extends Seeder
                 'name' => 'Student',
                 'password' => Hash::make('password'),
                 'must_change_password' => false,
-                'plain_password' => null,
+                'plain_password' => 'password',
             ]
         );
         $student->assignRole('student');
@@ -70,8 +70,7 @@ class UserSeeder extends Seeder
                 'first_name' => 'System',
                 'last_name' => 'Student',
                 'department_id' => Department::first()?->id,
-                'semester' => 1,
-                'level' => 'undergraduate',
+                'level' => 'Level 1',
                 'section' => 'A',
                 'enrollment_date' => now()->toDateString(),
             ]

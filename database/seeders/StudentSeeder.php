@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Student;
 use App\Models\Department;
+use Illuminate\Support\Facades\Hash;
 use Faker\Factory as Faker;
 
 class StudentSeeder extends Seeder
@@ -19,26 +20,32 @@ class StudentSeeder extends Seeder
         for ($i = 1; $i <= 5; $i++) {
             $email = $faker->unique()->safeEmail;
 
+            // Create a user first
+            $user = User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'name' => $faker->name,
+                    'password' => Hash::make('password'),
+                    'plain_password' => 'password',
+                    'must_change_password' => false
+                ]
+            );
+
             $student = Student::firstOrCreate(
                 [
                     'student_id' => 'STU' . str_pad($i, 3, '0', STR_PAD_LEFT),
                 ], 
                 [
+                    'user_id' => $user->id,
                     'first_name' => $faker->firstName,
                     'last_name' => $faker->lastName,
                     'email' => $email,
                     'phone' => $faker->phoneNumber,
                     'department_id' => $faker->randomElement($departments),
-                    'semester' => $faker->numberBetween(1, 8),
+                    'level' => $faker->randomElements(['undergraduate', 'postgraduate'])[0],
                     'enrollment_date' => $faker->date('Y-m-d'),
                 ]
             );
-
-            $user = User::where('email', $email)->first();
-            if ($user && !$student->user_id) {
-                $student->user_id = $user->id;
-                $student->save();
-            }
         }
     }
 }
