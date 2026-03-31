@@ -1,8 +1,22 @@
-import React, { useState } from 'react';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import React, { useMemo, useState } from 'react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
 
-export default function Generate({ semesters, courseOfferings, teachers, rooms, timeslots, sections }) {
+function getSectionSemesterId(section) {
+    return Number(section?.course_offering?.semester_id ?? section?.courseOffering?.semester_id ?? 0);
+}
+
+function StatCard({ title, value, subtitle }) {
+    return (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm font-medium text-gray-600">{title}</p>
+            <p className="mt-2 text-2xl font-bold text-gray-900">{value}</p>
+            {subtitle && <p className="mt-1 text-xs text-gray-500">{subtitle}</p>}
+        </div>
+    );
+}
+
+export default function Generate({ semesters = [], courseOfferings = [], teachers = [], rooms = [], timeslots = [], sections = [] }) {
     const [activeTab, setActiveTab] = useState('auto');
     const { props } = usePage();
     const flash = props.flash;
@@ -11,16 +25,91 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
         semester_id: ''
     });
 
+    const selectedSemesterId = Number(autoData.semester_id || 0);
+    const selectedSemester = semesters.find((semester) => Number(semester.id) === selectedSemesterId);
+
+    const semesterCourseOfferings = useMemo(() => {
+        if (!selectedSemesterId) return [];
+        return courseOfferings.filter((offering) => Number(offering.semester_id ?? offering.semester?.id) === selectedSemesterId);
+    }, [courseOfferings, selectedSemesterId]);
+
+    const semesterSections = useMemo(() => {
+        if (!selectedSemesterId) return [];
+        return sections.filter((section) => getSectionSemesterId(section) === selectedSemesterId);
+    }, [sections, selectedSemesterId]);
+
+    const sectionsWithoutTeachers = useMemo(() => {
+        return semesterSections.filter((section) => !Array.isArray(section.teachers) || section.teachers.length === 0);
+    }, [semesterSections]);
+
+    const sectionsWithoutEnrollments = useMemo(() => {
+        return semesterSections.filter((section) => !Array.isArray(section.enrollments) || section.enrollments.length === 0);
+    }, [semesterSections]);
+
+    const totalSemesterEnrollments = useMemo(() => {
+        return semesterSections.reduce((sum, section) => sum + (section.enrollments?.length ?? 0), 0);
+    }, [semesterSections]);
+
+    const readinessChecks = [
+        {
+            label: 'Semester selected',
+            ok: Boolean(selectedSemesterId),
+            blocking: true,
+            detail: 'Choose which semester should be scheduled.'
+        },
+        {
+            label: 'Course offerings available',
+            ok: semesterCourseOfferings.length > 0,
+            blocking: true,
+            detail: 'The selected semester needs at least one course offering.'
+        },
+        {
+            label: 'Sections available',
+            ok: semesterSections.length > 0,
+            blocking: true,
+            detail: 'The scheduler creates timetables for sections.'
+        },
+        {
+            label: 'Every section has a teacher',
+            ok: semesterSections.length > 0 && sectionsWithoutTeachers.length === 0,
+            blocking: true,
+            detail: 'Automatic generation requires at least one teacher per section.'
+        },
+        {
+            label: 'Rooms loaded',
+            ok: rooms.length > 0,
+            blocking: true,
+            detail: 'Room capacity and type are enforced during scheduling.'
+        },
+        {
+            label: 'Timeslots loaded',
+            ok: timeslots.length > 0,
+            blocking: true,
+            detail: 'Real timeslots should exist before generating schedules.'
+        },
+        {
+            label: 'Enrollments loaded',
+            ok: totalSemesterEnrollments > 0,
+            blocking: false,
+            detail: 'Recommended for student conflict detection.'
+        }
+    ];
+
+    const blockers = readinessChecks.filter((check) => check.blocking && !check.ok);
+    const canAutoGenerate = blockers.length === 0;
+
     const handleAutoGenerate = () => {
         if (!autoData.semester_id) {
-            alert('Please select a semester for automatic generation');
+            alert('Please select a semester for automatic generation.');
+            return;
+        }
+
+        if (!canAutoGenerate) {
+            alert(`Please complete setup first: ${blockers.map((item) => item.label).join(', ')}`);
             return;
         }
 
         autoPost(route('schedules.generate.auto'), {
-            onSuccess: () => {
-                // Server will redirect to /schedules with flash message
-            },
             onError: (errors) => {
                 console.error('Auto generation errors:', errors);
                 alert('Error generating automatic schedule: ' + Object.values(errors).join(', '));
@@ -31,130 +120,220 @@ export default function Generate({ semesters, courseOfferings, teachers, rooms, 
     return (
         <DashboardLayout>
             <Head title="Generate Schedule" />
-            
-            <div className="bg-deep-jungle-green overflow-hidden shadow-2xl sm:rounded-lg border border-pearl-aqua/20">
-                <div className="p-6 bg-rich-black/80 border-b border-pearl-aqua/20">
-                    <h2 className="text-2xl font-bold mb-6 text-pearl-aqua">Schedule Generation</h2>
 
-                    {flash?.success && (
-                        <div className="mb-4 bg-pearl-aqua/20 border border-pearl-aqua text-rich-black px-4 py-3 rounded">
-                            {flash.success}
-                        </div>
-                    )}
-                    {flash?.error && (
-                        <div className="mb-4 bg-vivid-orange/20 border border-vivid-orange text-rich-black px-4 py-3 rounded">
-                            {flash.error}
-                        </div>
-                    )}
-
-                    {/* Tab Navigation */}
-                    <div className="border-b border-gray-200 mb-6">
-                        <nav className="-mb-px flex space-x-8">
-                            <button
-                                onClick={() => setActiveTab('auto')}
-                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === 'auto'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                Automatic Generation
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('manual')}
-                                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === 'manual'
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                Manual Generation
-                            </button>
-                        </nav>
-                    </div>
-
-                    {/* Automatic Generation Tab */}
-                    {activeTab === 'auto' && (
-                        <div>
-                            <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
-                                <h3 className="text-lg font-semibold text-blue-800 mb-2">Automatic Schedule Generation</h3>
-                                <p className="text-blue-700 mb-4">
-                                    The system will automatically generate schedules based on professional constraints including:
+            <div className="space-y-6">
+                <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg border border-gray-200">
+                    <div className="p-6 bg-white border-b border-gray-200">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900">Schedule Generation</h2>
+                                <p className="mt-2 text-sm text-gray-600">
+                                    This generator schedules <span className="font-semibold">sections</span> using imported <span className="font-semibold">teachers</span>, <span className="font-semibold">rooms</span>, <span className="font-semibold">timeslots</span>, and optional <span className="font-semibold">enrollments</span> for student conflict prevention.
                                 </p>
-                                <ul className="list-disc list-inside text-blue-700 space-y-1">
-                                    <li>No room or teacher conflicts</li>
-                                    <li>Room capacity and type requirements</li>
-                                    <li>Teacher qualifications and workload limits</li>
-                                    <li>Student group conflict avoidance</li>
-                                    <li>Optimized timing preferences</li>
-                                </ul>
                             </div>
 
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700">Semester *</label>
-                                <select
-                                    value={autoData.semester_id}
-                                    onChange={e => setAutoData('semester_id', e.target.value)}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                    required
+                            <div className="flex gap-3">
+                                <Link
+                                    href={route('import.index')}
+                                    className="rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
                                 >
-                                    <option value="">Select Semester</option>
-                                    {semesters?.map(semester => (
-                                        <option key={semester.id} value={semester.id}>
-                                            {semester.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-
-
-                            <div className="mb-6">
-                                <button
-                                    onClick={handleAutoGenerate}
-                                    disabled={autoProcessing}
-                                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-md transition-colors duration-200"
+                                    Open Setup Wizard
+                                </Link>
+                                <Link
+                                    href={route('schedules.index')}
+                                    className="rounded-md border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
                                 >
-                                    {autoProcessing ? 'Generating...' : 'Generate Automatic Schedule'}
-                                </button>
-                            </div>
-
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                                <h4 className="font-semibold text-yellow-800 mb-2">Important Notes:</h4>
-                                <ul className="list-disc list-inside text-yellow-700 space-y-1">
-                                    <li>All existing schedules for the selected semester will be replaced</li>
-                                    <li>Make sure you have sufficient rooms, teachers, and timeslots configured</li>
-                                    <li>Courses without qualified teachers or suitable rooms may cause conflicts</li>
-                                    <li>Review the generated schedule and resolve any conflicts manually if needed</li>
-                                </ul>
+                                    View Schedules
+                                </Link>
                             </div>
                         </div>
-                    )}
 
-                    {/* Manual Generation Tab */}
-                    {activeTab === 'manual' && (
-                        <ManualScheduleForm
-                            semesters={semesters}
-                            courseOfferings={courseOfferings}
-                            teachers={teachers}
-                            rooms={rooms}
-                            timeslots={timeslots}
-                            sections={sections}
-                        />
-                    )}
+                        {flash?.success && (
+                            <div className="mt-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+                                {flash.success}
+                            </div>
+                        )}
+                        {flash?.error && (
+                            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+                                {flash.error}
+                            </div>
+                        )}
+
+                        <div className="mt-6 border-b border-gray-200">
+                            <nav className="-mb-px flex space-x-8">
+                                <button
+                                    onClick={() => setActiveTab('auto')}
+                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                        activeTab === 'auto'
+                                            ? 'border-indigo-500 text-indigo-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                                >
+                                    Automatic Generation
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('manual')}
+                                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                        activeTab === 'manual'
+                                            ? 'border-indigo-500 text-indigo-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                                >
+                                    Manual Adjustment
+                                </button>
+                            </nav>
+                        </div>
+
+                        {activeTab === 'auto' && (
+                            <div className="mt-6 space-y-6">
+                                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                                        <h3 className="text-lg font-semibold text-blue-900">What the generator needs</h3>
+                                        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-blue-800">
+                                            <li><span className="font-semibold">Course offerings</span> and <span className="font-semibold">sections</span> for the selected semester</li>
+                                            <li><span className="font-semibold">Section-teacher assignments</span> so every section has an instructor</li>
+                                            <li><span className="font-semibold">Rooms</span> with capacity/type and valid <span className="font-semibold">timeslots</span></li>
+                                            <li><span className="font-semibold">Enrollments</span> if you want student conflict prevention</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                                        <h3 className="text-lg font-semibold text-amber-900">Recommended workflow</h3>
+                                        <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-amber-800">
+                                            <li>Import setup data in the wizard.</li>
+                                            <li>Pick a semester and review readiness below.</li>
+                                            <li>Generate automatically for the first draft.</li>
+                                            <li>Use the manual tab to fix edge cases.</li>
+                                        </ol>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                    <label className="block text-sm font-medium text-gray-700">Semester *</label>
+                                    <select
+                                        value={autoData.semester_id}
+                                        onChange={(e) => setAutoData('semester_id', e.target.value)}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                        required
+                                    >
+                                        <option value="">Select Semester</option>
+                                        {semesters?.map((semester) => (
+                                            <option key={semester.id} value={semester.id}>
+                                                {semester.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        Existing schedules for the selected semester will be replaced when you generate automatically.
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+                                    <StatCard title="Course Offerings" value={selectedSemesterId ? semesterCourseOfferings.length : '-'} subtitle="For selected semester" />
+                                    <StatCard title="Sections" value={selectedSemesterId ? semesterSections.length : '-'} subtitle="Actual classes to schedule" />
+                                    <StatCard title="Teachers Ready" value={selectedSemesterId ? `${semesterSections.length - sectionsWithoutTeachers.length}/${semesterSections.length || 0}` : '-'} subtitle="Sections with at least one teacher" />
+                                    <StatCard title="Rooms" value={rooms.length} subtitle="Available teaching spaces" />
+                                    <StatCard title="Timeslots" value={timeslots.length} subtitle="Loaded timetable slots" />
+                                    <StatCard title="Enrollments" value={selectedSemesterId ? totalSemesterEnrollments : '-'} subtitle="Used for student conflict checks" />
+                                </div>
+
+                                <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-gray-900">Ready-to-generate checklist</h3>
+                                            <p className="mt-1 text-sm text-gray-600">
+                                                {selectedSemester ? `Review the current setup for ${selectedSemester.name}.` : 'Select a semester to evaluate scheduling readiness.'}
+                                            </p>
+                                        </div>
+                                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${canAutoGenerate ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            {canAutoGenerate ? 'Ready' : `${blockers.length} blocker${blockers.length === 1 ? '' : 's'}`}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                        {readinessChecks.map((check) => (
+                                            <div key={check.label} className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-sm font-medium text-gray-900">{check.label}</p>
+                                                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${check.ok ? 'bg-green-100 text-green-700' : check.blocking ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                        {check.ok ? 'OK' : check.blocking ? 'Missing' : 'Recommended'}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-1 text-xs text-gray-600">{check.detail}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {sectionsWithoutTeachers.length > 0 && (
+                                        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-4">
+                                            <p className="text-sm font-semibold text-red-800">Sections still missing teacher assignments</p>
+                                            <p className="mt-1 text-xs text-red-700">
+                                                Assign teachers to these sections before automatic generation.
+                                            </p>
+                                            <ul className="mt-2 list-disc pl-5 text-sm text-red-800">
+                                                {sectionsWithoutTeachers.slice(0, 8).map((section) => (
+                                                    <li key={section.id}>{section.section_name}</li>
+                                                ))}
+                                            </ul>
+                                            {sectionsWithoutTeachers.length > 8 && (
+                                                <p className="mt-2 text-xs text-red-700">...and {sectionsWithoutTeachers.length - 8} more section(s).</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {selectedSemesterId && sectionsWithoutEnrollments.length > 0 && (
+                                        <div className="mt-4 rounded-md border border-yellow-200 bg-yellow-50 p-4">
+                                            <p className="text-sm font-semibold text-yellow-800">Enrollment coverage is still incomplete</p>
+                                            <p className="mt-1 text-xs text-yellow-700">
+                                                Automatic generation can still run, but student conflict detection will be weaker for {sectionsWithoutEnrollments.length} section(s).
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                    <button
+                                        onClick={handleAutoGenerate}
+                                        disabled={autoProcessing || !canAutoGenerate}
+                                        className="rounded-md bg-indigo-600 px-6 py-3 font-medium text-white transition-colors duration-200 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                                    >
+                                        {autoProcessing ? 'Generating...' : 'Generate Automatic Schedule'}
+                                    </button>
+                                    {!canAutoGenerate && (
+                                        <p className="text-sm text-amber-700">
+                                            Complete the blockers above before running the scheduler.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'manual' && (
+                            <div className="mt-6">
+                                <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                                    <h3 className="text-lg font-semibold text-indigo-900">Manual adjustment mode</h3>
+                                    <p className="mt-1 text-sm text-indigo-800">
+                                        Use this after the automatic generator to fix edge cases, special room needs, or remaining conflicts one row at a time.
+                                    </p>
+                                </div>
+
+                                <ManualScheduleForm
+                                    semesters={semesters}
+                                    courseOfferings={courseOfferings}
+                                    rooms={rooms}
+                                    timeslots={timeslots}
+                                    sections={sections}
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </DashboardLayout>
     );
 }
 
-function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, timeslots, sections }) {
-    console.log('ManualScheduleForm data:', {
-        sectionsCount: sections?.length || 0,
-        firstSection: sections?.[0],
-        sectionsSample: sections?.slice(0, 10),
-        allSectionIds: sections?.map(s => ({ id: s.id, name: s.section_name }))
-    });
+function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sections }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         data: {
             semester_id: '',
@@ -169,19 +348,33 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
         timeslot_id: ''
     });
 
+    const selectedSemesterId = Number(data.data.semester_id || 0);
+
+    const availableCourseOfferings = useMemo(() => {
+        return courseOfferings.filter((offering) => !selectedSemesterId || Number(offering.semester_id ?? offering.semester?.id) === selectedSemesterId);
+    }, [courseOfferings, selectedSemesterId]);
+
+    const availableSections = useMemo(() => {
+        return sections.filter((section) => {
+            const matchesSemester = !selectedSemesterId || getSectionSemesterId(section) === selectedSemesterId;
+            const matchesOffering = !newLine.course_offering_id || section.course_offering_id === Number(newLine.course_offering_id);
+            return matchesSemester && matchesOffering;
+        });
+    }, [sections, selectedSemesterId, newLine.course_offering_id]);
+
     const handleAddLine = () => {
         if (!newLine.course_offering_id || !newLine.section_id || !newLine.room_id || !newLine.timeslot_id) {
-            alert('Please fill all fields for manual schedule row.');
+            alert('Please fill all fields for the manual schedule row.');
             return;
         }
 
-        const selectedOffering = courseOfferings.find(o => o.id === parseInt(newLine.course_offering_id));
-        const selectedSection = sections.find(s => s.id === parseInt(newLine.section_id));
-        const selectedRoom = rooms.find(r => r.id === parseInt(newLine.room_id));
-        const selectedTimeslot = timeslots.find(t => t.id === parseInt(newLine.timeslot_id));
+        const selectedOffering = courseOfferings.find((offering) => offering.id === Number(newLine.course_offering_id));
+        const selectedSection = sections.find((section) => section.id === Number(newLine.section_id));
+        const selectedRoom = rooms.find((room) => room.id === Number(newLine.room_id));
+        const selectedTimeslot = timeslots.find((timeslot) => timeslot.id === Number(newLine.timeslot_id));
 
         if (!selectedOffering || !selectedSection || !selectedRoom || !selectedTimeslot) {
-            alert('Invalid data. Please verify selection.');
+            alert('Invalid data. Please verify the selected values.');
             return;
         }
 
@@ -189,9 +382,9 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
             course_offering_id: selectedOffering.id,
             section_id: selectedSection.id,
             section_name: selectedSection.section_name,
-            room_id: parseInt(newLine.room_id),
-            timeslot_id: parseInt(newLine.timeslot_id),
-            course_name: selectedOffering.course.course_name,
+            room_id: Number(newLine.room_id),
+            timeslot_id: Number(newLine.timeslot_id),
+            course_name: selectedOffering.course?.course_name,
             room_code: selectedRoom.room_code,
             day: selectedTimeslot.day_of_week,
             start_time: selectedTimeslot.start_time,
@@ -220,7 +413,7 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
         e.preventDefault();
 
         if (!data.data.semester_id) {
-            alert('Please choose semester.');
+            alert('Please choose a semester.');
             return;
         }
 
@@ -239,82 +432,104 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
     };
 
     return (
-        <div>
-            <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700">Semester *</label>
-                <select
-                    value={data.data.semester_id}
-                    onChange={e => setData('data.semester_id', e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    required
-                >
-                    <option value="">Select Semester</option>
-                    {semesters?.map(semester => (
-                        <option key={semester.id} value={semester.id}>
-                            {semester.name}
-                        </option>
-                    ))}
-                </select>
-                {errors['data.semester_id'] && (
-                    <p className="mt-2 text-sm text-red-600">{errors['data.semester_id']}</p>
-                )}
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Semester *</label>
+                    <select
+                        value={data.data.semester_id}
+                        onChange={(e) => {
+                            setData('data.semester_id', e.target.value);
+                            setNewLine({
+                                course_offering_id: '',
+                                section_id: '',
+                                room_id: '',
+                                timeslot_id: ''
+                            });
+                        }}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        required
+                    >
+                        <option value="">Select Semester</option>
+                        {semesters?.map((semester) => (
+                            <option key={semester.id} value={semester.id}>
+                                {semester.name}
+                            </option>
+                        ))}
+                    </select>
+                    {errors['data.semester_id'] && (
+                        <p className="mt-2 text-sm text-red-600">{errors['data.semester_id']}</p>
+                    )}
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                    <p className="font-semibold text-gray-900">Manual scheduling tip</p>
+                    <p className="mt-1">
+                        Choose a semester first, then add only the section, room, and timeslot combinations you want to override or create manually.
+                    </p>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Course Offering</label>
                     <select
                         value={newLine.course_offering_id}
-                        onChange={e => setNewLine({ ...newLine, course_offering_id: e.target.value })}
+                        onChange={(e) => setNewLine({ ...newLine, course_offering_id: e.target.value, section_id: '' })}
                         className="mt-1 block w-full rounded-md border-gray-300"
                     >
                         <option value="">Select</option>
-                        {courseOfferings?.map(offering => (
+                        {availableCourseOfferings.map((offering) => (
                             <option key={offering.id} value={offering.id}>
-                                {offering.course.course_code} - {offering.course.course_name} ({offering.semester.name})
+                                {offering.course?.course_code} - {offering.course?.course_name}
                             </option>
                         ))}
                     </select>
                 </div>
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Section</label>
                     <select
                         value={newLine.section_id}
-                        onChange={e => setNewLine({ ...newLine, section_id: e.target.value })}
+                        onChange={(e) => setNewLine({ ...newLine, section_id: e.target.value })}
                         className="mt-1 block w-full rounded-md border-gray-300"
                     >
                         <option value="">Select</option>
-                        {sections?.filter(section => !newLine.course_offering_id || section.course_offering_id === parseInt(newLine.course_offering_id)).map(section => (
+                        {availableSections.map((section) => (
                             <option key={section.id} value={section.id}>
-                                {section.section_name} (ID: {section.id})
+                                {section.section_name} (Cap: {section.capacity})
                             </option>
                         ))}
                     </select>
                 </div>
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Room</label>
                     <select
                         value={newLine.room_id}
-                        onChange={e => setNewLine({ ...newLine, room_id: e.target.value })}
+                        onChange={(e) => setNewLine({ ...newLine, room_id: e.target.value })}
                         className="mt-1 block w-full rounded-md border-gray-300"
                     >
                         <option value="">Select</option>
-                        {rooms?.map(room => (
-                            <option key={room.id} value={room.id}>{room.room_code}</option>
+                        {rooms?.map((room) => (
+                            <option key={room.id} value={room.id}>
+                                {room.room_code} ({room.type}, cap {room.capacity})
+                            </option>
                         ))}
                     </select>
                 </div>
+
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Timeslot</label>
                     <select
                         value={newLine.timeslot_id}
-                        onChange={e => setNewLine({ ...newLine, timeslot_id: e.target.value })}
+                        onChange={(e) => setNewLine({ ...newLine, timeslot_id: e.target.value })}
                         className="mt-1 block w-full rounded-md border-gray-300"
                     >
                         <option value="">Select</option>
-                        {timeslots?.map(ts => (
-                            <option key={ts.id} value={ts.id}>
-                                {ts.day_of_week} {ts.start_time} - {ts.end_time}
+                        {timeslots?.map((timeslot) => (
+                            <option key={timeslot.id} value={timeslot.id}>
+                                {timeslot.day_of_week} {timeslot.start_time} - {timeslot.end_time}
                             </option>
                         ))}
                     </select>
@@ -324,17 +539,17 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
             <button
                 type="button"
                 onClick={handleAddLine}
-                className="mb-6 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+                className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700"
             >
                 Add Manual Schedule Row
             </button>
 
             {data.data.schedule.length > 0 && (
-                <div className="mb-6">
-                    <h4 className="font-semibold mb-2">Manual Schedule Rows</h4>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full bg-rich-black/80 border border-pearl-aqua/30 text-pearl-aqua">
-                            <thead>
+                <div>
+                    <h4 className="mb-2 font-semibold text-gray-900">Manual Schedule Rows</h4>
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="min-w-full bg-white text-sm text-gray-800">
+                            <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-3 py-2 border">Course</th>
                                     <th className="px-3 py-2 border">Section</th>
@@ -370,7 +585,7 @@ function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, times
             <button
                 onClick={handleSubmit}
                 disabled={processing}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 px-5 rounded-md"
+                className="rounded-md bg-blue-600 px-5 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
             >
                 {processing ? 'Submitting...' : 'Submit Manual Schedule'}
             </button>

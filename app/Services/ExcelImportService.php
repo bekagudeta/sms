@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Imports\StudentsImport;
 use App\Imports\TeachersImport;
 use App\Imports\CoursesImport;
+use App\Imports\DepartmentsImport;
+use App\Imports\SemestersImport;
 use App\Imports\CourseOfferingsImport;
 use App\Imports\SectionsImport;
 use App\Imports\SectionTeachersImport;
@@ -100,6 +102,46 @@ class ExcelImportService
         }
     }
 
+    public function importDepartments($file)
+    {
+        try {
+            $import = new DepartmentsImport();
+            Excel::import($import, $file);
+
+            return [
+                'success' => true,
+                'message' => 'Departments imported successfully',
+                'count' => $import->getRowCount()
+            ];
+        } catch (\Exception $e) {
+            Log::error('Department import failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Import failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    public function importSemesters($file)
+    {
+        try {
+            $import = new SemestersImport();
+            Excel::import($import, $file);
+
+            return [
+                'success' => true,
+                'message' => 'Semesters imported successfully',
+                'count' => $import->getRowCount()
+            ];
+        } catch (\Exception $e) {
+            Log::error('Semester import failed: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Import failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
     public function importTimeslots($file)
     {
         try {
@@ -127,16 +169,20 @@ class ExcelImportService
             Excel::import($import, $file);
 
             $errors = $import->getErrors();
-            $message = 'Course offerings imported successfully';
+            $count = $import->getRowCount();
+            $success = $count > 0 || empty($errors);
+            $message = $success
+                ? 'Course offerings imported successfully'
+                : 'No course offerings were imported';
             
             if (!empty($errors)) {
-                $message .= ' (with ' . count($errors) . ' errors)';
+                $message .= ' (with ' . count($errors) . ' warnings)';
             }
 
             return [
-                'success' => true,
+                'success' => $success,
                 'message' => $message,
-                'count' => $import->getRowCount(),
+                'count' => $count,
                 'errors' => $errors
             ];
         } catch (\Exception $e) {
@@ -211,16 +257,20 @@ class ExcelImportService
             Excel::import($import, $file);
 
             $errors = $import->getErrors();
-            $message = 'Section teachers assigned successfully';
+            $count = $import->getRowCount();
+            $success = $count > 0 || empty($errors);
+            $message = $success
+                ? 'Section teachers assigned successfully'
+                : 'No section-teacher assignments were imported';
             
             if (!empty($errors)) {
                 $message .= ' (with ' . count($errors) . ' warnings)';
             }
 
             return [
-                'success' => true,
+                'success' => $success,
                 'message' => $message,
-                'count' => $import->getRowCount(),
+                'count' => $count,
                 'errors' => $errors
             ];
         } catch (\Exception $e) {

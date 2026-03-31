@@ -486,9 +486,9 @@ class SchedulingEngine
     {
         $score = 100; // Base score
         
-        // Prefer rooms that exactly match course type
-        $courseType = $section->courseOffering->course->type ?? 'lecture';
-        if ($room->type === $courseType) {
+        // Prefer rooms that exactly match the course requirement
+        $requiredRoomType = $this->getRequiredRoomType($section->courseOffering->course);
+        if ($requiredRoomType === 'any' || $this->normalizeRoomType($room->type ?? 'lecture') === $requiredRoomType) {
             $score += 20;
         }
         
@@ -522,31 +522,70 @@ class SchedulingEngine
     }
 
     /**
+     * Resolve the preferred room type for a course.
+     */
+    private function getRequiredRoomType($course): string
+    {
+        $requiredRoomType = strtolower(trim((string) ($course->required_room_type ?? '')));
+        $courseName = strtolower(trim((string) ($course->course_name ?? '')));
+        $courseLevel = strtolower(trim((string) ($course->level ?? 'undergraduate')));
+
+        if ($requiredRoomType !== '' && $requiredRoomType !== 'any') {
+            return $this->normalizeRoomType($requiredRoomType);
+        }
+
+        if (str_contains($courseName, 'lab')) {
+            return 'lab';
+        }
+
+        if ($courseLevel === 'graduate') {
+            return 'seminar';
+        }
+
+        return 'lecture';
+    }
+
+    /**
+     * Normalize different room labels into scheduler-friendly values.
+     */
+    private function normalizeRoomType($roomType): string
+    {
+        return match (strtolower(trim((string) $roomType))) {
+            'laboratory', 'computer lab', 'computer-lab', 'computer_lab' => 'lab',
+            'classroom', 'hall', 'auditorium' => 'lecture',
+            default => strtolower(trim((string) $roomType)),
+        };
+    }
+
+    /**
      * Get eligible rooms for a section
      */
     private function getEligibleRooms(Section $section, Collection $rooms): Collection
     {
         $course = $section->courseOffering->course;
         $requiredCapacity = $section->capacity;
+        $requiredRoomType = $this->getRequiredRoomType($course);
         
-        return $rooms->filter(function ($room) use ($course, $requiredCapacity) {
-            // Check capacity
+        return $rooms->filter(function ($room) use ($requiredCapacity, $requiredRoomType) {
             if ($room->capacity < $requiredCapacity) {
                 return false;
             }
-            
-            // Check room type if specified
-            $courseType = $course->type ?? 'lecture';
-            if ($courseType !== 'any' && $room->type !== $courseType) {
-                return false;
+
+            $roomType = $this->normalizeRoomType($room->type ?? 'lecture');
+
+            if ($requiredRoomType === 'any') {
+                return true;
+            }
+
+            if ($requiredRoomType === 'seminar') {
+                return in_array($roomType, ['seminar', 'conference', 'lecture'], true);
+            }
+
+            if ($requiredRoomType === 'lecture') {
+                return in_array($roomType, ['lecture', 'seminar', 'conference'], true);
             }
             
-            // Special handling for lab courses
-            if (str_contains(strtolower($course->course_name ?? ''), 'lab') && $room->type !== 'lab') {
-                return false;
-            }
-            
-            return true;
+            return $roomType === $requiredRoomType;
         });
     }
 

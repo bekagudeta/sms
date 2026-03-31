@@ -75,7 +75,7 @@ class ScheduleController extends Controller
         $rooms = Room::all();
         $semesters = Semester::all();
         $timeslots = Timeslot::orderBy('day_of_week')->orderBy('start_time')->get();
-        $sections = Section::with(['courseOffering.course', 'courseOffering.semester'])->get();
+        $sections = Section::with(['courseOffering.course', 'courseOffering.semester', 'teachers', 'enrollments'])->get();
         
         // Debug: Check first section data
         $firstSection = $sections->first();
@@ -592,19 +592,31 @@ class ScheduleController extends Controller
      */
     private function isRoomSuitableForCourse($room, $course)
     {
-        $roomType = $room->type ?? 'lecture';
-        $courseLevel = $course->level ?? 'undergraduate';
-        
-        // Labs require lab rooms
-        if (str_contains(strtolower($course->course_name ?? ''), 'lab') && $roomType !== 'lab') {
-            return false;
+        $roomType = strtolower(trim((string) ($room->type ?? 'lecture')));
+        $requiredRoomType = strtolower(trim((string) ($course->required_room_type ?? '')));
+        $courseLevel = strtolower(trim((string) ($course->level ?? 'undergraduate')));
+        $courseName = strtolower(trim((string) ($course->course_name ?? '')));
+
+        if ($requiredRoomType === '' && str_contains($courseName, 'lab')) {
+            $requiredRoomType = 'lab';
         }
-        
-        // Seminars can use seminar or lecture rooms
-        if ($courseLevel === 'graduate' && !in_array($roomType, ['seminar', 'lecture', 'conference'])) {
-            return false;
+
+        if (in_array($requiredRoomType, ['', 'any', 'lecture'], true)) {
+            if ($courseLevel === 'graduate') {
+                return in_array($roomType, ['seminar', 'conference', 'lecture'], true);
+            }
+
+            return in_array($roomType, ['lecture', 'classroom', 'seminar', 'conference'], true);
         }
-        
-        return true;
+
+        if ($requiredRoomType === 'lab') {
+            return in_array($roomType, ['lab', 'laboratory', 'computer-lab', 'computer_lab'], true);
+        }
+
+        if ($requiredRoomType === 'seminar') {
+            return in_array($roomType, ['seminar', 'conference', 'lecture'], true);
+        }
+
+        return $roomType === $requiredRoomType;
     }
 }

@@ -507,8 +507,8 @@ class AutoSchedulerService
         }
         
         // Room suitability
-        $courseType = $course->type ?? 'lecture';
-        if ($room->type === $courseType) {
+        $preferredRoomType = $this->getRequiredRoomType($course);
+        if ($preferredRoomType === 'any' || $this->normalizeRoomType($room->type ?? 'lecture') === $preferredRoomType) {
             $score += 20;
         }
         
@@ -845,19 +845,7 @@ class AutoSchedulerService
     protected function getEligibleRooms($course)
     {
         return $this->rooms->filter(function ($room) use ($course) {
-            // Check capacity if available
-            if ($room->capacity && isset($course->capacity) && $room->capacity < $course->capacity) {
-                return false;
-            }
-            
-            // Check room type if specified
-            if (isset($course->type) && $course->type !== 'any') {
-                if ($room->type !== $course->type) {
-                    return false;
-                }
-            }
-            
-            return true;
+            return $this->isRoomSuitableForCourse($room, $course);
         })->values();
     }
     
@@ -895,17 +883,55 @@ class AutoSchedulerService
     {
         return isset($this->roomTimeslotMap[$room->id][$timeslot->id]);
     }
+
+    protected function getRequiredRoomType($course)
+    {
+        $requiredRoomType = strtolower(trim((string) ($course->required_room_type ?? '')));
+        $courseName = strtolower(trim((string) ($course->course_name ?? '')));
+        $courseLevel = strtolower(trim((string) ($course->level ?? 'undergraduate')));
+
+        if ($requiredRoomType !== '' && $requiredRoomType !== 'any') {
+            return $this->normalizeRoomType($requiredRoomType);
+        }
+
+        if (str_contains($courseName, 'lab')) {
+            return 'lab';
+        }
+
+        if ($courseLevel === 'graduate') {
+            return 'seminar';
+        }
+
+        return 'lecture';
+    }
+
+    protected function normalizeRoomType($roomType)
+    {
+        return match (strtolower(trim((string) $roomType))) {
+            'laboratory', 'computer lab', 'computer-lab', 'computer_lab' => 'lab',
+            'classroom', 'hall', 'auditorium' => 'lecture',
+            default => strtolower(trim((string) $roomType)),
+        };
+    }
     
     protected function isRoomSuitableForCourse($room, $course)
     {
-        $roomType = $room->type ?? 'lecture';
-        $courseType = $course->type ?? 'lecture';
-        
-        if ($courseType !== 'any' && $roomType !== $courseType) {
-            return false;
+        $roomType = $this->normalizeRoomType($room->type ?? 'lecture');
+        $requiredRoomType = $this->getRequiredRoomType($course);
+
+        if ($requiredRoomType === 'any') {
+            return true;
         }
-        
-        return true;
+
+        if ($requiredRoomType === 'seminar') {
+            return in_array($roomType, ['seminar', 'conference', 'lecture'], true);
+        }
+
+        if ($requiredRoomType === 'lecture') {
+            return in_array($roomType, ['lecture', 'seminar', 'conference'], true);
+        }
+
+        return $roomType === $requiredRoomType;
     }
     
     protected function isTimeslotValid($section, $course, $timeslot)

@@ -15,10 +15,6 @@ class RoomsImport implements ToCollection, WithHeadingRow, WithValidation
 
     public function collection(Collection $rows)
     {
-        // Clear all existing rooms first to ensure proper ordering
-        Room::query()->delete();
-        
-        // Sort the collection by building, then floor, then room_code
         $sortedRows = $rows->sortBy([
             ['building', 'asc'],
             ['floor', 'asc'],
@@ -26,25 +22,39 @@ class RoomsImport implements ToCollection, WithHeadingRow, WithValidation
         ]);
 
         foreach ($sortedRows as $row) {
-            $this->rowCount++;
-            
+            if (empty($row['room_code'])) {
+                continue;
+            }
+
             try {
-                // Create new room (no updateOrCreate since we cleared all)
-                Room::create([
-                    'room_code' => $row['room_code'],
-                    'building' => $row['building'],
-                    'floor' => $row['floor'],
-                    'capacity' => $row['capacity'],
-                    'type' => $row['type'],
-                    'has_projector' => $row['has_projector'] ?? false,
-                    'has_computers' => $row['has_computers'] ?? false,
-                    'computer_count' => $row['computer_count'] ?? 0
-                ]);
+                Room::updateOrCreate(
+                    ['room_code' => trim((string) $row['room_code'])],
+                    [
+                        'building' => trim((string) ($row['building'] ?? '')),
+                        'floor' => (int) ($row['floor'] ?? 0),
+                        'capacity' => (int) ($row['capacity'] ?? 0),
+                        'type' => strtolower(trim((string) ($row['type'] ?? 'lecture'))),
+                        'has_projector' => $this->toBoolean($row['has_projector'] ?? false),
+                        'has_computers' => $this->toBoolean($row['has_computers'] ?? false),
+                        'computer_count' => (int) ($row['computer_count'] ?? 0),
+                    ]
+                );
+
+                $this->rowCount++;
             } catch (\Exception $e) {
-                Log::error('Error creating room from row: ' . $e->getMessage(), $row->toArray());
+                Log::error('Error creating room from row: ' . $e->getMessage(), is_array($row) ? $row : $row->toArray());
                 throw $e;
             }
         }
+    }
+
+    protected function toBoolean($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'y'], true);
     }
 
     public function rules(): array

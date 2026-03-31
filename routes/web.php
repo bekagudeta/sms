@@ -185,6 +185,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/import', [ImportController::class, 'index'])
             ->name('import.index');
 
+        Route::get('/import/templates/{type}', [ImportController::class, 'downloadTemplate'])
+            ->name('import.template');
+
         Route::post('/import/students',
             [ImportController::class,'importStudents'])
             ->name('import.students');
@@ -192,6 +195,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/import/teachers',
             [ImportController::class,'importTeachers'])
             ->name('import.teachers');
+
+        Route::post('/import/departments',
+            [ImportController::class,'importDepartments'])
+            ->name('import.departments');
+
+        Route::post('/import/semesters',
+            [ImportController::class,'importSemesters'])
+            ->name('import.semesters');
 
         Route::post('/import/courses',
             [ImportController::class,'importCourses'])
