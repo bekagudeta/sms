@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('teachers', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('teacher_id')->unique();
             $table->string('first_name');
             $table->string('last_name');
@@ -17,6 +18,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->foreignId('department_id')->constrained();
             $table->string('qualification')->nullable();
+            $table->string('specialization')->nullable();
             $table->integer('max_hours_per_week')->default(20);
             $table->timestamps();
         });
