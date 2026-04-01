@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\Section;
 use App\Models\Teacher;
+use App\Models\SectionTeacher;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
@@ -11,63 +12,106 @@ use Illuminate\Support\Collection;
 
 class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidation
 {
-    protected $rowCount = 0;
+    protected $processedCount = 0;
+    protected $createdCount = 0;
     protected $errors = [];
 
     public function collection(Collection $rows)
     {
-        foreach ($rows as $row) {
+        foreach ($rows as $index => $row) {
             // Skip empty rows
-            if (empty($row['section_id']) || empty($row['teacher_ids'])) {
+            $sectionIdentifier = trim((string)($row['section_id'] ?? ''));
+            $teacherIdentifiers = trim((string)($row['teacher_ids'] ?? ''));
+
+            if ($sectionIdentifier === '' || $teacherIdentifiers === '') {
                 continue;
             }
 
-            // Find section
-            $section = Section::find($row['section_id']);
+            // Find section by ID or name
+            $section = $this->findSection($sectionIdentifier);
+
             if (!$section) {
-                $this->errors[] = "Section ID {$row['section_id']} not found";
+                $this->errors[] = "Row " . ($index + 2) . ": Section '{$sectionIdentifier}' not found";
                 continue;
             }
 
             // Parse teacher IDs (comma-separated)
-            $teacherIds = explode(',', $row['teacher_ids']);
-            $validTeacherIds = [];
+            $teacherIds = array_filter(array_map('trim', explode(',', $teacherIdentifiers)));
 
-            foreach ($teacherIds as $teacherId) {
-                $teacherId = trim($teacherId);
-                
-                // Try finding by teacher_id (custom ID) or database id
-                $teacher = Teacher::where('teacher_id', $teacherId)->first();
-                
-                if (!$teacher && is_numeric($teacherId)) {
-                    $teacher = Teacher::find($teacherId);
-                }
-
-                if ($teacher) {
-                    $validTeacherIds[] = $teacher->id;
-                } else {
-                    $this->errors[] = "Teacher '{$teacherId}' not found for section {$row['section_id']}";
-                }
+            if (empty($teacherIds)) {
+                $this->errors[] = "Row " . ($index + 2) . ": No teacher_ids provided";
+                continue;
             }
 
-            // Attach teachers to section (sync = replace existing)
-            if (!empty($validTeacherIds)) {
-                if (!empty($row['append']) && strtolower($row['append']) === 'yes') {
-                    // Append mode - don't remove existing teachers
-                    $section->teachers()->syncWithoutDetaching($validTeacherIds);
-                } else {
-                    // Replace mode - sync replaces all existing
-                    $section->teachers()->sync($validTeacherIds);
+            foreach ($teacherIds as $rawTeacherId) {
+                $teacher = $this->findTeacher($rawTeacherId);
+
+                if (!$teacher) {
+                    $this->errors[] = "Row " . ($index + 2) . ": Teacher '{$rawTeacherId}' not found";
+                    continue;
                 }
-                $this->rowCount++;
+
+                try {
+                    $existingAssignment = SectionTeacher::where('section_id', $section->id)
+                        ->where('teacher_id', $teacher->id)
+                        ->first();
+
+                    if (!$existingAssignment) {
+                        SectionTeacher::create([
+                            'section_id' => $section->id,
+                            'teacher_id' => $teacher->id,
+                        ]);
+                        $this->createdCount++;
+                    }
+
+                    // Count every row assignment attempt so imports reflect supplied rows
+                    $this->processedCount++;
+
+                } catch (\Exception $e) {
+                    $this->errors[] = "Row " . ($index + 2) . ": Error assigning teacher '{$rawTeacherId}' to section '{$sectionIdentifier}': " . $e->getMessage();
+                }
             }
         }
+    }
+
+    private function findSection(string $sectionIdentifier)
+    {
+        if (is_numeric($sectionIdentifier)) {
+            $section = Section::find((int)$sectionIdentifier);
+            if ($section) {
+                return $section;
+            }
+        }
+
+        $section = Section::where('section_name', $sectionIdentifier)
+            ->orWhereRaw('LOWER(section_name) = ?', [strtolower($sectionIdentifier)])
+            ->orWhere('section_name', 'like', "%{$sectionIdentifier}%")
+            ->first();
+
+        return $section;
+    }
+
+    private function findTeacher(string $teacherIdentifier)
+    {
+        $teacherIdentifier = trim($teacherIdentifier);
+
+        $teacher = Teacher::where('teacher_id', $teacherIdentifier)
+            ->orWhereRaw('LOWER(teacher_id) = ?', [strtolower($teacherIdentifier)])
+            ->orWhere('email', $teacherIdentifier)
+            ->orWhereRaw('LOWER(email) = ?', [strtolower($teacherIdentifier)])
+            ->first();
+
+        if (!$teacher && is_numeric($teacherIdentifier)) {
+            $teacher = Teacher::find((int)$teacherIdentifier);
+        }
+
+        return $teacher;
     }
 
     public function rules(): array
     {
         return [
-            '*.section_id' => 'required|integer',
+            '*.section_id' => 'required',
             '*.teacher_ids' => 'required|string',
             '*.append' => 'nullable|string'
         ];
@@ -76,7 +120,7 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
     public function prepareForValidation($data, $index)
     {
         // Skip completely empty rows by returning null (will be filtered out)
-        if (empty($data['section_id']) && empty($data['teacher_id'])) {
+        if (empty(trim((string)($data['section_id'] ?? ''))) && empty(trim((string)($data['teacher_ids'] ?? '')))) {
             return null;
         }
         return $data;
@@ -84,7 +128,7 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
 
     public function getRowCount(): int
     {
-        return $this->rowCount;
+        return $this->processedCount;
     }
 
     public function getErrors(): array

@@ -188,6 +188,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/import/templates/{type}', [ImportController::class, 'downloadTemplate'])
             ->name('import.template');
 
+        // Bulk import route for modern import modal
+        Route::post('/import/bulk', [ImportController::class, 'bulkImport'])
+            ->name('import.bulk');
+
         Route::post('/import/students',
             [ImportController::class,'importStudents'])
             ->name('import.students');

@@ -144,6 +144,47 @@ class ImportController extends Controller
         ];
     }
 
+    public function bulkImport(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv',
+            'entity_type' => 'required|string',
+            'mappings' => 'nullable|array',
+            'skip_header' => 'nullable|boolean',
+            'validation_mode' => 'nullable|string'
+        ]);
+
+        $entityType = $request->input('entity_type');
+        $file = $request->file('file');
+
+        // Map entity types to import methods
+        $entityMethodMap = [
+            'students' => 'importStudents',
+            'teachers' => 'importTeachers',
+            'courses' => 'importCourses',
+            'departments' => 'importDepartments',
+            'semesters' => 'importSemesters',
+            'course-offerings' => 'importCourseOfferings',
+            'sections' => 'importSections',
+            'section-teachers' => 'importSectionTeachers',
+            'timeslots' => 'importTimeslots',
+            'rooms' => 'importRooms',
+            'enrollments' => 'importEnrollments',
+        ];
+
+        if (!isset($entityMethodMap[$entityType])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unknown entity type: ' . $entityType
+            ], 400);
+        }
+
+        $method = $entityMethodMap[$entityType];
+        $result = $this->$method($request);
+
+        return $this->respondImportResult($result);
+    }
+
     public function importStudents(Request $request)
     {
         $request->validate([

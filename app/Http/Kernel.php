@@ -60,7 +60,7 @@ class Kernel extends HttpKernel
             StartSession::class,
             \Illuminate\Session\Middleware\AuthenticateSession::class,
             ShareErrorsFromSession::class,
-            \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
+            \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             // Prevent browser from caching protected pages behind authentication
             PreventBackHistory::class,

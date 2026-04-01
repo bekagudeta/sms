@@ -194,6 +194,20 @@ function formatFileSize(bytes = 0) {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta?.getAttribute('content')) {
+        return String(meta.getAttribute('content'));
+    }
+
+    const cookieMatch = document.cookie.match(/(^|; )XSRF-TOKEN=([^;]+)/);
+    if (cookieMatch) {
+        return decodeURIComponent(cookieMatch[2]);
+    }
+
+    return null;
+}
+
 export default function ImportExcel({ entityCounts = {} }) {
     const [importType, setImportType] = useState('');
     const [errorMessage, setErrorMessage] = useState(null);
@@ -287,7 +301,7 @@ export default function ImportExcel({ entityCounts = {} }) {
     const criticalReady = readinessChecks.filter((check) => !check.recommended).every((check) => check.ok);
 
     const downloadFile = async (url, formData, defaultFilename) => {
-        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const token = getCsrfToken();
 
         const formDataWithToken = new FormData();
         for (const [key, value] of formData.entries()) {
@@ -468,7 +482,7 @@ export default function ImportExcel({ entityCounts = {} }) {
         const formData = new FormData();
         formData.append('file', data.file);
 
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const csrfToken = getCsrfToken();
         if (csrfToken) {
             formData.append('_token', csrfToken);
         }
@@ -494,7 +508,7 @@ export default function ImportExcel({ entityCounts = {} }) {
 
         try {
             setIsDownloading(true);
-            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const token = getCsrfToken();
 
             const response = await fetch(routeUrl, {
                 method: 'POST',
