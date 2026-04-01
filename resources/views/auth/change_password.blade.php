@@ -43,7 +43,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="/change-password" class="space-y-6" id="changePasswordForm">
+            <form method="POST" action="{{ route('change.password.update') }}" class="space-y-6" id="changePasswordForm">
                 @csrf
 
                 <div class="relative">

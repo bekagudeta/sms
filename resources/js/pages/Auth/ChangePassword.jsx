@@ -20,7 +20,7 @@ export default function ChangePassword() {
     const submit = (e) => {
         e.preventDefault();
 
-        post(route('password.change.update'), {
+        post(route('change.password.update'), {
             onFinish: () => reset('password', 'password_confirmation'),
         });
     };

@@ -224,12 +224,12 @@ export default function NavigationSidebar({ currentRoute }) {
                 </div>
             )}
 
-            {/* Entity Categories - Only show for admin */}
-            {userRoles.some(role => role.name === 'admin') && NAVIGATION_STRUCTURE.map((category) => {
+            {/* Entity Categories */}
+            {NAVIGATION_STRUCTURE.map((category) => {
                 const isExpanded = expandedCategories.has(category.category);
                 const hasVisibleItems = category.items.some(item => {
                     const config = getEntityConfig(item.key);
-                    return hasPermission(config.permissions.view);
+                    return config && config.permissions && hasPermission(config.permissions.view);
                 });
 
                 if (!hasVisibleItems) return null;

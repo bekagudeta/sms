@@ -57,6 +57,28 @@ class EntityController extends Controller
                 'import' => 'import course-offerings'
             ]
         ],
+        'departments' => [
+            'model' => 'App\Models\Department',
+            'controller' => null,
+            'permissions' => [
+                'view' => 'view departments',
+                'create' => 'create departments',
+                'edit' => 'edit departments',
+                'delete' => 'delete departments',
+                'import' => 'import departments'
+            ]
+        ],
+        'semesters' => [
+            'model' => 'App\Models\Semester',
+            'controller' => null,
+            'permissions' => [
+                'view' => 'view semesters',
+                'create' => 'create semesters',
+                'edit' => 'edit semesters',
+                'delete' => 'delete semesters',
+                'import' => 'import semesters'
+            ]
+        ],
         'sections' => [
             'model' => 'App\Models\Section',
             'controller' => 'App\Http\Controllers\SectionController',
@@ -370,6 +392,18 @@ class EntityController extends Controller
                 'section_id' => 'required|exists:sections,id',
                 'teacher_id' => 'required|exists:teachers,id',
                 'role' => 'nullable|string|max:255'
+            ],
+            'departments' => [
+                'code' => 'required|string|max:50|unique:departments,code' . ($id ? ",{$id}" : ''),
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string'
+            ],
+            'semesters' => [
+                'name' => 'required|string|max:255',
+                'code' => 'required|string|max:50|unique:semesters,code' . ($id ? ",{$id}" : ''),
+                'start_date' => 'nullable|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
+                'is_active' => 'sometimes|boolean'
             ],
             'timeslots' => [
                 'day_of_week' => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',

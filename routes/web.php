@@ -84,6 +84,15 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('auth')
         ->name('password.change.update');
 
+    // Change password routes (initial forced password change)
+    Route::get('/change-password', [ChangePasswordController::class, 'showForm'])
+        ->middleware('auth')
+        ->name('change.password');
+
+    Route::post('/change-password', [ChangePasswordController::class, 'update'])
+        ->middleware('auth')
+        ->name('change.password.update');
+
     // Unified Entity Management Routes
     Route::prefix('entities')->group(function () {
         Route::get('/{entityType}', [EntityController::class, 'index'])
@@ -114,6 +123,8 @@ Route::middleware(['auth'])->group(function () {
     Route::redirect('/courses', '/entities/courses');
     Route::redirect('/course-offerings', '/entities/course-offerings');
     Route::redirect('/sections', '/entities/sections');
+    Route::redirect('/departments', '/entities/departments');
+    Route::redirect('/semesters', '/entities/semesters');
     Route::redirect('/rooms', '/entities/rooms');
     Route::redirect('/timeslots', '/entities/timeslots');
     Route::redirect('/enrollments', '/entities/enrollments');

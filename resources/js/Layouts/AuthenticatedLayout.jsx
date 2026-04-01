@@ -32,20 +32,20 @@ export default function AuthenticatedLayout({ header, children }) {
                                     Dashboard
                                 </NavLink>
                                 <NavLink
-                                    href={route('students.index')}
-                                    active={route().current('students.*')}
+                                    href={route('entities.index', { entityType: 'students' })}
+                                    active={route().current('entities.*')}
                                 >
                                     Students
                                 </NavLink>
                                 <NavLink
-                                    href={route('teachers.index')}
-                                    active={route().current('teachers.*')}
+                                    href={route('entities.index', { entityType: 'teachers' })}
+                                    active={route().current('entities.*')}
                                 >
                                     Teachers
                                 </NavLink>
                                 <NavLink
-                                    href={route('courses.index')}
-                                    active={route().current('courses.*')}
+                                    href={route('entities.index', { entityType: 'courses' })}
+                                    active={route().current('entities.*')}
                                 >
                                     Courses
                                 </NavLink>
@@ -179,20 +179,20 @@ export default function AuthenticatedLayout({ header, children }) {
                             Dashboard
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
-                            href={route('students.index')}
-                            active={route().current('students.*')}
+                            href={route('entities.index', { entityType: 'students' })}
+                            active={route().current('entities.*')}
                         >
                             Students
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
-                            href={route('teachers.index')}
-                            active={route().current('teachers.*')}
+                            href={route('entities.index', { entityType: 'teachers' })}
+                            active={route().current('entities.*')}
                         >
                             Teachers
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
-                            href={route('courses.index')}
-                            active={route().current('courses.*')}
+                            href={route('entities.index', { entityType: 'courses' })}
+                            active={route().current('entities.*')}
                         >
                             Courses
                         </ResponsiveNavLink>

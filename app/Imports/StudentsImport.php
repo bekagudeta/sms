@@ -111,7 +111,7 @@ class StudentsImport implements
                 }
 
                 // Ensure the role exists and is assigned
-                Role::findOrCreate('student', 'web');
+                Role::firstOrCreate(['name' => 'student', 'guard_name' => 'web']);
                 if (!$user->hasRole('student')) {
                     $user->assignRole('student');
                 }

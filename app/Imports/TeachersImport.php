@@ -94,7 +94,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             }
 
             // Ensure the role exists and is assigned
-            Role::findOrCreate('teacher', 'web');
+            Role::firstOrCreate(['name' => 'teacher', 'guard_name' => 'web']);
 
             if (! $user->hasRole('teacher')) {
                 $user->assignRole('teacher');

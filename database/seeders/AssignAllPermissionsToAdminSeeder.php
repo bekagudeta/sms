@@ -10,7 +10,7 @@ class AssignAllPermissionsToAdminSeeder extends Seeder
 {
     public function run()
     {
-        $adminRole = Role::findOrCreate('admin', 'web');
+        $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
         $permissions = Permission::all();
         $adminRole->syncPermissions($permissions);
     }

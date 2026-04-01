@@ -7,8 +7,8 @@ use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        commands: __DIR__.'/../routes/console.php',
+        web: __DIR__ . '/../routes/web.php',
+        commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -27,19 +27,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->renderable(function (QueryException|\PDOException $e, $request) {
             // Check if we're on an auth route - if so, don't show database error
             $path = $request->path();
-            
+
             if (str_starts_with($path, 'login') || str_starts_with($path, 'register') || str_starts_with($path, 'password')) {
                 // For auth routes, don't intercept database errors - let them fail normally
                 // This will allow the login page to load even without database
                 return null;
             }
-            
+
             $message = 'We are currently unable to process your request due to temporary system availability. Please try again shortly.';
 
             if ($request->expectsJson()) {
                 return response()->json(['error' => $message], 503);
             }
 
-            return response()->view('errors.db_connection', ['message' => $message], 503);
+            // return response()->view('errors.db_connection', ['message' => $message], 503);
         });
     })->create();

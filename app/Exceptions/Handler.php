@@ -44,31 +44,31 @@ class Handler extends ExceptionHandler
      * @param  \Throwable  $e
      * @return \Symfony\Component\HttpFoundation\Response
      */
-    public function render($request, Throwable $e)
-    {
-        if ($e instanceof QueryException || $e instanceof PDOException) {
-            $errorCode = (int) $e->getCode();
+    // public function render($request, Throwable $e)
+    // {
+    //     if ($e instanceof QueryException || $e instanceof PDOException) {
+    //         $errorCode = (int) $e->getCode();
 
-            if (in_array($errorCode, [2002, 2006, 1045, 1049], true)) {
-                if ($request->expectsJson()) {
-                    return response()->json([
-                        'message' => 'Database is temporarily unavailable. Please try again shortly.',
-                    ], 503);
-                }
+    //         if (in_array($errorCode, [2002, 2006, 1045, 1049], true)) {
+    //             if ($request->expectsJson()) {
+    //                 return response()->json([
+    //                     'message' => 'Database is temporarily unavailable. Please try again shortly.',
+    //                 ], 503);
+    //             }
 
-                if ($request->is('login') || $request->is('register')) {
-                    return redirect()->route('login')
-                        ->withErrors([
-                            'email' => 'Database is temporarily unavailable. Please try again shortly.',
-                        ])
-                        ->withInput($request->only('name', 'email'));
-                }
+    //             if ($request->is('login') || $request->is('register')) {
+    //                 return redirect()->route('login')
+    //                     ->withErrors([
+    //                         'email' => 'Database is temporarily unavailable. Please try again shortly.',
+    //                     ])
+    //                     ->withInput($request->only('name', 'email'));
+    //             }
 
-                return redirect('/')
-                    ->with('status', 'Database is temporarily unavailable. You have been returned to the home page.');
-            }
-        }
+    //             return redirect('/')
+    //                 ->with('status', 'Database is temporarily unavailable. You have been returned to the home page.');
+    //         }
+    //     }
 
-        return parent::render($request, $e);
-    }
+    //     return parent::render($request, $e);
+    // }
 }

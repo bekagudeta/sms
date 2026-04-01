@@ -25,7 +25,8 @@ class ChangePasswordController extends Controller
         $user->update([
             'password' => Hash::make($request->password),
             'must_change_password' => false,
-            'plain_password' => null
+            // avoid INSERT/UPDATE error on non-null plain_password column
+            'plain_password' => '',
         ]);
 
         return redirect('/')->with('success', 'Password changed successfully.');

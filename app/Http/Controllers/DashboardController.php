@@ -70,7 +70,7 @@ class DashboardController extends Controller
         }
         $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
             ->whereHas('section.teachers', function($query) use ($teacher) {
-                $query->where('teacher_id', $teacher->id);
+                $query->where('teachers.id', $teacher->id);
             })
             ->get();
         return view('teacher.schedule', compact('schedules'));
@@ -93,7 +93,7 @@ class DashboardController extends Controller
             foreach ($roleMap as $prefix => $mappedRole) {
                 if (str_starts_with($email, $prefix)) {
                     // Ensure the role exists before assigning
-                    Role::findOrCreate($mappedRole, 'web');
+                    Role::firstOrCreate(['name' => $mappedRole, 'guard_name' => 'web']);
 
                     $user->assignRole($mappedRole);
                     $role = $mappedRole;
@@ -208,7 +208,7 @@ class DashboardController extends Controller
         $recentSchedules = collect();
         if ($teacher) {
             $recentSchedules = Schedule::whereHas('section.teachers', function($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
+                    $query->where('teachers.id', $teacher->id);
                 })
                 ->with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
                 ->latest()

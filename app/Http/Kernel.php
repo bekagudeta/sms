@@ -40,11 +40,11 @@ class Kernel extends HttpKernel
      */
     protected $middleware = [
         //\App\Http\Middleware\TrustHosts::class,
-        \Illuminate\Http\Middleware\TrustProxies::class,
+        TrustProxies::class,
         HandleCors::class,
         PreventRequestsDuringMaintenance::class,
         ValidatePostSize::class,
-        \Illuminate\Foundation\Http\Middleware\TrimStrings::class,
+        TrimStrings::class,
         ConvertEmptyStringsToNull::class,
     ];
 
@@ -58,10 +58,10 @@ class Kernel extends HttpKernel
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
-            \Illuminate\Session\Middleware\AuthenticateSession::class,
+            AuthenticateSession::class,
             ShareErrorsFromSession::class,
-            \App\Http\Middleware\VerifyCsrfToken::class,
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            VerifyCsrfToken::class,
+            SubstituteBindings::class,
             // Prevent browser from caching protected pages behind authentication
             PreventBackHistory::class,
         ],
@@ -69,7 +69,7 @@ class Kernel extends HttpKernel
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             'throttle:api',
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            SubstituteBindings::class,
         ],
     ];
 
@@ -85,7 +85,7 @@ class Kernel extends HttpKernel
         'auth.basic' => AuthenticateWithBasicAuth::class,
         'cache.headers' => SetCacheHeaders::class,
         'can' => Authorize::class,
-        'guest' => \Illuminate\Auth\Middleware\RedirectIfAuthenticated::class,
+        'guest' => RedirectIfAuthenticated::class,
         'password.confirm' => RequirePassword::class,
         'signed' => ValidateSignature::class,
         'throttle' => ThrottleRequests::class,

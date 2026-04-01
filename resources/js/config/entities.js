@@ -76,6 +76,54 @@ export const ENTITY_CONFIG = {
       import: "import courses"
     }
   },
+  departments: {
+    title: "Departments",
+    singular: "Department",
+    icon: "Archive",
+    category: "Academics",
+    columns: [
+      { key: "id", label: "ID", sortable: true },
+      { key: "code", label: "Code", sortable: true, searchable: true },
+      { key: "name", label: "Name", sortable: true, searchable: true },
+      { key: "description", label: "Description", sortable: false }
+    ],
+    requiredColumns: ["code", "name"],
+    optionalColumns: ["description"],
+    apiEndpoint: "/api/departments",
+    routePrefix: "departments",
+    permissions: {
+      view: "view departments",
+      create: "create departments",
+      edit: "edit departments",
+      delete: "delete departments",
+      import: "import departments"
+    }
+  },
+  semesters: {
+    title: "Semesters",
+    singular: "Semester",
+    icon: "Calendar",
+    category: "Academics",
+    columns: [
+      { key: "id", label: "ID", sortable: true },
+      { key: "name", label: "Name", sortable: true, searchable: true },
+      { key: "code", label: "Code", sortable: true, searchable: true },
+      { key: "start_date", label: "Start Date", sortable: true },
+      { key: "end_date", label: "End Date", sortable: true },
+      { key: "is_active", label: "Active", sortable: true }
+    ],
+    requiredColumns: ["name", "code"],
+    optionalColumns: ["start_date", "end_date", "is_active"],
+    apiEndpoint: "/api/semesters",
+    routePrefix: "semesters",
+    permissions: {
+      view: "view semesters",
+      create: "create semesters",
+      edit: "edit semesters",
+      delete: "delete semesters",
+      import: "import semesters"
+    }
+  },
   "course-offerings": {
     title: "Course Offerings",
     singular: "Offering",
@@ -238,6 +286,8 @@ export const NAVIGATION_STRUCTURE = [
     category: "Academics",
     icon: "BookOpen", 
     items: [
+      { key: "departments", name: "Departments", icon: "Archive" },
+      { key: "semesters", name: "Semesters", icon: "Calendar" },
       { key: "courses", name: "Courses", icon: "Book" },
       { key: "course-offerings", name: "Course Offerings", icon: "Calendar" },
       { key: "sections", name: "Sections", icon: "Grid" }

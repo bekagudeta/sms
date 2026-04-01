@@ -52,7 +52,7 @@ class AuthenticatedSessionController extends Controller
             foreach ($roleMap as $prefix => $mappedRole) {
                 if (str_starts_with($email, $prefix)) {
                     // Ensure the role exists before assigning it
-                    Role::findOrCreate($mappedRole, 'web');
+                    Role::firstOrCreate(['name' => $mappedRole, 'guard_name' => 'web']);
 
                     // Assign role to user (using Spatie Laravel Permission package)
                     $user->assignRole($mappedRole);
