@@ -44,7 +44,7 @@ class ScheduleRepository
     {
         return Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot', 'section.courseOffering.semester'])
                       ->whereHas('section.teachers', function($q) use ($teacherId) {
-                          $q->where('teacher_id', $teacherId);
+                          $q->where('teachers.id', $teacherId);
                       })
                       ->join('timeslots', 'schedules.timeslot_id', '=', 'timeslots.id')
                       ->orderBy('timeslots.day_of_week')

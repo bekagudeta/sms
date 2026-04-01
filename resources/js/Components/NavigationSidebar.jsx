@@ -45,14 +45,16 @@ export default function NavigationSidebar({ currentRoute }) {
         
         if (userRoles.some(role => role.name === 'teacher')) {
             const teacherPermissions = [
-                'view schedules', 'view own schedule', 'view courses', 'view rooms', 'view timeslots'
+                'view schedules',
+                'view own schedule'
             ];
             return teacherPermissions.includes(permission) || userPermissions.includes(permission);
         }
         
         if (userRoles.some(role => role.name === 'student')) {
             const studentPermissions = [
-                'view schedules', 'view own schedule', 'view courses', 'view rooms', 'view timeslots'
+                'view schedules',
+                'view own schedule'
             ];
             return studentPermissions.includes(permission) || userPermissions.includes(permission);
         }

@@ -572,7 +572,7 @@ class ScheduleController extends Controller
     private function checkTeacherWorkload($teacher, $timeslot)
     {
         $currentHours = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
-            $q->where('teacher_id', $teacher->id);
+            $q->where('teachers.id', $teacher->id);
         })->count();
         
         $maxHours = $teacher->max_hours_per_week ?? 20;
