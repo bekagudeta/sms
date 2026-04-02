@@ -65,6 +65,8 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation,
 
         $studentIdentifier = trim((string)($rowData['student_id'] ?? ''));
         $sectionIdentifier = trim((string)($rowData['section_id'] ?? ''));
+        $enrolledAt = trim((string)($rowData['enrolled_at'] ?? '')) ?: null;
+        $studentCodeValue = trim((string)($rowData['student_code_value'] ?? $rowData['student_code'] ?? '')) ?: null;
 
         if (!$studentIdentifier || !$sectionIdentifier) {
             $this->errors[] = "Row {$rowNumber}: Both student_id and section_id are required";
@@ -81,7 +83,13 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation,
             return;
         }
 
-        $this->createOrUpdateEnrollment($student->id, $section->id, $student->student_id);
+        $this->createOrUpdateEnrollment(
+            $student->id,
+            $section->id,
+            $studentCodeValue ?? $student->student_id,
+            $enrolledAt,
+        );
+
         $this->rowCount++;
     }
 
@@ -280,7 +288,7 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation,
         return null;
     }
 
-    private function createOrUpdateEnrollment($studentId, $sectionId, $studentCode)
+    private function createOrUpdateEnrollment($studentId, $sectionId, $studentCode = null, $enrolledAt = null)
     {
         $existing = Enrollment::where('student_id', $studentId)
             ->where('section_id', $sectionId)
@@ -289,18 +297,28 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation,
         $hasStudentCode = \Schema::hasColumn('enrollments', 'student_code');
 
         if ($existing) {
-            if ($hasStudentCode) {
+            if ($hasStudentCode && $studentCode) {
                 $existing->student_code = $studentCode;
             }
+
+            if ($enrolledAt) {
+                $existing->enrolled_at = $enrolledAt;
+            }
+
             $existing->touch();
+            $existing->save();
         } else {
             $createData = [
                 'student_id' => $studentId,
                 'section_id' => $sectionId,
             ];
 
-            if ($hasStudentCode) {
+            if ($hasStudentCode && $studentCode) {
                 $createData['student_code'] = $studentCode;
+            }
+
+            if ($enrolledAt) {
+                $createData['enrolled_at'] = $enrolledAt;
             }
 
             Enrollment::create($createData);
@@ -328,7 +346,9 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation,
     {
         return [
             '*.student_id' => 'required|string',
-            '*.section_id' => 'required|string'
+            '*.section_id' => 'required|string',
+            '*.enrolled_at' => 'nullable|date',
+            '*.student_code_value' => 'nullable|string',
         ];
     }
 
@@ -344,6 +364,14 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation,
 
         if (isset($data['section_id'])) {
             $data['section_id'] = trim((string)$data['section_id']);
+        }
+
+        if (isset($data['enrolled_at'])) {
+            $data['enrolled_at'] = trim((string)$data['enrolled_at']);
+        }
+
+        if (isset($data['student_code_value'])) {
+            $data['student_code_value'] = trim((string)$data['student_code_value']);
         }
 
         return $data;

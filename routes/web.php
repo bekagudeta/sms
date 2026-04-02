@@ -239,6 +239,10 @@ Route::middleware(['auth'])->group(function () {
             [ImportController::class,'importTimeslots'])
             ->name('import.timeslots');
 
+        Route::post('/import/preview',
+            [ImportController::class,'previewImport'])
+            ->name('import.preview');
+
         Route::post('/import/rooms',
             [ImportController::class,'importRooms'])
             ->name('import.rooms');

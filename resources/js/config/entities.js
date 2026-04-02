@@ -64,8 +64,8 @@ export const ENTITY_CONFIG = {
       { key: "credits", label: "Credits", sortable: true },
       { key: "department.name", label: "Department", sortable: true, filterable: true }
     ],
-    requiredColumns: ["course_code", "course_name", "credits"],
-    optionalColumns: ["department", "description", "level", "prerequisites"],
+    requiredColumns: ["course_code", "course_name", "credits", "hours_per_week", "department_id"],
+    optionalColumns: ["description", "level", "required_room_type"],
     apiEndpoint: "/api/courses",
     routePrefix: "courses",
     permissions: {
@@ -137,7 +137,7 @@ export const ENTITY_CONFIG = {
       { key: "created_at", label: "Created", sortable: true }
     ],
     requiredColumns: ["course_id", "semester_id", "expected_students"],
-    optionalColumns: ["created_at", "updated_at"],
+    optionalColumns: [] ,
     apiEndpoint: "/api/course-offerings",
     routePrefix: "course-offerings",
     permissions: {
@@ -162,7 +162,7 @@ export const ENTITY_CONFIG = {
       { key: "created_at", label: "Created", sortable: true }
     ],
     requiredColumns: ["course_offering_id", "section_name", "capacity"],
-    optionalColumns: ["created_at", "updated_at", "room_id"],
+    optionalColumns: [] ,
     apiEndpoint: "/api/sections",
     routePrefix: "sections",
     permissions: {
@@ -237,8 +237,8 @@ export const ENTITY_CONFIG = {
       { key: "enrolled_at", label: "Enrolled Date", sortable: true },
       { key: "student_code_value", label: "Student Code", sortable: true }
     ],
-    requiredColumns: ["student_id", "section_id", "enrolled_at"],
-    optionalColumns: ["student_code_value", "created_at", "updated_at"],
+    requiredColumns: ["student_id", "section_id"],
+    optionalColumns: ["enrolled_at", "student_code_value"],
     apiEndpoint: "/api/enrollments",
     routePrefix: "enrollments",
     permissions: {
@@ -259,8 +259,8 @@ export const ENTITY_CONFIG = {
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
       { key: "teacher.full_name", label: "Teacher", sortable: true, searchable: true }
     ],
-    requiredColumns: ["section_id", "teacher_id"],
-    optionalColumns: [],
+    requiredColumns: ["section_id", "teacher_id", "teacher_ids"],
+    optionalColumns: ["append"],
     apiEndpoint: "/api/section-teachers",
     routePrefix: "section-teachers",
     permissions: {

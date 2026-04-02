@@ -61,6 +61,121 @@ class ImportController extends Controller
         ]);
     }
 
+    private function normalizeHeader(string $value): string
+    {
+        return strtolower(trim(preg_replace('/[^a-z0-9]+/i', '_', $value), '_'));
+    }
+
+    private function prepareImportFile($file, array $mappings, bool $skipHeader = true)
+    {
+        $rows = Excel::toArray([], $file)[0] ?? [];
+
+        if (empty($rows)) {
+            throw new \Exception('Import file appears empty.');
+        }
+
+        if ($skipHeader) {
+            $sourceHeaders = array_map('trim', (array)$rows[0]);
+            $dataRows = array_slice($rows, 1);
+        } else {
+            $maxCols = max(array_map(fn($r) => count((array)$r), $rows));
+            $sourceHeaders = array_map(fn($i) => "column_{$i}", range(0, $maxCols - 1));
+            $dataRows = $rows;
+        }
+
+        $normalizedSourceHeaders = array_map([$this, 'normalizeHeader'], $sourceHeaders);
+
+        $mappingsPrepared = [];
+
+        foreach ($mappings as $targetField => $sourceValue) {
+            $sourceValue = trim((string)$sourceValue);
+            $targetField = trim($targetField);
+
+            if ($sourceValue === '' || $targetField === '') {
+                continue;
+            }
+
+            if (is_numeric($sourceValue)) {
+                $index = (int)$sourceValue;
+                if ($index >= 0 && $index < count($sourceHeaders)) {
+                    $mappingsPrepared[$targetField] = $index;
+                }
+                continue;
+            }
+
+            $mappedIndex = array_search($this->normalizeHeader($sourceValue), $normalizedSourceHeaders, true);
+            if ($mappedIndex !== false) {
+                $mappingsPrepared[$targetField] = $mappedIndex;
+            }
+        }
+
+        foreach (array_keys($mappings) as $targetField) {
+            $targetField = trim($targetField);
+            if ($targetField === '' || isset($mappingsPrepared[$targetField])) {
+                continue;
+            }
+
+            $guessIndex = array_search($this->normalizeHeader($targetField), $normalizedSourceHeaders, true);
+            if ($guessIndex !== false) {
+                $mappingsPrepared[$targetField] = $guessIndex;
+            }
+        }
+
+        $configuredFields = array_filter(array_map('trim', array_keys($mappings)));
+        $missingRequired = [];
+
+        foreach ($configuredFields as $field) {
+            if (!isset($mappingsPrepared[$field])) {
+                $missingRequired[] = $field;
+            }
+        }
+
+        if (!empty($missingRequired)) {
+            throw new \Exception('Unable to map required field(s): ' . implode(', ', array_unique($missingRequired)));
+        }
+
+        $outputHeaders = array_keys($mappingsPrepared);
+        $usedSourceIndices = array_values($mappingsPrepared);
+
+        foreach ($sourceHeaders as $index => $sourceHeader) {
+            if (!in_array($index, $usedSourceIndices, true)) {
+                $outputHeaders[] = $sourceHeader ?: "column_{$index}";
+                $mappingsPrepared[$sourceHeader ?: "column_{$index}"] = $index;
+            }
+        }
+
+        $tmpPath = tempnam(sys_get_temp_dir(), 'sms_import_');
+        if ($tmpPath === false) {
+            throw new \Exception('Unable to create temporary file for import processing.');
+        }
+
+        $tmpCsv = $tmpPath . '.csv';
+        rename($tmpPath, $tmpCsv);
+
+        $handle = fopen($tmpCsv, 'w');
+        if (!$handle) {
+            throw new \Exception('Unable to write temporary import file.');
+        }
+
+        fputcsv($handle, $outputHeaders);
+
+        foreach ($dataRows as $row) {
+            $row = (array) $row;
+            $outputRow = [];
+
+            foreach ($outputHeaders as $header) {
+                $sourceIndex = $mappingsPrepared[$header] ?? null;
+                $outputRow[] = ($sourceIndex !== null && array_key_exists($sourceIndex, $row)) ? $row[$sourceIndex] : null;
+            }
+
+            fputcsv($handle, $outputRow);
+        }
+
+        fclose($handle);
+
+        return $tmpCsv;
+    }
+
     private function getTemplateDefinitions(): array
     {
         return [
@@ -108,9 +223,9 @@ class ImportController extends Controller
             ],
             'section-teachers' => [
                 'filename' => 'section_teachers_template.csv',
-                'headers' => ['section_id', 'teacher_ids', 'append'],
+                'headers' => ['section_id', 'teacher_ids', 'teacher_id', 'append'],
                 'rows' => [
-                    ['1', 'T-001', 'no'],
+                    ['1', 'T-001', '', 'no'],
                 ],
             ],
             'rooms' => [
@@ -144,6 +259,81 @@ class ImportController extends Controller
         ];
     }
 
+    public function previewImport(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv',
+            'entity_type' => 'required|string',
+            'required_columns' => 'nullable|array',
+            'optional_columns' => 'nullable|array',
+            'skip_header' => 'nullable|boolean',
+        ]);
+
+        $file = $request->file('file');
+        $requiredColumns = array_map('trim', (array)$request->input('required_columns', []));
+        $optionalColumns = array_map('trim', (array)$request->input('optional_columns', []));
+        $skipHeader = $request->boolean('skip_header', true);
+
+        $raw = Excel::toArray([], $file)[0] ?? [];
+        if (empty($raw)) {
+            return response()->json([ 'headers' => [], 'rows' => [], 'mapping' => [] ]);
+        }
+
+        if ($skipHeader) {
+            $sourceHeaders = array_map('trim', (array)$raw[0]);
+            $dataRows = array_slice($raw, 1);
+        } else {
+            $columns = max(array_map(fn($r) => count((array)$r), $raw));
+            $sourceHeaders = array_map(fn($i) => "column_{$i}", range(0, $columns - 1));
+            $dataRows = $raw;
+        }
+
+        $normalizedSourceHeaders = array_map([$this, 'normalizeHeader'], $sourceHeaders);
+        $mapping = [];
+
+        foreach (array_unique(array_merge($requiredColumns, $optionalColumns)) as $field) {
+            $normalizedField = $this->normalizeHeader($field);
+
+            // exact match
+            $match = array_search($normalizedField, $normalizedSourceHeaders, true);
+
+            // fuzzy match
+            if ($match === false) {
+                foreach ($normalizedSourceHeaders as $index => $normalizedHeader) {
+                    if (
+                        str_contains($normalizedHeader, $normalizedField) ||
+                        str_contains($normalizedField, $normalizedHeader) ||
+                        ($normalizedField === 'department_id' && in_array($normalizedHeader, ['department_code', 'department_name'], true))
+                    ) {
+                        $match = $index;
+                        break;
+                    }
+                }
+            }
+
+            // fallback id rules
+            if ($match === false && str_ends_with($normalizedField, '_id')) {
+                $base = substr($normalizedField, 0, -3);
+                foreach ($normalizedSourceHeaders as $index => $normalizedHeader) {
+                    if (in_array($normalizedHeader, ["{$base}_id", "{$base}_code", "{$base}_name", $base], true)) {
+                        $match = $index;
+                        break;
+                    }
+                }
+            }
+
+            if ($match !== false) {
+                $mapping[$field] = (string)$match;
+            }
+        }
+
+        return response()->json([
+            'headers' => $sourceHeaders,
+            'rows' => array_slice($dataRows, 0, 5),
+            'mapping' => $mapping,
+        ]);
+    }
+
     public function bulkImport(Request $request)
     {
         $request->validate([
@@ -156,6 +346,8 @@ class ImportController extends Controller
 
         $entityType = $request->input('entity_type');
         $file = $request->file('file');
+        $mappings = $request->input('mappings', []);
+        $skipHeader = $request->boolean('skip_header', true);
 
         // Map entity types to import methods
         $entityMethodMap = [
@@ -179,8 +371,28 @@ class ImportController extends Controller
             ], 400);
         }
 
+        $processedFile = $file;
+
+        if (!empty($mappings)) {
+            try {
+                $processedFile = $this->prepareImportFile($file, $mappings, $skipHeader);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Import failed: ' . $e->getMessage()
+                ], 422);
+            }
+        }
+
         $method = $entityMethodMap[$entityType];
-        $result = $this->$method($request);
+
+        try {
+            $result = $this->$method($processedFile);
+        } finally {
+            if (is_string($processedFile) && file_exists($processedFile) && $processedFile !== $file->getRealPath()) {
+                @unlink($processedFile);
+            }
+        }
 
         return $this->respondImportResult($result);
     }

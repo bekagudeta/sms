@@ -18,12 +18,26 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
 
     public function collection(Collection $rows)
     {
-        foreach ($rows as $index => $row) {
-            // Skip empty rows
-            $sectionIdentifier = trim((string)($row['section_id'] ?? ''));
-            $teacherIdentifiers = trim((string)($row['teacher_ids'] ?? ''));
+        $clearedSections = [];
 
-            if ($sectionIdentifier === '' || $teacherIdentifiers === '') {
+        foreach ($rows as $index => $row) {
+            // Skip fully empty rows
+            $sectionIdentifier = trim((string)($row['section_id'] ?? ''));
+            $teacherIdentifiers = trim((string)($row['teacher_ids'] ?? $row['teacher_id'] ?? ''));
+            $appendFlag = trim((string)($row['append'] ?? ''));
+            $isAppend = in_array(strtolower($appendFlag), ['1', 'true', 'yes'], true);
+
+            if ($sectionIdentifier === '' && $teacherIdentifiers === '') {
+                continue;
+            }
+
+            if ($sectionIdentifier === '') {
+                $this->errors[] = "Row " . ($index + 2) . ": section_id is required";
+                continue;
+            }
+
+            if ($teacherIdentifiers === '') {
+                $this->errors[] = "Row " . ($index + 2) . ": teacher_id or teacher_ids is required";
                 continue;
             }
 
@@ -35,15 +49,24 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
                 continue;
             }
 
+            if (!$isAppend && !in_array($section->id, $clearedSections, true)) {
+                SectionTeacher::where('section_id', $section->id)->delete();
+                $clearedSections[] = $section->id;
+            }
+
             // Parse teacher IDs (comma-separated)
             $teacherIds = array_filter(array_map('trim', explode(',', $teacherIdentifiers)));
 
             if (empty($teacherIds)) {
-                $this->errors[] = "Row " . ($index + 2) . ": No teacher_ids provided";
+                $this->errors[] = "Row " . ($index + 2) . ": No valid teacher identifiers found";
                 continue;
             }
 
             foreach ($teacherIds as $rawTeacherId) {
+                if ($rawTeacherId === '') {
+                    continue;
+                }
+
                 $teacher = $this->findTeacher($rawTeacherId);
 
                 if (!$teacher) {
@@ -64,9 +87,8 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
                         $this->createdCount++;
                     }
 
-                    // Count every row assignment attempt so imports reflect supplied rows
+                    // Count each assignment attempt to report progress
                     $this->processedCount++;
-
                 } catch (\Exception $e) {
                     $this->errors[] = "Row " . ($index + 2) . ": Error assigning teacher '{$rawTeacherId}' to section '{$sectionIdentifier}': " . $e->getMessage();
                 }
@@ -112,7 +134,8 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
     {
         return [
             '*.section_id' => 'required',
-            '*.teacher_ids' => 'required|string',
+            '*.teacher_ids' => 'nullable|string',
+            '*.teacher_id' => 'nullable|string',
             '*.append' => 'nullable|string'
         ];
     }
