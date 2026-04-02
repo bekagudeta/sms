@@ -5,6 +5,18 @@ namespace App\Http\Controllers;
 use App\Exports\CredentialsExport;
 use App\Services\ExcelImportService;
 use Illuminate\Http\Request;
+use App\Models\Section;
+use App\Models\CourseOffering;
+use App\Models\User;
+use App\Models\Teacher;
+use App\Models\Student;
+use App\Models\Semester;
+use App\Models\Department;
+use App\Models\Course;
+use App\Models\Room;
+use App\Models\Timeslot;
+use App\Models\Enrollment;
+
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -24,17 +36,17 @@ class ImportController extends Controller
     {
         return Inertia::render('Imports/ImportExcel', [
             'entityCounts' => [
-                'departments' => \App\Models\Department::count(),
-                'semesters' => \App\Models\Semester::count(),
-                'courses' => \App\Models\Course::count(),
-                'course-offerings' => \App\Models\CourseOffering::count(),
-                'sections' => \App\Models\Section::count(),
-                'teachers' => \App\Models\Teacher::count(),
+                'departments' => Department::count(),
+                'semesters' => Semester::count(),
+                'courses' => Course::count(),
+                'course-offerings' => CourseOffering::count(),
+                'sections' => Section::count(),
+                'teachers' => Teacher::count(),
                 'section-teachers' => DB::table('section_teachers')->count(),
-                'rooms' => \App\Models\Room::count(),
-                'timeslots' => \App\Models\Timeslot::count(),
-                'students' => \App\Models\Student::count(),
-                'enrollments' => \App\Models\Enrollment::count(),
+                'rooms' => Room::count(),
+                'timeslots' => Timeslot::count(),
+                'students' => Student::count(),
+                'enrollments' => Enrollment::count(),
             ],
         ]);
     }
