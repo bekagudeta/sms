@@ -349,8 +349,8 @@ class ImportController extends Controller
         $mappings = $request->input('mappings', []);
         $skipHeader = $request->boolean('skip_header', true);
 
-        // Map entity types to import methods
-        $entityMethodMap = [
+        // Map entity types to import service methods
+        $entityServiceMethodMap = [
             'students' => 'importStudents',
             'teachers' => 'importTeachers',
             'courses' => 'importCourses',
@@ -364,7 +364,7 @@ class ImportController extends Controller
             'enrollments' => 'importEnrollments',
         ];
 
-        if (!isset($entityMethodMap[$entityType])) {
+        if (!isset($entityServiceMethodMap[$entityType])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unknown entity type: ' . $entityType
@@ -384,10 +384,10 @@ class ImportController extends Controller
             }
         }
 
-        $method = $entityMethodMap[$entityType];
+        $serviceMethod = $entityServiceMethodMap[$entityType];
 
         try {
-            $result = $this->$method($processedFile);
+            $result = $this->importService->$serviceMethod($processedFile);
         } finally {
             if (is_string($processedFile) && file_exists($processedFile) && $processedFile !== $file->getRealPath()) {
                 @unlink($processedFile);
@@ -534,7 +534,9 @@ class ImportController extends Controller
 
     private function respondImportResult(array $result)
     {
-        if (request()->wantsJson() || request()->ajax()) {
+        $isInertia = request()->header('X-Inertia') || request()->header('X-Inertia-Partial-Data');
+
+        if (!$isInertia && (request()->wantsJson() || request()->ajax())) {
             $response = [
                 'success' => $result['success'],
                 'message' => $result['message'],

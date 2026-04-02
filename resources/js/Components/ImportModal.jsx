@@ -219,15 +219,6 @@ export default function ImportModal({
                 }
             });
 
-            // If section-teachers import has one teacher field mapped, mirror to allow either teacher_id or teacher_ids
-            if (entityType === "section-teachers") {
-                if (finalMappings.teacher_ids && !finalMappings.teacher_id) {
-                    finalMappings.teacher_id = finalMappings.teacher_ids;
-                } else if (finalMappings.teacher_id && !finalMappings.teacher_ids) {
-                    finalMappings.teacher_ids = finalMappings.teacher_id;
-                }
-            }
-
             setPreviewData({
                 headers: result.headers || [],
                 data: result.rows || [],

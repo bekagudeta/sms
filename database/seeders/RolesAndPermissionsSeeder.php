@@ -47,16 +47,16 @@ class RolesAndPermissionsSeeder extends Seeder
                 'export schedule',
             ],
             'scheduler' => [
-                'view schedule',
+                'view schedules',
                 'generate schedule',
                 'manage schedules',
                 'view students', 'view teachers', 'view courses', 'view rooms', 'view timeslots',
             ],
             'teacher' => [
-                'view schedule',
+                'view schedules',
             ],
             'student' => [
-                'view schedule',
+                'view schedules',
             ],
         ];
 
@@ -82,16 +82,16 @@ class RolesAndPermissionsSeeder extends Seeder
                 'export schedule',
             ],
             'scheduler' => [
-                'view schedule',
+                'view schedules',
                 'generate schedule',
                 'manage schedules',
                 'view students', 'view teachers', 'view courses', 'view rooms', 'view timeslots',
             ],
             'teacher' => [
-                'view schedule',
+                'view schedules',
             ],
             'student' => [
-                'view schedule',
+                'view schedules',
             ],
         ];
 
