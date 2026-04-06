@@ -2,80 +2,82 @@
 
 namespace App\Imports;
 
-use App\Models\CourseOffering;
 use App\Models\Course;
 use App\Models\Semester;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Illuminate\Support\Collection;
 
 class CourseOfferingsImport implements ToCollection, WithHeadingRow
 {
-    protected $rowCount = 0;
-    protected $errors = [];
+    protected int $rowCount = 0;
+    protected array $errors = [];
+
+    protected $courses;
+    protected $semesters;
+
+    public function __construct()
+    {
+        // 🔥 Load once (NO N+1)
+        $this->courses = Course::all()->keyBy('course_code');
+        $this->semesters = Semester::all()->keyBy('code');
+    }
 
     public function collection(Collection $rows)
     {
+        $batch = [];
+
         foreach ($rows as $index => $row) {
-            if (
-                empty($row['course_name'])
-                && empty($row['course_code'])
-                && empty($row['course_id'])
-                && empty($row['semester_id'])
-                && empty($row['semester_code'])
-                && empty($row['semester_name'])
-            ) {
-                continue;
-            }
 
             $rowNumber = $index + 2;
 
-            $course = null;
-            if (!empty($row['course_id'])) {
-                $course = Course::find($row['course_id']);
-            }
-            if (!$course && !empty($row['course_code'])) {
-                $course = Course::where('course_code', trim($row['course_code']))->first();
-            }
-            if (!$course && !empty($row['course_name'])) {
-                $course = Course::where('course_name', trim($row['course_name']))->first();
-            }
-
-            if (!$course) {
-                $identifier = $row['course_code'] ?? $row['course_name'] ?? $row['course_id'] ?? 'unknown';
-                $this->errors[] = "Row {$rowNumber}: Course '{$identifier}' was not found. Import courses first.";
+            if (empty($row['course_code']) || empty($row['semester_code'])) {
                 continue;
             }
 
-            $semester = null;
-            if (!empty($row['semester_id'])) {
-                $semester = Semester::find($row['semester_id']);
-            }
-            if (!$semester && !empty($row['semester_code'])) {
-                $semester = Semester::where('code', trim($row['semester_code']))->first();
-            }
-            if (!$semester && !empty($row['semester_name'])) {
-                $semester = Semester::where('name', trim($row['semester_name']))->first();
+            $course = $this->courses[trim($row['course_code'])] ?? null;
+            $semester = $this->semesters[trim($row['semester_code'])] ?? null;
+
+            if (!$course) {
+                $this->errors[] = "Row {$rowNumber}: Course not found ({$row['course_code']})";
+                continue;
             }
 
             if (!$semester) {
-                $identifier = $row['semester_code'] ?? $row['semester_name'] ?? $row['semester_id'] ?? 'unknown';
-                $this->errors[] = "Row {$rowNumber}: Semester '{$identifier}' was not found. Import semesters first.";
+                $this->errors[] = "Row {$rowNumber}: Semester not found ({$row['semester_code']})";
                 continue;
             }
 
-            CourseOffering::updateOrCreate(
-                [
-                    'course_id' => $course->id,
-                    'semester_id' => $semester->id,
-                ],
-                [
-                    'expected_students' => max(1, (int) ($row['expected_students'] ?? 30)),
-                ]
-            );
+            $batch[] = [
+                'course_id' => $course->id,
+                'semester_id' => $semester->id,
+                'expected_students' => max(1, (int) ($row['expected_students'] ?? 30)),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
 
             $this->rowCount++;
+
+            // 🔥 Chunk insert
+            if (count($batch) >= 500) {
+                $this->upsertBatch($batch);
+                $batch = [];
+            }
         }
+
+        if (!empty($batch)) {
+            $this->upsertBatch($batch);
+        }
+    }
+
+    protected function upsertBatch(array $batch)
+    {
+        DB::table('course_offerings')->upsert(
+            $batch,
+            ['course_id', 'semester_id'],
+            ['expected_students', 'updated_at']
+        );
     }
 
     public function getErrors(): array

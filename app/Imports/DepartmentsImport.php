@@ -2,48 +2,87 @@
 
 namespace App\Imports;
 
-use App\Models\Department;
-use Maatwebsite\Excel\Concerns\ToModel;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
-use Illuminate\Support\Facades\Log;
 
-class DepartmentsImport implements ToModel, WithHeadingRow, WithValidation
+class DepartmentsImport implements ToCollection, WithHeadingRow, WithValidation
 {
-    protected $rowCount = 0;
+    protected int $rowCount = 0;
+    protected array $errors = [];
 
-    public function model(array $row)
+    public function collection(Collection $rows)
     {
-        $this->rowCount++;
-        
-        // Log the row for debugging
-        Log::info('Processing department row: ', $row);
-        
-        try {
-            // Use updateOrCreate to handle duplicates
-            return Department::updateOrCreate(
-                ['code' => $row['code']], // Search criteria
-                [
-                    'name' => $row['name'],
-                    'description' => $row['description'] ?? null
-                ]
-            );
-        } catch (\Exception $e) {
-            Log::error('Error creating department from row: ' . $e->getMessage(), $row);
-            throw $e;
+        $batch = [];
+
+        foreach ($rows as $index => $row) {
+
+            if (empty($row['code'])) {
+                continue;
+            }
+
+            $rowNumber = $index + 2;
+
+            try {
+                $code = strtolower(trim($row['code']));
+                $name = trim($row['name']);
+
+                if (!$code || !$name) {
+                    $this->errors[] = "Row {$rowNumber}: Invalid data";
+                    continue;
+                }
+
+                $batch[] = [
+                    'code' => $code,
+                    'name' => $name,
+                    'description' => $row['description'] ?? null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                $this->rowCount++;
+
+                if (count($batch) >= 500) {
+                    $this->upsertBatch($batch);
+                    $batch = [];
+                }
+
+            } catch (\Exception $e) {
+                $this->errors[] = "Row {$rowNumber}: " . $e->getMessage();
+            }
         }
+
+        if (!empty($batch)) {
+            $this->upsertBatch($batch);
+        }
+    }
+
+    protected function upsertBatch(array $batch)
+    {
+        DB::table('departments')->upsert(
+            $batch,
+            ['code'],
+            ['name', 'description', 'updated_at']
+        );
     }
 
     public function rules(): array
     {
         return [
-            'code' => 'required|string|max:10', // Remove unique constraint for import
-            'name' => 'required|string|max:255'
+            '*.code' => 'required|string|max:10',
+            '*.name' => 'required|string|max:255',
         ];
     }
 
     public function getRowCount(): int
     {
         return $this->rowCount;
+    }
+
+    public function getErrors(): array
+    {
+        return $this->errors;
     }
 }
