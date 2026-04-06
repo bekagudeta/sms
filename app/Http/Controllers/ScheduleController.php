@@ -218,7 +218,7 @@ class ScheduleController extends Controller
         
         // Validate each schedule item has required fields (manual section-based scheduling)
         foreach ($scheduleItems as $index => $item) {
-            $requiredFields = ['course_offering_id', 'section_id', 'room_id', 'timeslot_id'];
+            $requiredFields = ['course_offering_id', 'section_id', 'teacher_id', 'room_id', 'timeslot_id'];
             foreach ($requiredFields as $field) {
                 if (empty($item[$field])) {
                     return ['valid' => false, 'message' => "Schedule item " . ($index + 1) . " is missing required field: $field"];
@@ -261,6 +261,13 @@ class ScheduleController extends Controller
                 return ['success' => false, 'message' => 'Course offering not found'];
             }
 
+            // Find teacher and validate assignment
+            $teacher = Teacher::find($item['teacher_id'] ?? null);
+            if (!$teacher) {
+                Log::error('Teacher not found:', ['teacher_id' => $item['teacher_id'] ?? null]);
+                return ['success' => false, 'message' => 'Teacher not found'];
+            }
+
             // Validate room exists
             $room = Room::find($item['room_id'] ?? null);
             if (!$room) {
@@ -298,6 +305,16 @@ class ScheduleController extends Controller
                     'course_offering_id' => $courseOffering->id
                 ]);
                 return ['success' => false, 'message' => 'Selected section does not belong to the course offering'];
+            }
+
+            // Attach teacher to section if not already assigned
+            if (!$section->teachers->contains($teacher)) {
+                $section->teachers()->attach($teacher->id);
+            }
+
+            // Prevent teacher conflict at the selected timeslot
+            if ($this->hasTeacherConflict($teacher, $timeslot, $section->id)) {
+                return ['success' => false, 'message' => 'The selected teacher has another class at this timeslot'];
             }
 
             // Prevent scheduling conflicts for room at this timeslot
@@ -440,16 +457,21 @@ class ScheduleController extends Controller
                 'timeslot'
             ]);
 
-            $sections = Section::all();
+            $sections = Section::with(['courseOffering.course', 'courseOffering.semester', 'teachers.user'])->get();
+            $teachers = Teacher::with('user')->get();
 
             $rooms = Room::all();
             $timeslots = Timeslot::orderBy('day_of_week')->orderBy('start_time')->get();
+            $otherSchedules = Schedule::with(['section.teachers.user', 'timeslot'])
+                ->where('id', '!=', $schedule->id)
+                ->get();
 
             Log::info('Data loaded successfully', [
                 'schedule_count' => 1,
                 'sections_count' => $sections->count(),
                 'rooms_count' => $rooms->count(),
                 'timeslots_count' => $timeslots->count(),
+                'other_schedules_count' => $otherSchedules->count(),
                 'sample_section' => $sections->first(),
                 'all_sections' => $sections->take(3)->toArray()
             ]);
@@ -457,8 +479,10 @@ class ScheduleController extends Controller
             return Inertia::render('Schedules/Edit', [
                 'schedule' => $schedule,
                 'sections' => $sections,
+                'teachers' => $teachers,
                 'rooms' => $rooms,
-                'timeslots' => $timeslots
+                'timeslots' => $timeslots,
+                'otherSchedules' => $otherSchedules,
             ]);
         } catch (\Exception $e) {
             Log::error('Edit method error: ' . $e->getMessage(), [
@@ -478,9 +502,21 @@ class ScheduleController extends Controller
             'section_id' => 'required|exists:sections,id',
             'room_id' => 'required|exists:rooms,id',
             'timeslot_id' => 'required|exists:timeslots,id',
+            'teacher_id' => 'nullable|exists:teachers,id',
         ]);
 
-        $schedule->update($validated);
+        if (!empty($validated['teacher_id'])) {
+            $section = Section::find($validated['section_id']);
+            if ($section && !$section->teachers->contains($validated['teacher_id'])) {
+                $section->teachers()->attach($validated['teacher_id']);
+            }
+        }
+
+        $schedule->update([
+            'section_id' => $validated['section_id'],
+            'room_id' => $validated['room_id'],
+            'timeslot_id' => $validated['timeslot_id'],
+        ]);
 
         return redirect()->route('schedules.show', $schedule->id)
             ->with('success', 'Schedule updated successfully!');
@@ -564,6 +600,22 @@ class ScheduleController extends Controller
             }
         }
         return false;
+    }
+
+    /**
+     * Check if the selected teacher has another schedule at the same timeslot
+     */
+    private function hasTeacherConflict($teacher, $timeslot, $excludeSectionId = null)
+    {
+        $query = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
+            $q->where('teachers.id', $teacher->id);
+        })->where('timeslot_id', $timeslot->id);
+
+        if ($excludeSectionId) {
+            $query->where('section_id', '!=', $excludeSectionId);
+        }
+
+        return $query->exists();
     }
 
     /**

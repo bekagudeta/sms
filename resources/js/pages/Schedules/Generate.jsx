@@ -16,6 +16,14 @@ function StatCard({ title, value, subtitle }) {
     );
 }
 
+function getOfferingSemesterId(offering) {
+    return Number(offering?.semester_id ?? offering?.semester?.id ?? 0);
+}
+
+function getSectionCourseOfferingId(section) {
+    return Number(section?.course_offering_id ?? section?.course_offering?.id ?? section?.courseOffering?.id ?? 0);
+}
+
 export default function Generate({ semesters = [], courseOfferings = [], teachers = [], rooms = [], timeslots = [], sections = [] }) {
     const [activeTab, setActiveTab] = useState('auto');
     const { props } = usePage();
@@ -320,6 +328,7 @@ export default function Generate({ semesters = [], courseOfferings = [], teacher
                                 <ManualScheduleForm
                                     semesters={semesters}
                                     courseOfferings={courseOfferings}
+                                    teachers={teachers}
                                     rooms={rooms}
                                     timeslots={timeslots}
                                     sections={sections}
@@ -333,7 +342,7 @@ export default function Generate({ semesters = [], courseOfferings = [], teacher
     );
 }
 
-function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sections }) {
+function ManualScheduleForm({ semesters, courseOfferings, teachers, rooms, timeslots, sections }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         data: {
             semester_id: '',
@@ -344,36 +353,50 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
     const [newLine, setNewLine] = useState({
         course_offering_id: '',
         section_id: '',
+        teacher_id: '',
         room_id: '',
         timeslot_id: ''
     });
 
     const selectedSemesterId = Number(data.data.semester_id || 0);
+    const selectedSemester = semesters.find((semester) => Number(semester.id) === selectedSemesterId);
 
     const availableCourseOfferings = useMemo(() => {
-        return courseOfferings.filter((offering) => !selectedSemesterId || Number(offering.semester_id ?? offering.semester?.id) === selectedSemesterId);
+        return courseOfferings.filter((offering) => !selectedSemesterId || getOfferingSemesterId(offering) === selectedSemesterId);
     }, [courseOfferings, selectedSemesterId]);
 
     const availableSections = useMemo(() => {
         return sections.filter((section) => {
             const matchesSemester = !selectedSemesterId || getSectionSemesterId(section) === selectedSemesterId;
-            const matchesOffering = !newLine.course_offering_id || section.course_offering_id === Number(newLine.course_offering_id);
+            const matchesOffering = !newLine.course_offering_id || getSectionCourseOfferingId(section) === Number(newLine.course_offering_id);
             return matchesSemester && matchesOffering;
         });
     }, [sections, selectedSemesterId, newLine.course_offering_id]);
 
+    const selectedSection = useMemo(() => {
+        return sections.find((section) => Number(section.id) === Number(newLine.section_id));
+    }, [sections, newLine.section_id]);
+
+    const availableTeachers = useMemo(() => {
+        if (selectedSection?.teachers && selectedSection.teachers.length > 0) {
+            return selectedSection.teachers;
+        }
+        return teachers;
+    }, [selectedSection, teachers]);
+
     const handleAddLine = () => {
-        if (!newLine.course_offering_id || !newLine.section_id || !newLine.room_id || !newLine.timeslot_id) {
+        if (!newLine.course_offering_id || !newLine.section_id || !newLine.teacher_id || !newLine.room_id || !newLine.timeslot_id) {
             alert('Please fill all fields for the manual schedule row.');
             return;
         }
 
         const selectedOffering = courseOfferings.find((offering) => offering.id === Number(newLine.course_offering_id));
         const selectedSection = sections.find((section) => section.id === Number(newLine.section_id));
+        const selectedTeacher = teachers.find((teacher) => teacher.id === Number(newLine.teacher_id));
         const selectedRoom = rooms.find((room) => room.id === Number(newLine.room_id));
         const selectedTimeslot = timeslots.find((timeslot) => timeslot.id === Number(newLine.timeslot_id));
 
-        if (!selectedOffering || !selectedSection || !selectedRoom || !selectedTimeslot) {
+        if (!selectedOffering || !selectedSection || !selectedTeacher || !selectedRoom || !selectedTimeslot) {
             alert('Invalid data. Please verify the selected values.');
             return;
         }
@@ -381,7 +404,9 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
         const scheduleItem = {
             course_offering_id: selectedOffering.id,
             section_id: selectedSection.id,
+            teacher_id: selectedTeacher.id,
             section_name: selectedSection.section_name,
+            teacher_name: selectedTeacher.user?.name || selectedTeacher.full_name || 'Assigned Teacher',
             room_id: Number(newLine.room_id),
             timeslot_id: Number(newLine.timeslot_id),
             course_name: selectedOffering.course?.course_name,
@@ -399,6 +424,7 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
         setNewLine({
             course_offering_id: '',
             section_id: '',
+            teacher_id: '',
             room_id: '',
             timeslot_id: ''
         });
@@ -443,6 +469,7 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
                             setNewLine({
                                 course_offering_id: '',
                                 section_id: '',
+                                teacher_id: '',
                                 room_id: '',
                                 timeslot_id: ''
                             });
@@ -465,7 +492,7 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
                     <p className="font-semibold text-gray-900">Manual scheduling tip</p>
                     <p className="mt-1">
-                        Choose a semester first, then add only the section, room, and timeslot combinations you want to override or create manually.
+                        Choose a semester first, then add the section, teacher, room, and timeslot combinations you want to override or create manually.
                     </p>
                 </div>
             </div>
@@ -475,24 +502,32 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
                     <label className="block text-sm font-medium text-gray-700">Course Offering</label>
                     <select
                         value={newLine.course_offering_id}
-                        onChange={(e) => setNewLine({ ...newLine, course_offering_id: e.target.value, section_id: '' })}
+                        onChange={(e) => setNewLine({ ...newLine, course_offering_id: e.target.value, section_id: '', teacher_id: '', room_id: '', timeslot_id: '' })}
                         className="mt-1 block w-full rounded-md border-gray-300"
+                        disabled={!selectedSemesterId}
                     >
                         <option value="">Select</option>
                         {availableCourseOfferings.map((offering) => (
                             <option key={offering.id} value={offering.id}>
-                                {offering.course?.course_code} - {offering.course?.course_name}
+                                {offering.course?.course_code || 'Unnamed course'} - {offering.course?.course_name || 'Untitled'}
                             </option>
                         ))}
                     </select>
+                    {!selectedSemesterId && (
+                        <p className="mt-2 text-xs text-gray-500">Select a semester first to see the course offerings for that semester.</p>
+                    )}
+                    {selectedSemesterId && availableCourseOfferings.length === 0 && (
+                        <p className="mt-2 text-xs text-yellow-700">No course offerings are available for {selectedSemester?.name ?? 'the selected semester'}.</p>
+                    )}
                 </div>
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Section</label>
                     <select
                         value={newLine.section_id}
-                        onChange={(e) => setNewLine({ ...newLine, section_id: e.target.value })}
+                        onChange={(e) => setNewLine({ ...newLine, section_id: e.target.value, teacher_id: '' })}
                         className="mt-1 block w-full rounded-md border-gray-300"
+                        disabled={!newLine.course_offering_id}
                     >
                         <option value="">Select</option>
                         {availableSections.map((section) => (
@@ -501,6 +536,35 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
                             </option>
                         ))}
                     </select>
+                    {!newLine.course_offering_id && (
+                        <p className="mt-2 text-xs text-gray-500">Choose a course offering first, then pick a matching section.</p>
+                    )}
+                    {newLine.course_offering_id && availableSections.length === 0 && (
+                        <p className="mt-2 text-xs text-yellow-700">No sections are linked to this course offering or semester.</p>
+                    )}
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Teacher</label>
+                    <select
+                        value={newLine.teacher_id}
+                        onChange={(e) => setNewLine({ ...newLine, teacher_id: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300"
+                        disabled={!newLine.section_id}
+                    >
+                        <option value="">Select</option>
+                        {availableTeachers.map((teacher) => (
+                            <option key={teacher.id} value={teacher.id}>
+                                {teacher.user?.name || teacher.full_name || `Teacher ${teacher.id}`}
+                            </option>
+                        ))}
+                    </select>
+                    {!newLine.section_id && (
+                        <p className="mt-2 text-xs text-gray-500">Select a section first to choose a teacher.</p>
+                    )}
+                    {newLine.section_id && availableTeachers.length === 0 && (
+                        <p className="mt-2 text-xs text-yellow-700">This section has no assigned teachers yet. Choose a teacher to assign.</p>
+                    )}
                 </div>
 
                 <div>
@@ -553,6 +617,7 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
                                 <tr>
                                     <th className="px-3 py-2 border">Course</th>
                                     <th className="px-3 py-2 border">Section</th>
+                                    <th className="px-3 py-2 border">Teacher</th>
                                     <th className="px-3 py-2 border">Room</th>
                                     <th className="px-3 py-2 border">Timeslot</th>
                                     <th className="px-3 py-2 border">Action</th>
@@ -563,6 +628,7 @@ function ManualScheduleForm({ semesters, courseOfferings, rooms, timeslots, sect
                                     <tr key={index}>
                                         <td className="px-3 py-2 border">{item.course_name}</td>
                                         <td className="px-3 py-2 border">{item.section_name}</td>
+                                        <td className="px-3 py-2 border">{item.teacher_name || 'Not assigned'}</td>
                                         <td className="px-3 py-2 border">{item.room_code}</td>
                                         <td className="px-3 py-2 border">{item.day} {item.start_time}-{item.end_time}</td>
                                         <td className="px-3 py-2 border">

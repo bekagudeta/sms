@@ -17,6 +17,7 @@ use Maatwebsite\Excel\Validators\Failure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation, SkipsOnFailure
 {
@@ -256,36 +257,10 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation,
         return null;
     }
 
-    private function extractCourseCode($identifier)
+    private function extractCourseCode($sectionIdentifier)
     {
-        // Try to extract course code from section name patterns
-        // Examples: "BSCS-1A" -> "BSCS", "MATH-101" -> "MATH", "CS101" -> "CS"
-        
-        if (preg_match('/^([A-Z]{2,4})/i', $identifier, $matches)) {
-            return strtoupper($matches[1]);
-        }
-
-        if (preg_match('/([A-Z]{2,4})-\d+[A-Z]?/i', $identifier, $matches)) {
-            return strtoupper($matches[1]);
-        }
-
-        if (preg_match('/([A-Z]{2,4})\d+/i', $identifier, $matches)) {
-            return strtoupper($matches[1]);
-        }
-
-        // For numeric identifiers, try to map to known course patterns
-        if (is_numeric($identifier)) {
-            $num = (int)$identifier;
-            
-            // Map common numeric ranges to course prefixes
-            if ($num >= 100 && $num < 200) return 'BA';  // Business Administration
-            if ($num >= 200 && $num < 300) return 'CS';  // Computer Science  
-            if ($num >= 300 && $num < 400) return 'MATH'; // Mathematics
-            if ($num >= 400 && $num < 500) return 'ENG'; // English
-            if ($num >= 500 && $num < 600) return 'SCI'; // Science
-        }
-
-        return null;
+        $parts = explode('-', $sectionIdentifier);
+        return $parts[0] ?? null;
     }
 
     private function createOrUpdateEnrollment($studentId, $sectionId, $studentCode = null, $enrolledAt = null)
@@ -294,7 +269,7 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow, WithValidation,
             ->where('section_id', $sectionId)
             ->first();
 
-        $hasStudentCode = \Schema::hasColumn('enrollments', 'student_code');
+        $hasStudentCode = Schema::hasColumn('enrollments', 'student_code');
 
         if ($existing) {
             if ($hasStudentCode && $studentCode) {
