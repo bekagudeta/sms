@@ -6,21 +6,29 @@ use App\Models\Course;
 use App\Models\Department;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
 
-class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
+class CoursesImport implements ToCollection, WithHeadingRow, WithValidation, SkipsEmptyRows
 {
     protected int $rowCount = 0;
     protected array $errors = [];
 
-    protected $departments;
+    protected array $departmentsById = [];
+    protected array $departmentsByCode = [];
+    protected array $departmentsByName = [];
 
     public function __construct()
     {
-        // 🔥 preload departments
-        $this->departments = Department::all()->keyBy('code');
+        $departments = Department::all();
+
+        foreach ($departments as $department) {
+            $this->departmentsById[$department->id] = $department;
+            $this->departmentsByCode[strtolower(trim((string) $department->code))] = $department;
+            $this->departmentsByName[strtolower(trim((string) $department->name))] = $department;
+        }
     }
 
     public function collection(Collection $rows)
@@ -28,25 +36,20 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
         $batch = [];
 
         foreach ($rows as $index => $row) {
-
-            if (empty($row['course_code'])) {
+            if ($this->isBlankRow($row)) {
                 continue;
             }
 
             $rowNumber = $index + 2;
+            $courseCode = strtolower(trim((string) ($row['course_code'] ?? '')));
 
-            $courseCode = strtolower(trim($row['course_code']));
-            $departmentCode = strtolower(trim((string) ($row['department_id'] ?? '')));
-
-            if (!$departmentCode) {
-                $this->errors[] = "Row {$rowNumber}: Missing department code";
+            if ($courseCode === '') {
+                $this->errors[] = "Row {$rowNumber}: The course_code field is required.";
                 continue;
             }
 
-            $department = $this->departments[$departmentCode] ?? null;
-
-            if (!$department) {
-                $this->errors[] = "Row {$rowNumber}: Department not found ({$departmentCode})";
+            $departmentId = $this->resolveDepartmentId($row, $rowNumber);
+            if ($departmentId === null) {
                 continue;
             }
 
@@ -55,11 +58,11 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
 
             $batch[] = [
                 'course_code' => $courseCode,
-                'course_name' => trim($row['course_name']),
+                'course_name' => trim((string) ($row['course_name'] ?? '')),
                 'description' => $row['description'] ?? null,
                 'credits' => (int) ($row['credits'] ?? 3),
                 'hours_per_week' => (int) ($row['hours_per_week'] ?? 3),
-                'department_id' => $department->id,
+                'department_id' => $departmentId,
                 'level' => $level,
                 'required_room_type' => $roomType,
                 'created_at' => now(),
@@ -138,7 +141,9 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
             '*.course_name' => 'required|string',
             '*.credits' => 'required|integer|min:1|max:6',
             '*.hours_per_week' => 'required|integer|min:1|max:6',
-            '*.department_id' => 'required|string',
+            '*.department_id' => 'required_without_all:*.department_code,*.department_name|integer|exists:departments,id',
+            '*.department_code' => 'nullable|string|exists:departments,code',
+            '*.department_name' => 'nullable|string|exists:departments,name',
             '*.level' => 'required|string',
         ];
     }
@@ -146,6 +151,55 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation
     public function getRowCount(): int
     {
         return $this->rowCount;
+    }
+
+    protected function isBlankRow($row): bool
+    {
+        foreach ($row as $value) {
+            if ($value !== null && trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function resolveDepartmentId($row, int $rowNumber): ?int
+    {
+        $departmentId = trim((string) ($row['department_id'] ?? ''));
+        if ($departmentId !== '') {
+            if (is_numeric($departmentId) && isset($this->departmentsById[(int) $departmentId])) {
+                return (int) $departmentId;
+            }
+
+            $this->errors[] = "Row {$rowNumber}: Department not found for department_id '{$departmentId}'.";
+            return null;
+        }
+
+        $departmentCode = strtolower(trim((string) ($row['department_code'] ?? '')));
+        if ($departmentCode !== '') {
+            $department = $this->departmentsByCode[$departmentCode] ?? null;
+            if ($department) {
+                return $department->id;
+            }
+
+            $this->errors[] = "Row {$rowNumber}: Department not found for department_code '{$row['department_code']}'.";
+            return null;
+        }
+
+        $departmentName = strtolower(trim((string) ($row['department_name'] ?? '')));
+        if ($departmentName !== '') {
+            $department = $this->departmentsByName[$departmentName] ?? null;
+            if ($department) {
+                return $department->id;
+            }
+
+            $this->errors[] = "Row {$rowNumber}: Department not found for department_name '{$row['department_name']}'.";
+            return null;
+        }
+
+        $this->errors[] = "Row {$rowNumber}: Missing department_id, department_code or department_name.";
+        return null;
     }
 
     public function getErrors(): array

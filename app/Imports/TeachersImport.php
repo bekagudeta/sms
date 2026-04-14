@@ -21,37 +21,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
     public function collection(Collection $rows)
     {
         foreach ($rows as $row) {
-            $departmentInput = trim((string) ($row['department_id'] ?? ''));
-            $departmentName = trim((string) ($row['department_name'] ?? ''));
-
-            if ($departmentInput === '') {
-                throw new \Exception('Import failed: department_id is required for teacher row.');
-            }
-
-            // 1) try numeric db id
-            if (ctype_digit($departmentInput)) {
-                $department = Department::find((int) $departmentInput);
-            } else {
-                $department = null;
-            }
-
-            // 2) if no numeric department, treat as code string
-            if (! $department) {
-                $department = Department::where('code', $departmentInput)->first();
-            }
-
-            // 3) If still not found and department_name is provided, create it
-            if (! $department && $departmentName !== '') {
-                $department = Department::create([
-                    'code' => $departmentInput,
-                    'name' => $departmentName,
-                ]);
-            }
-
-            // 4) final fallback is not allowed (system depends on department relation)
-            if (! $department) {
-                throw new \Exception("Import failed: department '$departmentInput' not found, and department_name is missing.");
-            }
+            $department = $this->resolveDepartment($row);
 
             // =========================
             // 1. User handling
@@ -121,16 +91,59 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
     public function rules(): array
     {
         return [
-            'teacher_id' => 'required|string',
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
-            'email' => 'required|email',
-            'department_id' => 'required|string',
-            'department_name' => 'nullable|string',
-            'phone' => 'nullable|string',
-            'qualification' => 'nullable|string',
-            'max_hours_per_week' => 'nullable|integer|min:1|max:40'
+            '*.teacher_id' => 'required|string',
+            '*.first_name' => 'required|string',
+            '*.last_name' => 'required|string',
+            '*.email' => 'required|email',
+            '*.department_id' => 'required_without_all:*.department_code,*.department_name|string',
+            '*.department_code' => 'nullable|string|exists:departments,code',
+            '*.department_name' => 'nullable|string|exists:departments,name',
+            '*.phone' => 'nullable|string',
+            '*.qualification' => 'nullable|string',
+            '*.max_hours_per_week' => 'nullable|integer|min:1|max:40'
         ];
+    }
+
+    protected function resolveDepartment($row)
+    {
+        if ($row instanceof Collection) {
+            $row = $row->toArray();
+        }
+
+        $departmentId = trim((string) ($row['department_id'] ?? ''));
+        $departmentCode = trim((string) ($row['department_code'] ?? ''));
+        $departmentName = trim((string) ($row['department_name'] ?? ''));
+
+        if ($departmentId !== '') {
+            if (ctype_digit($departmentId)) {
+                $department = Department::find((int) $departmentId);
+            } else {
+                $department = Department::whereRaw('LOWER(code) = ?', [Str::lower($departmentId)])->first();
+            }
+
+            if (! $department) {
+                throw new \Exception("Import failed: department_id '{$departmentId}' not found for teacher row.");
+            }
+            return $department;
+        }
+
+        if ($departmentCode !== '') {
+            $department = Department::whereRaw('LOWER(code) = ?', [Str::lower($departmentCode)])->first();
+            if (! $department) {
+                throw new \Exception("Import failed: department_code '{$departmentCode}' not found for teacher row.");
+            }
+            return $department;
+        }
+
+        if ($departmentName !== '') {
+            $department = Department::whereRaw('LOWER(name) = ?', [Str::lower($departmentName)])->first();
+            if (! $department) {
+                throw new \Exception("Import failed: department_name '{$departmentName}' not found for teacher row.");
+            }
+            return $department;
+        }
+
+        throw new \Exception('Import failed: department_id, department_code, or department_name is required for teacher row.');
     }
 
     public function getRowCount(): int

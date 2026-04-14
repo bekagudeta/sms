@@ -14,6 +14,7 @@ use App\Imports\EnrollmentsImport;
 use App\Imports\TimeslotsImport;
 use App\Imports\RoomsImport;
 use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\Validators\ValidationException;
 use Illuminate\Support\Facades\Log;
 
 class ExcelImportService
@@ -91,7 +92,22 @@ class ExcelImportService
             return [
                 'success' => true,
                 'message' => 'Courses imported successfully',
-                'count' => $import->getRowCount()
+                'count' => $import->getRowCount(),
+                'errors' => $import->getErrors(),
+            ];
+        } catch (ValidationException $e) {
+            Log::error('Course import validation failed: ' . $e->getMessage());
+            $failures = $e->failures();
+            $messages = array_map(function ($failure) {
+                $row = $failure->row();
+                $attribute = $failure->attribute();
+                $errors = implode(' / ', $failure->errors());
+                return "Row {$row} [{$attribute}]: {$errors}";
+            }, $failures);
+
+            return [
+                'success' => false,
+                'message' => 'Validation failed: ' . implode(' | ', $messages)
             ];
         } catch (\Exception $e) {
             Log::error('Course import failed: ' . $e->getMessage());
