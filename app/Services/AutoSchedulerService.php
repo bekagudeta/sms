@@ -110,8 +110,14 @@ class AutoSchedulerService
                 }
             }
 
+            // If simple engine fails, try advanced backtracking algorithm
             if (empty($finalSchedule)) {
-                throw new \Exception("Simple scheduling engine failed to generate any schedules");
+                Log::info('Simple engine failed, attempting advanced backtracking algorithm');
+                $finalSchedule = $this->attemptAdvancedScheduling();
+                
+                if (empty($finalSchedule)) {
+                    throw new \Exception("Both simple and advanced scheduling engines failed to generate any schedules");
+                }
             }
 
             // Set scheduled section assignments from final schedule before saving
@@ -164,6 +170,115 @@ class AutoSchedulerService
         }
     }
     
+    /**
+     * Attempt advanced scheduling using backtracking algorithm
+     */
+    protected function attemptAdvancedScheduling()
+    {
+        try {
+            // Sort sections by difficulty for better backtracking performance
+            $sortedSections = $this->sortSectionsByDifficulty();
+            $this->sections = $sortedSections;
+            
+            // Get available timeslots
+            $availableTimeslots = $this->timeslots;
+            
+            // Reset state for clean scheduling attempt
+            $this->resetSchedulingState();
+            
+            // Attempt backtracking scheduling
+            $success = $this->backtrackAssignSections(0, $availableTimeslots);
+            
+            if ($success) {
+                // Convert current schedule to final format
+                $finalSchedule = [];
+                foreach ($this->currentSchedule as $assignment) {
+                    $finalSchedule[] = $assignment;
+                }
+                return $finalSchedule;
+            }
+            
+            // If backtracking fails, try greedy approach as last resort
+            return $this->attemptGreedyScheduling();
+            
+        } catch (\Exception $e) {
+            Log::error('Advanced scheduling failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Greedy scheduling as fallback when backtracking fails
+     */
+    protected function attemptGreedyScheduling()
+    {
+        $finalSchedule = [];
+        $usedRoomTimeslots = [];
+        $usedTeacherTimeslots = [];
+        
+        foreach ($this->sections as $section) {
+            $course = $section->courseOffering->course;
+            $requiredSlots = $course->hours_per_week ?? 3;
+            $assignedSlots = 0;
+            
+            foreach ($this->timeslots as $timeslot) {
+                if ($assignedSlots >= $requiredSlots) {
+                    break;
+                }
+                
+                // Check teacher availability
+                $teacherAvailable = true;
+                foreach ($section->teachers as $teacher) {
+                    $key = $teacher->id . '_' . $timeslot->id;
+                    if (isset($usedTeacherTimeslots[$key])) {
+                        $teacherAvailable = false;
+                        break;
+                    }
+                }
+                
+                if (!$teacherAvailable) {
+                    continue;
+                }
+                
+                // Find available room
+                $room = null;
+                foreach ($this->rooms as $potentialRoom) {
+                    if ($potentialRoom->capacity >= $section->capacity) {
+                        $roomKey = $potentialRoom->id . '_' . $timeslot->id;
+                        if (!isset($usedRoomTimeslots[$roomKey])) {
+                            if ($this->isRoomSuitableForCourse($potentialRoom, $course)) {
+                                $room = $potentialRoom;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if ($room) {
+                    // Assign schedule
+                    $finalSchedule[] = [
+                        'section_id' => $section->id,
+                        'room_id' => $room->id,
+                        'timeslot_id' => $timeslot->id,
+                    ];
+                    
+                    // Mark as used
+                    $roomKey = $room->id . '_' . $timeslot->id;
+                    $usedRoomTimeslots[$roomKey] = true;
+                    
+                    foreach ($section->teachers as $teacher) {
+                        $teacherKey = $teacher->id . '_' . $timeslot->id;
+                        $usedTeacherTimeslots[$teacherKey] = true;
+                    }
+                    
+                    $assignedSlots++;
+                }
+            }
+        }
+        
+        return $finalSchedule;
+    }
+
     /**
      * Precompute data for performance optimization
      */
@@ -245,13 +360,12 @@ class AutoSchedulerService
         $course = $section->courseOffering->course;
         $requiredSlots = $course->hours_per_week ?? 3;
         
-        // PRUNING: Check if remaining sections can possibly be scheduled
-        if (!$this->hasEnoughRemainingCapacity($sectionIndex, $requiredSlots)) {
-            return false;
-        }
-        
         // Get all possible timeslot-room combinations for this section
         $possibleAssignments = $this->getPossibleAssignments($section, $course, $availableTimeslots, $requiredSlots);
+        
+        if ($possibleAssignments->isEmpty()) {
+            return false; // No possible assignments for this section
+        }
         
         // Limit combinations to prevent explosion
         if ($possibleAssignments->count() > $this->maxCombinationsPerSection) {
@@ -265,16 +379,19 @@ class AutoSchedulerService
         
         // Try each possible assignment
         foreach ($possibleAssignments as $assignment) {
-            // Forward checking: test if this assignment leads to dead end
-            if (!$this->forwardCheck($sectionIndex, $assignment)) {
-                continue;
-            }
-            
             // Apply assignment
             $this->applyAssignment($section, $assignment);
             
-            // Recurse to next section
-            $result = $this->backtrackAssignSections($sectionIndex + 1, $availableTimeslots);
+            // Check if we still need more slots for this section
+            $currentSlots = $this->getCurrentSectionSlotCount($section->id);
+            
+            if ($currentSlots < $requiredSlots) {
+                // Need more slots for this same section
+                $result = $this->backtrackAssignSections($sectionIndex, $availableTimeslots);
+            } else {
+                // Section is complete, move to next section
+                $result = $this->backtrackAssignSections($sectionIndex + 1, $availableTimeslots);
+            }
             
             if ($result) {
                 return true; // Found valid solution
@@ -430,13 +547,13 @@ class AutoSchedulerService
             return $this->isTimeslotValid($section, $course, $timeslot);
         });
 
-        if ($validTimeslots->count() < $requiredSlots) {
+        if ($validTimeslots->isEmpty()) {
             return $possibilities;
         }
 
-        $combinations = $this->getValidCombinationsByDay($validTimeslots, $requiredSlots);
-
-        foreach ($combinations as $combination) {
+        // For simplicity and reliability, assign individual slots rather than combinations
+        // This approach is more robust and avoids combination explosion
+        foreach ($validTimeslots as $timeslot) {
             $eligibleRooms = $this->getEligibleRooms($course);
 
             foreach ($eligibleRooms as $room) {
@@ -444,29 +561,22 @@ class AutoSchedulerService
                     continue;
                 }
 
-                $roomAvailable = true;
-                foreach ($combination as $timeslot) {
-                    if ($this->hasRoomConflictInMemory($room, $timeslot)) {
-                        $roomAvailable = false;
-                        break;
-                    }
-                }
-
-                if (!$roomAvailable) {
+                if ($this->hasRoomConflictInMemory($room, $timeslot)) {
                     continue;
                 }
 
-                $day = $combination[0]->day_of_week;
-                $score = $this->calculateAssignmentScore($section, $course, $combination, $room);
+                $day = $timeslot->day_of_week;
+                $score = $this->calculateAssignmentScore($section, $course, [$timeslot], $room);
 
                 $possibilities->push([
-                    'timeslots' => $combination,
+                    'timeslots' => collect([$timeslot]),
                     'room' => $room,
                     'day' => $day,
                     'score' => $score,
                 ]);
 
-                break; // Use first available room for this combination
+                // Use first available room for this timeslot to avoid duplicates
+                break;
             }
         }
 
@@ -594,6 +704,20 @@ class AutoSchedulerService
         }
         
         unset($this->sectionAssignments[$section->id]);
+    }
+    
+    /**
+     * Get current slot count for a section
+     */
+    protected function getCurrentSectionSlotCount($sectionId)
+    {
+        $count = 0;
+        foreach ($this->currentSchedule as $assignment) {
+            if ($assignment['section_id'] == $sectionId) {
+                $count++;
+            }
+        }
+        return $count;
     }
     
     /**
@@ -800,7 +924,8 @@ class AutoSchedulerService
         $totalCapacity = $this->timeslots->count() * $this->rooms->count();
         
         if ($totalRequiredSlots > $totalCapacity) {
-            throw new \Exception("Impossible: Not enough total capacity for all required slots. Required: {$totalRequiredSlots}, Available: {$totalCapacity}");
+            Log::warning("Insufficient total capacity for all required slots. Required: {$totalRequiredSlots}, Available: {$totalCapacity}. Will generate partial schedule.");
+            // Don't throw exception - allow partial scheduling
         }
         
         // Check each section has at least one teacher
@@ -936,12 +1061,25 @@ class AutoSchedulerService
     
     protected function isTimeslotValid($section, $course, $timeslot)
     {
-        if ($this->hasAnyTeacherConflict($section, $timeslot)) {
-            return false;
+        // Check teacher conflicts
+        foreach ($section->teachers as $teacher) {
+            if (isset($this->teacherTimeslotMap[$teacher->id][$timeslot->id])) {
+                return false;
+            }
+            
+            // Check teacher hours limit
+            $currentHours = $this->teacherHours[$teacher->id] ?? 0;
+            $maxHours = $teacher->max_hours_per_week ?? 39;
+            if ($currentHours >= $maxHours) {
+                return false;
+            }
         }
         
-        if ($this->hasAnyStudentConflict($section, $timeslot)) {
-            return false;
+        // Check student conflicts
+        foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
+            if (isset($this->studentTimeslotMap[$studentId][$timeslot->id])) {
+                return false;
+            }
         }
         
         return true;
