@@ -170,7 +170,7 @@ export default function Welcome({ auth }) {
       <section id="security" className="mx-auto max-w-7xl px-6 py-12 mb-12 sm:mb-16 rounded-3xl border border-[#6BCFCB]/30 bg-gradient-to-r from-[#001722]/90 via-[#084A48]/85 to-[#6BCFCB]/30">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center text-4xl font-bold text-[#6BCFCB]">Enterprise-Grade Security</h2>
-          <p className="mx-auto mt-3 max-w-3xl text-center text-[#C8F9FF]">Role-based permissions, audit logs, and encrypted data ensure your institution stays compliant and secure, with military-grade AES-256 encryption and granular access controls.</p>
+          <p className="mx-auto mt-3 max-w-3xl text-center text-[#C8F9FF]">Role-based permissions, audit logs, and encrypted data ensure your institution stays compliant and secure, with military-grade AES-256 encryption and granular access controls.s</p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[
               { title: 'Access Control', desc: 'RBAC and SSO with multi-factor authentication', icon: '🔐' },
