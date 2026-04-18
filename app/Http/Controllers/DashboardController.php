@@ -302,35 +302,40 @@ class DashboardController extends Controller
     {
         $query = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot']);
 
+        // Primary filter: Department-based filtering
         if ($student->department_id) {
             $query->whereHas('section.courseOffering.course', function ($q) use ($student) {
                 $q->where('department_id', $student->department_id);
-
-                if (!empty($student->level)) {
+                
+                // Only filter by level if it matches course levels (skip numeric vs text mismatch)
+                if (!empty($student->level) && !is_numeric($student->level)) {
                     $q->where('level', $student->level);
                 }
             });
-        } elseif (!empty($student->level)) {
-            $query->whereHas('section.courseOffering.course', function ($q) use ($student) {
-                $q->where('level', $student->level);
-            });
         }
 
+        // Optional semester filtering
         if (!empty($student->semester)) {
             $semesterModel = Semester::where('name', $student->semester . ' Semester')->first();
             if ($semesterModel) {
                 $query->whereHas('section.courseOffering', function ($q) use ($semesterModel) {
                     $q->where('semester_id', $semesterModel->id);
                 });
-            } elseif (is_numeric($student->semester)) {
-                // Skip this filter as semester_id is now accessed through section.courseOffering
-                // The semester filtering above should handle this case
             }
         }
 
+        // Flexible section filtering - try exact match first, then partial match
         if (!empty($student->section)) {
-            $query->whereHas('section', function ($q) use ($student) {
-                $q->where('section_name', $student->section);
+            $query->where(function ($q) use ($student) {
+                // Exact match
+                $q->whereHas('section', function ($subQ) use ($student) {
+                    $subQ->where('section_name', $student->section);
+                });
+                
+                // Partial match for sections like "BSSE-1B" containing "B"
+                $q->orWhereHas('section', function ($subQ) use ($student) {
+                    $subQ->where('section_name', 'like', '%' . $student->section . '%');
+                });
             });
         }
 
