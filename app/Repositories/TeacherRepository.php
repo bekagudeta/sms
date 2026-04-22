@@ -1,25 +1,14 @@
 <?php
 
-
-
 namespace App\Repositories;
 
-
-
 use App\Models\Teacher;
-
 use Illuminate\Support\Collection;
 
-
-
 class TeacherRepository
-
 {
-
     public function getAll(): Collection
-
     {
-
         return Teacher::with('department')->get();
     }
 
@@ -39,58 +28,31 @@ class TeacherRepository
             ->withQueryString();
     }
 
-
-
-
     public function findById($id): ?Teacher
-
     {
-
         return Teacher::with(['department', 'sections.courseOffering.course'])
             ->find($id);
-
     }
-
-
 
     public function findByTeacherId($teacherId): ?Teacher
-
     {
-
         return Teacher::where('teacher_id', $teacherId)->first();
-
     }
-
-
 
     public function create(array $data): Teacher
-
     {
-
         return Teacher::create($data);
-
     }
-
-
 
     public function update($id, array $data): bool
-
     {
-
         $teacher = Teacher::find($id);
-
         return $teacher ? $teacher->update($data) : false;
-
     }
-
-
-
+    
     public function delete($id): bool
-
     {
-
         $teacher = $this->findById($id);
-
         if (! $teacher) {
             return false;
         }
@@ -99,35 +61,19 @@ class TeacherRepository
         $teacher->sections()->detach();
 
         return $teacher->delete();
-
     }
-
-
 
     public function getByDepartment($departmentId): Collection
-
     {
-
         return Teacher::where('department_id', $departmentId)
-
-                     ->with('department')
-
-                     ->get();
-
+            ->with('department')
+            ->get();
     }
-
-
-
+    
     public function getAvailableTeachers($maxHours = 20): Collection
-
     {
-
         return Teacher::where('max_hours_per_week', '>=', $maxHours)
-
-                     ->with('department')
-
-                     ->get();
-
+            ->with('department')
+            ->get();
     }
-
 }

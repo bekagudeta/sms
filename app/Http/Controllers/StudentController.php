@@ -44,12 +44,12 @@ class StudentController extends Controller
     {
         $validated = $request->validate([
             'student_id'      => 'required|string|max:50|unique:students,student_id',
+            'user_id'         => 'required|exists:users,id',
             'first_name'      => 'required|string|max:100',
             'last_name'       => 'required|string|max:100',
             'email'           => 'required|email|max:255|unique:students,email',
             'phone'           => 'nullable|string|max:20',
-            'department_id'   => 'nullable|exists:departments,id',
-            'grade'           => 'nullable|integer|min:1|max:12',
+            'department_id'   => 'required|exists:departments,id',
             'status'          => 'nullable|string|in:active,inactive,pending,graduated,suspended',
             'enrollment_date' => 'nullable|date',
         ]);
@@ -76,12 +76,12 @@ class StudentController extends Controller
     {
         $validated = $request->validate([
             'student_id'      => 'required|string|max:50|unique:students,student_id,' . $student->id,
+            'user_id'         => 'required|exists:users,id',
             'first_name'      => 'required|string|max:100',
             'last_name'       => 'required|string|max:100',
             'email'           => 'required|email|max:255|unique:students,email,' . $student->id,
             'phone'           => 'nullable|string|max:20',
-            'department_id'   => 'nullable|exists:departments,id',
-            'grade'           => 'nullable|integer|min:1|max:12',
+            'department_id'   => 'required|exists:departments,id',
             'status'          => 'nullable|string|in:active,inactive,pending,graduated,suspended',
             'enrollment_date' => 'nullable|date',
         ]);

@@ -51,25 +51,25 @@ class CourseRepository
     public function getByDepartment($departmentId): Collection
     {
         return Course::where('department_id', $departmentId)
-                     ->with(['department', 'semester', 'teacher'])
-                     ->get();
+            ->with(['department', 'semester', 'teacher'])
+            ->get();
     }
 
     public function getBySemester($semesterId): Collection
     {
         return Course::whereHas('courseOfferings', function ($q) use ($semesterId) {
-                     $q->where('semester_id', $semesterId);
-                 })
-                 ->with(['department', 'courseOfferings.sections.teachers.user'])
-                 ->get();
+            $q->where('semester_id', $semesterId);
+        })
+            ->with(['department', 'courseOfferings.sections.teachers.user'])
+            ->get();
     }
 
     public function getByTeacher($teacherId): Collection
     {
         return Course::whereHas('courseOfferings.sections.teachers', function ($q) use ($teacherId) {
-                     $q->where('teacher_id', $teacherId);
-                 })
-                 ->with(['department', 'courseOfferings.sections.teachers.user'])
-                 ->get();
+            $q->where('teacher_id', $teacherId);
+        })
+            ->with(['department', 'courseOfferings.sections.teachers.user'])
+            ->get();
     }
 }

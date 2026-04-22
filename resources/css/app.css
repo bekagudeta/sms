@@ -8,41 +8,41 @@
     }
 
     body {
-        @apply bg-platinum text-deep-jungle-green antialiased;
+        @apply bg-gray-50 text-primary antialiased;
     }
 }
 
 @layer components {
     .app-shell {
-        @apply min-h-screen bg-platinum text-deep-jungle-green;
+        @apply min-h-screen bg-gray-50 text-primary;
     }
 
     .app-panel {
-        @apply rounded-2xl border border-deep-jungle-green/10 bg-white shadow-sm;
+        @apply rounded-2xl border border-primary/10 bg-white shadow-sm;
     }
 
     .app-panel-muted {
-        @apply rounded-2xl border border-deep-jungle-green/10 bg-platinum shadow-sm;
+        @apply rounded-2xl border border-primary/10 bg-gray-50 shadow-sm;
     }
 
     .app-primary-btn {
-        @apply inline-flex items-center justify-center rounded-xl bg-vivid-orange px-4 py-2.5 text-sm font-semibold text-rich-black shadow-sm transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-vivid-orange focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+        @apply inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
     }
 
     .app-secondary-btn {
-        @apply inline-flex items-center justify-center rounded-xl border border-deep-jungle-green/15 bg-white px-4 py-2.5 text-sm font-semibold text-deep-jungle-green transition hover:bg-platinum focus:outline-none focus:ring-2 focus:ring-vivid-orange focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+        @apply inline-flex items-center justify-center rounded-xl border border-primary/15 bg-white px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
     }
 
     .app-input {
-        @apply rounded-xl border-deep-jungle-green/20 bg-white text-deep-jungle-green placeholder:text-deep-jungle-green/45 shadow-sm focus:border-vivid-orange focus:ring-vivid-orange;
+        @apply rounded-xl border-primary/20 bg-white text-primary placeholder:text-primary/45 shadow-sm focus:border-primary focus:ring-primary;
     }
 
     .app-badge {
-        @apply inline-flex items-center rounded-full bg-vivid-orange/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-vivid-orange;
+        @apply inline-flex items-center rounded-full bg-success/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-success;
     }
 
     .app-table-shell {
-        @apply overflow-x-auto rounded-2xl border border-deep-jungle-green/10 bg-white shadow-sm;
+        @apply overflow-x-auto rounded-2xl border border-primary/10 bg-white shadow-sm;
     }
 }
 

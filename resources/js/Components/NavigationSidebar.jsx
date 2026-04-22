@@ -153,8 +153,8 @@ export default function NavigationSidebar({ currentRoute }) {
                 href="/dashboard"
                 className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                     isActive('/dashboard')
-                        ? 'bg-vivid-orange text-rich-black shadow-sm'
-                        : 'text-platinum/80 hover:bg-white/10 hover:text-white'
+                        ? 'bg-success text-white shadow-sm'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
             >
                 {getIcon('Dashboard')}
@@ -167,8 +167,8 @@ export default function NavigationSidebar({ currentRoute }) {
                     href="/schedules"
                     className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                         isActive('/schedules')
-                            ? 'bg-vivid-orange text-rich-black shadow-sm'
-                            : 'text-platinum/80 hover:bg-white/10 hover:text-white'
+                            ? 'bg-success text-white shadow-sm'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
                     }`}
                 >
                     {getIcon('CalendarAlt')}
@@ -182,8 +182,8 @@ export default function NavigationSidebar({ currentRoute }) {
                     href="/schedules/generate"
                     className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                         isActive('/schedules/generate')
-                            ? 'bg-vivid-orange text-rich-black shadow-sm'
-                            : 'text-platinum/80 hover:bg-white/10 hover:text-white'
+                            ? 'bg-success text-white shadow-sm'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
                     }`}
                 >
                     {getIcon('Calendar')}
@@ -194,7 +194,7 @@ export default function NavigationSidebar({ currentRoute }) {
             {/* Import/Export - Scheduler specific */}
             {(hasPermission('import data') || hasPermission('export schedule')) && (
                 <div className="space-y-1">
-                    <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-platinum/55">
+                    <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/55">
                         Data Management
                     </div>
                     {hasPermission('import data') && (
@@ -202,8 +202,8 @@ export default function NavigationSidebar({ currentRoute }) {
                             href="/import"
                             className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                                 isActive('/import')
-                                    ? 'bg-vivid-orange text-rich-black shadow-sm'
-                                    : 'text-platinum/75 hover:bg-white/10 hover:text-white'
+                                    ? 'bg-success text-white shadow-sm'
+                                    : 'text-white/75 hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             {getIcon('BookOpen')}
@@ -215,8 +215,8 @@ export default function NavigationSidebar({ currentRoute }) {
                             href="/export/schedule"
                             className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                                 isActive('/export')
-                                    ? 'bg-vivid-orange text-rich-black shadow-sm'
-                                    : 'text-platinum/75 hover:bg-white/10 hover:text-white'
+                                    ? 'bg-success text-white shadow-sm'
+                                    : 'text-white/75 hover:bg-white/10 hover:text-white'
                             }`}
                         >
                             {getIcon('Book')}
@@ -240,7 +240,7 @@ export default function NavigationSidebar({ currentRoute }) {
                     <div key={category.category}>
                         <button
                             onClick={() => toggleCategory(category.category)}
-                            className="w-full group flex items-center rounded-xl px-3 py-2 text-sm font-medium text-platinum/80 transition hover:bg-white/10 hover:text-white"
+                            className="w-full group flex items-center rounded-xl px-3 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
                         >
                             {getIcon(category.icon)}
                             <span className="ml-3">{category.category}</span>
@@ -270,8 +270,8 @@ export default function NavigationSidebar({ currentRoute }) {
                                             href={route}
                                             className={`group flex items-center pl-10 pr-3 py-2 text-sm font-medium rounded-md ${
                                                 isActive(route)
-                                                    ? 'bg-vivid-orange text-rich-black shadow-sm'
-                                                    : 'text-platinum/75 hover:bg-white/10 hover:text-white'
+                                                    ? 'bg-success text-white shadow-sm'
+                                                    : 'text-white/75 hover:bg-white/10 hover:text-white'
                                             }`}
                                         >
                                             {getIcon(item.icon)}
@@ -290,8 +290,8 @@ export default function NavigationSidebar({ currentRoute }) {
                 href="/settings"
                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                     isActive('/settings')
-                        ? 'bg-vivid-orange text-rich-black shadow-sm'
-                        : 'text-platinum/80 hover:bg-white/10 hover:text-white'
+                        ? 'bg-success text-white shadow-sm'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
             >
                 {getIcon('Cog')}

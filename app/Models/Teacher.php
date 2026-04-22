@@ -39,7 +39,7 @@ class Teacher extends Model
 
     public function getSchedulesAttribute()
     {
-        return $this->sections()->with('schedule')->get()->pluck('schedule');
+        return $this->sections->load('schedule')->pluck('schedule')->flatten();
     }
 
     public function user()
@@ -49,6 +49,6 @@ class Teacher extends Model
 
     public function getFullNameAttribute()
     {
-        return $this->user?->name ?? 'Unknown';
+        return trim("{$this->first_name} {$this->last_name}");
     }
 }

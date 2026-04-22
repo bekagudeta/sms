@@ -12,13 +12,13 @@ export default function DashboardLayout({ children }) {
 
     return (
         <div className="app-shell lg:flex">
-            <aside className="w-full shrink-0 bg-deep-jungle-green text-platinum shadow-2xl lg:min-h-screen lg:w-72">
-                <div className="flex items-center gap-3 border-b border-white/10 bg-rich-black px-5 py-4">
+            <aside className="w-full shrink-0 bg-primary text-white shadow-2xl lg:min-h-screen lg:w-72">
+                <div className="flex items-center gap-3 border-b border-white/10 bg-primary-dark px-5 py-4">
                     <Link href="/dashboard" className="flex items-center gap-3">
                         <img src={logo} alt="Logo" className="h-10 w-auto object-contain" />
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-widest text-vivid-orange">SMS</p>
-                            <p className="text-sm font-semibold text-platinum">Schedule Management</p>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-success-light">SMS</p>
+                            <p className="text-sm font-semibold text-white">Schedule Management</p>
                         </div>
                     </Link>
                 </div>
@@ -29,17 +29,17 @@ export default function DashboardLayout({ children }) {
             </aside>
 
             <div className="flex min-w-0 flex-1 flex-col">
-                <header className="sticky top-0 z-30 border-b border-deep-jungle-green/10 bg-white/95 backdrop-blur">
+                <header className="sticky top-0 z-30 border-b border-primary/10 bg-white/95 backdrop-blur">
                     <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-widest text-vivid-orange">Dashboard</p>
-                            <h1 className="text-lg font-bold text-deep-jungle-green">Schedule Management System</h1>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-primary">Dashboard</p>
+                            <h1 className="text-lg font-bold text-primary">Schedule Management System</h1>
                         </div>
 
                         <div className="flex items-center gap-3">
                             <div className="hidden text-right sm:block">
-                                <p className="text-sm font-semibold text-deep-jungle-green">{user.name}</p>
-                                <p className="text-xs text-deep-jungle-green/60">Signed in</p>
+                                <p className="text-sm font-semibold text-primary">{user.name}</p>
+                                <p className="text-xs text-primary/60">Signed in</p>
                             </div>
                             <Link
                                 href={route('logout')}
@@ -57,15 +57,15 @@ export default function DashboardLayout({ children }) {
                 <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
                     <div className="mx-auto max-w-7xl space-y-4">
                         {flash.success && (
-                            <div className="rounded-2xl border border-vivid-orange/30 bg-white px-4 py-3 text-sm text-deep-jungle-green shadow-sm">
-                                <span className="mr-2 font-semibold text-vivid-orange">Success:</span>
+                            <div className="rounded-2xl border border-success/30 bg-white px-4 py-3 text-sm text-primary shadow-sm">
+                                <span className="mr-2 font-semibold text-success">Success:</span>
                                 {flash.success}
                             </div>
                         )}
 
                         {flash.error && (
-                            <div className="rounded-2xl border border-rich-black/20 bg-white px-4 py-3 text-sm text-deep-jungle-green shadow-sm">
-                                <span className="mr-2 font-semibold text-rich-black">Notice:</span>
+                            <div className="rounded-2xl border border-primary/20 bg-white px-4 py-3 text-sm text-primary shadow-sm">
+                                <span className="mr-2 font-semibold text-primary-dark">Notice:</span>
                                 {flash.error}
                             </div>
                         )}

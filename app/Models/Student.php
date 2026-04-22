@@ -24,7 +24,7 @@ class Student extends Model
         'enrollment_date',
     ];
 
-    protected $appends = ['name'];
+    protected $appends = ['full_name'];
 
     protected $casts = [
         'enrollment_date' => 'datetime:Y-m-d',
@@ -40,7 +40,7 @@ class Student extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function getNameAttribute()
+    public function getFullNameAttribute()
     {
         return trim("{$this->first_name} {$this->last_name}");
     }
@@ -57,6 +57,6 @@ class Student extends Model
 
     public function getSchedulesAttribute()
     {
-        return $this->sections()->with('schedule')->get()->pluck('schedule');
+        return $this->sections->load('schedule')->pluck('schedule')->flatten();
     }
 }

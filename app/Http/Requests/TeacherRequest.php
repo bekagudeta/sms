@@ -34,6 +34,7 @@ class TeacherRequest extends FormRequest
                 'max:50',
                 Rule::unique((new Teacher)->getTable(), 'teacher_id')->ignore($teacherId),
             ],
+            'user_id' => ['required', 'exists:users,id'],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name'  => ['required', 'string', 'max:100'],
             'email' => [
