@@ -7,7 +7,7 @@ import EntityForm from './EntityForm';
 import SearchBar from './SearchBar';
 import BulkActions from './BulkActions';
 
-export default function EntityManager({ entityType, initialData = [], filters = {}, permissions = {} }) {
+export default function EntityManager({ entityType, initialData = [], filters = {}, permissions = {}, relatedOptions = {} }) {
     const config = getEntityConfig(entityType);
     const { props } = usePage();
     const flash = props.flash;
@@ -469,6 +469,7 @@ export default function EntityManager({ entityType, initialData = [], filters = 
                     errors={errors}
                     processing={processing}
                     editingItem={editingItem}
+                    relatedOptions={relatedOptions}
                     onSubmit={handleFormSubmit}
                 />
             )}

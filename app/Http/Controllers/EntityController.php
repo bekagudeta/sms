@@ -7,8 +7,10 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
+use App\Models\Department;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use App\Models\User;
 
 class EntityController extends Controller
 {
@@ -195,6 +197,21 @@ class EntityController extends Controller
             }
         }
 
+        $relatedOptions = [];
+
+        if ($entityType === 'students') {
+            $relatedOptions = [
+                'departments' => Department::select('id', 'name')->orderBy('name')->get(),
+                'levels' => [
+                    ['value' => 'bachelor', 'label' => 'Bachelor'],
+                    ['value' => 'master', 'label' => 'Master'],
+                    ['value' => 'phd', 'label' => 'PhD'],
+                    ['value' => 'diploma', 'label' => 'Diploma'],
+                    ['value' => 'certificate', 'label' => 'Certificate'],
+                ],
+            ];
+        }
+
         // Always render the Entities/Index view with the entity data
         return Inertia::render('Entities/Index', [
             'entityType' => $entityType,
@@ -206,7 +223,8 @@ class EntityController extends Controller
                 'edit' => $isAdmin || auth()->user()->can($permissions['edit']),
                 'delete' => $isAdmin || auth()->user()->can($permissions['delete']),
                 'import' => $isAdmin || auth()->user()->can($permissions['import']),
-            ]
+            ],
+            'relatedOptions' => $relatedOptions,
         ]);
     }
 
@@ -328,6 +346,14 @@ class EntityController extends Controller
         $validationRules = $this->getValidationRules($entityType);
         $validated = $request->validate($validationRules);
 
+        if ($entityType === 'students') {
+            $validated['user_id'] = auth()->id();
+
+            if (empty($validated['enrollment_date'])) {
+                $validated['enrollment_date'] = now()->toDateString();
+            }
+        }
+
         $entity = $model::create($validated);
 
         return redirect()->route('entities.index', ['entityType' => $entityType])
@@ -367,8 +393,10 @@ class EntityController extends Controller
                 'first_name' => 'required|string|max:100',
                 'last_name' => 'required|string|max:100',
                 'email' => 'required|email|max:255|unique:students,email' . ($id ? ",{$id}" : ''),
+                'level' => 'nullable|string|max:50',
+                'section' => 'required|string|max:50',
                 'phone' => 'nullable|string|max:20',
-                'department_id' => 'nullable|exists:departments,id',
+                'department_id' => 'required|exists:departments,id',
                 'grade' => 'nullable|integer|min:1|max:12',
                 'status' => 'nullable|string|in:active,inactive,pending,graduated,suspended',
                 'enrollment_date' => 'nullable|date'

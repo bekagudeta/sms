@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function EntityForm({ isOpen, onClose, config, formData, setFormData, errors, processing, editingItem, onSubmit }) {
+export default function EntityForm({ isOpen, onClose, config, formData, setFormData, errors, processing, editingItem, relatedOptions = {}, onSubmit }) {
     if (!isOpen) return null;
 
     const handleChange = (e) => {
@@ -166,6 +166,20 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
         const configs = {
             students: {
                 email: { type: 'email', label: 'Email Address' },
+                level: {
+                    type: 'select',
+                    options: relatedOptions.levels || [
+                        { value: 'bachelor', label: 'Bachelor' },
+                        { value: 'master', label: 'Master' },
+                        { value: 'phd', label: 'PhD' },
+                        { value: 'diploma', label: 'Diploma' },
+                        { value: 'certificate', label: 'Certificate' }
+                    ]
+                },
+                department_id: {
+                    type: 'select',
+                    options: (relatedOptions.departments || []).map(dept => ({ value: dept.id, label: dept.name }))
+                },
                 grade: { type: 'number', min: 1, max: 12, label: 'Grade Level' },
                 status: { 
                     type: 'select', 

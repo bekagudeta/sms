@@ -44,7 +44,6 @@ class StudentController extends Controller
     {
         $validated = $request->validate([
             'student_id'      => 'required|string|max:50|unique:students,student_id',
-            'user_id'         => 'required|exists:users,id',
             'first_name'      => 'required|string|max:100',
             'last_name'       => 'required|string|max:100',
             'email'           => 'required|email|max:255|unique:students,email',
@@ -53,6 +52,8 @@ class StudentController extends Controller
             'status'          => 'nullable|string|in:active,inactive,pending,graduated,suspended',
             'enrollment_date' => 'nullable|date',
         ]);
+
+        $validated['user_id'] = auth()->id();
 
         $this->repository->create($validated);
 
@@ -76,7 +77,6 @@ class StudentController extends Controller
     {
         $validated = $request->validate([
             'student_id'      => 'required|string|max:50|unique:students,student_id,' . $student->id,
-            'user_id'         => 'required|exists:users,id',
             'first_name'      => 'required|string|max:100',
             'last_name'       => 'required|string|max:100',
             'email'           => 'required|email|max:255|unique:students,email,' . $student->id,
