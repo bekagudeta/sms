@@ -191,6 +191,22 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
             },
             teachers: {
                 email: { type: 'email', label: 'Email Address' },
+                department_id: {
+                    type: 'select',
+                    options: (relatedOptions.departments || []).map(dept => ({ value: dept.id, label: dept.name }))
+                },
+                qualification: {
+                    type: 'select',
+                    options: relatedOptions.qualifications || [
+                        { value: 'BSc', label: 'BSc' },
+                        { value: 'MSc', label: 'MSc' },
+                        { value: 'PhD', label: 'PhD' },
+                        { value: 'MBA', label: 'MBA' },
+                        { value: 'MA', label: 'MA' },
+                        { value: 'EdD', label: 'EdD' },
+                        { value: 'Other', label: 'Other' }
+                    ]
+                },
                 max_hours_per_week: { type: 'number', min: 1, max: 40, label: 'Max Hours per Week' },
                 status: { 
                     type: 'select', 
@@ -203,13 +219,32 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
             courses: {
                 course_code: { label: 'Course Code' },
                 course_name: { label: 'Course Name' },
-                credits: { type: 'number', min: 1, max: 6, label: 'Credits' },
+                credits: { type: 'number', min: 1, max: 10, label: 'Credits' },
+                hours_per_week: { type: 'number', min: 1, max: 39, label: 'Hours per Week' },
+                department_id: {
+                    type: 'select',
+                    label: 'Department',
+                    options: (relatedOptions.departments || []).map(dept => ({ value: dept.id, label: dept.name }))
+                },
                 description: { type: 'textarea', label: 'Description' },
                 level: { 
                     type: 'select',
-                    options: [
+                    options: relatedOptions.levels || [
                         { value: 'undergraduate', label: 'Undergraduate' },
-                        { value: 'graduate', label: 'Graduate' }
+                        { value: 'graduate', label: 'Graduate' },
+                        { value: 'certificate', label: 'Certificate' },
+                        { value: 'professional', label: 'Professional' }
+                    ]
+                },
+                required_room_type: {
+                    type: 'select',
+                    label: 'Required Room Type',
+                    options: relatedOptions.roomTypes || [
+                        { value: 'lecture', label: 'Lecture' },
+                        { value: 'lab', label: 'Laboratory' },
+                        { value: 'seminar', label: 'Seminar' },
+                        { value: 'conference', label: 'Conference' },
+                        { value: 'studio', label: 'Studio' }
                     ]
                 }
             },

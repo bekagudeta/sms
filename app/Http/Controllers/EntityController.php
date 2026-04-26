@@ -212,6 +212,40 @@ class EntityController extends Controller
             ];
         }
 
+        if ($entityType === 'teachers') {
+            $relatedOptions = [
+                'departments' => Department::select('id', 'name')->orderBy('name')->get(),
+                'qualifications' => [
+                    ['value' => 'BSc', 'label' => 'BSc'],
+                    ['value' => 'MSc', 'label' => 'MSc'],
+                    ['value' => 'PhD', 'label' => 'PhD'],
+                    ['value' => 'MBA', 'label' => 'MBA'],
+                    ['value' => 'MA', 'label' => 'MA'],
+                    ['value' => 'EdD', 'label' => 'EdD'],
+                    ['value' => 'Other', 'label' => 'Other'],
+                ],
+            ];
+        }
+
+        if ($entityType === 'courses') {
+            $relatedOptions = [
+                'departments' => Department::select('id', 'name')->orderBy('name')->get(),
+                'levels' => [
+                    ['value' => 'undergraduate', 'label' => 'Undergraduate'],
+                    ['value' => 'graduate', 'label' => 'Graduate'],
+                    ['value' => 'certificate', 'label' => 'Certificate'],
+                    ['value' => 'professional', 'label' => 'Professional'],
+                ],
+                'roomTypes' => [
+                    ['value' => 'lecture', 'label' => 'Lecture'],
+                    ['value' => 'lab', 'label' => 'Laboratory'],
+                    ['value' => 'seminar', 'label' => 'Seminar'],
+                    ['value' => 'conference', 'label' => 'Conference'],
+                    ['value' => 'studio', 'label' => 'Studio'],
+                ],
+            ];
+        }
+
         // Always render the Entities/Index view with the entity data
         return Inertia::render('Entities/Index', [
             'entityType' => $entityType,
@@ -400,6 +434,17 @@ class EntityController extends Controller
                 'grade' => 'nullable|integer|min:1|max:12',
                 'status' => 'nullable|string|in:active,inactive,pending,graduated,suspended',
                 'enrollment_date' => 'nullable|date'
+            ],
+            'teachers' => [
+                'teacher_id' => 'required|string|max:50|unique:teachers,teacher_id' . ($id ? ",{$id}" : ''),
+                'first_name' => 'required|string|max:100',
+                'last_name' => 'required|string|max:100',
+                'email' => 'required|email|max:255|unique:teachers,email' . ($id ? ",{$id}" : ''),
+                'phone' => 'nullable|string|max:20',
+                'department_id' => 'required|exists:departments,id',
+                'qualification' => 'nullable|string|max:255',
+                'max_hours_per_week' => 'required|integer|min:1|max:40',
+                'specialization' => 'nullable|string|max:255'
             ],
             'rooms' => [
                 'room_code' => 'required|string|max:50|unique:rooms,room_code' . ($id ? ",{$id}" : ''),

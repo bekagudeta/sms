@@ -40,8 +40,8 @@ export const ENTITY_CONFIG = {
       { key: "qualification", label: "Qualification", sortable: true },
       { key: "max_hours_per_week", label: "Max Hours", sortable: true }
     ],
-    requiredColumns: ["teacher_id", "first_name", "last_name", "email"],
-    optionalColumns: ["qualification", "phone", "max_hours_per_week", "department_id"],
+    requiredColumns: ["teacher_id", "first_name", "last_name", "email", "department_id"],
+    optionalColumns: ["qualification", "phone", "max_hours_per_week"],
     apiEndpoint: "/api/teachers",
     routePrefix: "teachers",
     permissions: {
