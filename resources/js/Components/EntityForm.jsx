@@ -248,6 +248,60 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                     ]
                 }
             },
+            semesters: {
+                start_date: { type: 'date', label: 'Start Date' },
+                end_date: { type: 'date', label: 'End Date' },
+                is_active: { type: 'checkbox', label: 'Is Active' }
+            },
+            'course-offerings': {
+                course_id: {
+                    type: 'select',
+                    label: 'Course',
+                    options: (relatedOptions.courses || []).map(course => ({ value: course.id, label: course.course_code }))
+                },
+                semester_id: {
+                    type: 'select',
+                    label: 'Semester',
+                    options: (relatedOptions.semesters || []).map(semester => ({ value: semester.id, label: semester.name }))
+                },
+                expected_students: { type: 'number', min: 0, label: 'Expected Students' }
+            },
+            sections: {
+                course_offering_id: {
+                    type: 'select',
+                    label: 'Course Offering',
+                    options: (relatedOptions.courseOfferings || []).map(offering => ({ value: offering.id, label: offering.label }))
+                },
+                section_name: { label: 'Section Name' },
+                capacity: { type: 'number', min: 1, label: 'Capacity' }
+            },
+            enrollments: {
+                student_id: {
+                    type: 'select',
+                    label: 'Student',
+                    options: (relatedOptions.students || []).map(student => ({ value: student.id, label: student.label }))
+                },
+                section_id: {
+                    type: 'select',
+                    label: 'Section',
+                    options: (relatedOptions.sections || []).map(section => ({ value: section.id, label: section.label }))
+                },
+                enrolled_at: { type: 'date', label: 'Enrolled At' },
+                student_code_value: { label: 'Student Code Value' }
+            },
+            'section-teachers': {
+                section_id: {
+                    type: 'select',
+                    label: 'Section',
+                    options: (relatedOptions.sections || []).map(section => ({ value: section.id, label: section.label }))
+                },
+                teacher_id: {
+                    type: 'select',
+                    label: 'Teacher',
+                    options: (relatedOptions.teachers || []).map(teacher => ({ value: teacher.id, label: teacher.label }))
+                },
+                role: { label: 'Role' }
+            },
             rooms: {
                 room_code: { label: 'Room Code' },
                 building: { label: 'Building' },

@@ -259,8 +259,8 @@ export const ENTITY_CONFIG = {
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
       { key: "teacher.full_name", label: "Teacher", sortable: true, searchable: true }
     ],
-    requiredColumns: ["section_id", "teacher_id", "teacher_ids"],
-    optionalColumns: ["append"],
+    requiredColumns: ["section_id", "teacher_id"],
+    optionalColumns: [],
     apiEndpoint: "/api/section-teachers",
     routePrefix: "section-teachers",
     permissions: {

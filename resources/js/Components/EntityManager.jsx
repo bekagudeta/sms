@@ -94,6 +94,15 @@ export default function EntityManager({ entityType, initialData = [], filters = 
                 value = toTimeInputValue(value);
             }
 
+            if (['start_date', 'end_date'].includes(key) && value) {
+                // Normalize date values for HTML date inputs
+                if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+                    value = value.slice(0, 10);
+                } else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+                    value = value.slice(0, 10);
+                }
+            }
+
             setFormData(key, value);
         });
         setShowFormModal(true);

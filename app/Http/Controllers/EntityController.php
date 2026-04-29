@@ -7,7 +7,14 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
+use App\Models\Course;
+use App\Models\CourseOffering;
 use App\Models\Department;
+use App\Models\Enrollment;
+use App\Models\Section;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Teacher;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
@@ -246,6 +253,95 @@ class EntityController extends Controller
             ];
         }
 
+        if ($entityType === 'course-offerings') {
+            $relatedOptions = [
+                'courses' => Course::select('id', 'course_code')->orderBy('course_code')->get(),
+                'semesters' => Semester::select('id', 'name')->orderBy('name')->get(),
+            ];
+        }
+
+        if ($entityType === 'sections') {
+            $relatedOptions = [
+                'courseOfferings' => CourseOffering::with(['course', 'semester'])
+                    ->get()
+                    ->map(function ($offering) {
+                        return [
+                            'id' => $offering->id,
+                            'label' => trim(sprintf(
+                                '%s / %s - %s',
+                                $offering->course?->course_code,
+                                $offering->course?->course_name,
+                                $offering->semester?->name
+                            )),
+                        ];
+                    }),
+            ];
+        }
+
+        if ($entityType === 'enrollments') {
+            $relatedOptions = [
+                'students' => Student::select('id', 'student_id', 'first_name', 'last_name')
+                    ->orderBy('student_id')
+                    ->get()
+                    ->map(function ($student) {
+                        return [
+                            'id' => $student->id,
+                            'student_id' => $student->student_id,
+                            'label' => trim(sprintf(
+                                '%s - %s %s',
+                                $student->student_id,
+                                $student->first_name,
+                                $student->last_name
+                            )),
+                        ];
+                    }),
+                'sections' => Section::with(['courseOffering.course', 'courseOffering.semester'])
+                    ->get()
+                    ->map(function ($section) {
+                        return [
+                            'id' => $section->id,
+                            'label' => trim(sprintf(
+                                '%s [%s - %s]',
+                                $section->section_name,
+                                $section->courseOffering?->course?->course_code,
+                                $section->courseOffering?->semester?->name
+                            )),
+                        ];
+                    }),
+            ];
+        }
+
+        if ($entityType === 'section-teachers') {
+            $relatedOptions = [
+                'sections' => Section::with(['courseOffering.course', 'courseOffering.semester'])
+                    ->get()
+                    ->map(function ($section) {
+                        return [
+                            'id' => $section->id,
+                            'label' => trim(sprintf(
+                                '%s [%s - %s]',
+                                $section->section_name,
+                                $section->courseOffering?->course?->course_code,
+                                $section->courseOffering?->semester?->name
+                            )),
+                        ];
+                    }),
+                'teachers' => Teacher::select('id', 'first_name', 'last_name')
+                    ->orderBy('last_name')
+                    ->get()
+                    ->map(function ($teacher) {
+                        return [
+                            'id' => $teacher->id,
+                            'label' => trim(sprintf(
+                                '%s %s',
+                                $teacher->first_name,
+                                $teacher->last_name
+                            )),
+                        ];
+                    }),
+            ];
+        }
+
         // Always render the Entities/Index view with the entity data
         return Inertia::render('Entities/Index', [
             'entityType' => $entityType,
@@ -388,6 +484,11 @@ class EntityController extends Controller
             }
         }
 
+        if ($entityType === 'enrollments' && isset($validated['student_code_value'])) {
+            $validated['student_code'] = $validated['student_code_value'];
+            unset($validated['student_code_value']);
+        }
+
         $entity = $model::create($validated);
 
         return redirect()->route('entities.index', ['entityType' => $entityType])
@@ -401,6 +502,11 @@ class EntityController extends Controller
 
         $validationRules = $this->getValidationRules($entityType, $id);
         $validated = $request->validate($validationRules);
+
+        if ($entityType === 'enrollments' && isset($validated['student_code_value'])) {
+            $validated['student_code'] = $validated['student_code_value'];
+            unset($validated['student_code_value']);
+        }
 
         $entity->update($validated);
 
@@ -466,10 +572,31 @@ class EntityController extends Controller
                 'teacher_id' => 'required|exists:teachers,id',
                 'role' => 'nullable|string|max:255'
             ],
+            'sections' => [
+                'course_offering_id' => 'required|exists:course_offerings,id',
+                'section_name' => 'required|string|max:255',
+                'capacity' => 'required|integer|min:1'
+            ],
+            'enrollments' => [
+                'student_id' => 'required|exists:students,id',
+                'section_id' => 'required|exists:sections,id',
+                'enrolled_at' => 'nullable|date',
+                'student_code_value' => 'nullable|string|max:255'
+            ],
             'departments' => [
                 'code' => 'required|string|max:50|unique:departments,code' . ($id ? ",{$id}" : ''),
                 'name' => 'required|string|max:255',
                 'description' => 'nullable|string'
+            ],
+            'courses' => [
+                'course_code' => 'required|string|max:50|unique:courses,course_code' . ($id ? ",{$id}" : ''),
+                'course_name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'credits' => 'required|integer|min:0',
+                'hours_per_week' => 'required|integer|min:0',
+                'department_id' => 'required|exists:departments,id',
+                'level' => 'nullable|string|max:50',
+                'required_room_type' => 'nullable|string|in:lecture,lab,seminar,conference,studio'
             ],
             'semesters' => [
                 'name' => 'required|string|max:255',
@@ -477,6 +604,11 @@ class EntityController extends Controller
                 'start_date' => 'nullable|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
                 'is_active' => 'sometimes|boolean'
+            ],
+            'course-offerings' => [
+                'course_id' => 'required|exists:courses,id',
+                'semester_id' => 'required|exists:semesters,id',
+                'expected_students' => 'required|integer|min:0'
             ],
             'timeslots' => [
                 'day_of_week' => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
