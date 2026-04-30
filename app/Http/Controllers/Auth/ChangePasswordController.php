@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class ChangePasswordController extends Controller
@@ -22,12 +23,22 @@ class ChangePasswordController extends Controller
         ]);
 
         $user = Auth::user();
-        $user->update([
+
+        if (! $user) {
+            return redirect()->route('login')
+                ->with('status', 'Your session has expired. Please log in again.');
+        }
+
+        $updateData = [
             'password' => Hash::make($request->password),
             'must_change_password' => false,
-            // avoid INSERT/UPDATE error on non-null plain_password column
-            'plain_password' => '',
-        ]);
+        ];
+
+        if (Schema::hasColumn('users', 'plain_password')) {
+            $updateData['plain_password'] = '';
+        }
+
+        $user->update($updateData);
 
         return redirect('/')->with('success', 'Password changed successfully.');
     }
