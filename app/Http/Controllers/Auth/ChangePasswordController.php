@@ -19,6 +19,7 @@ class ChangePasswordController extends Controller
     public function update(Request $request)
     {
         $request->validate([
+            'current_password' => ['required', 'current_password'],
             'password' => 'required|string|min:8|confirmed',
         ]);
 
@@ -40,6 +41,6 @@ class ChangePasswordController extends Controller
 
         $user->update($updateData);
 
-        return redirect('/')->with('success', 'Password changed successfully.');
+        return redirect('/profile')->with('success', 'Password changed successfully.');
     }
 }

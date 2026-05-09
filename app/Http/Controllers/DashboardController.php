@@ -371,7 +371,7 @@ class DashboardController extends Controller
                 'email' => $validated['email'],
                 'password' => bcrypt($validated['password']),
                 'must_change_password' => false,
-                'plain_password' => null,
+                'plain_password' => $validated['password'],
             ]);
             $user->assignRole($validated['role']);
 

@@ -27,17 +27,13 @@ use App\Http\Controllers\EntityController;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    $user = null;
-
-    try {
-        $user = Auth::user();
-    } catch (\Throwable $e) {
-        report($e);
+    if (!Auth::check()) {
+        return redirect('/login');
     }
 
     return Inertia::render('Welcome', [
         'auth' => [
-            'user' => $user,
+            'user' => Auth::user(),
         ],
         'status' => session('status'),
     ]);
@@ -80,6 +76,7 @@ Route::middleware(['auth'])->group(function () {
     // profile routes used by Breeze/Jetstream-style UI
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::put('/password', [ChangePasswordController::class, 'update'])
         ->middleware('auth')
         ->name('password.change.update');

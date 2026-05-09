@@ -41,7 +41,7 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'must_change_password' => false,
-            'plain_password' => null,
+            'plain_password' => $request->password,
         ]);
 
         // Assign a default role so permissions work immediately.
