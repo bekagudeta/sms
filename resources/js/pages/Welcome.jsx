@@ -33,8 +33,8 @@ export default function Welcome({ auth }) {
 
           <div>
             {auth?.user ? (
-              <Link href="/" className="rounded-full border-2 border-cyan-600 bg-white px-6 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-50">
-                Home
+              <Link href="/dashboard" className="rounded-full border-2 border-cyan-600 bg-white px-6 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-50">
+                Dashboard
               </Link>
             ) : (
               <Link href="/login" className="rounded-full border-2 border-cyan-600 bg-white px-6 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-50">
@@ -56,10 +56,14 @@ export default function Welcome({ auth }) {
         </div>
       )}
 
-      <div className="fixed bottom-4 left-1/2 z-40 hidden -translate-x-1/2 md:flex items-center gap-3 rounded-full bg-[#001722]/95 px-5 py-3 text-sm text-white shadow-xl shadow-[#001722]/50 backdrop-blur-md">
-        <span className="font-semibold text-cyan-300">Need help fast?</span>
-        <Link href="#help" className="rounded-full border border-cyan-500/40 bg-cyan-500/20 px-3 py-1 text-cyan-100 transition hover:bg-cyan-500/40">Visit Help Center</Link>
-        <Link href="/login" className="rounded-full border border-[#FE580B] bg-[#FE580B]/20 px-3 py-1 font-semibold text-[#FE580B] transition hover:bg-[#FE580B]/30">Sign in</Link>
+      <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 md:gap-3 rounded-full bg-[#001722]/95 px-3 py-2 md:px-5 md:py-3 text-xs md:text-sm text-white shadow-xl shadow-[#001722]/50 backdrop-blur-md">
+        <span className="font-semibold text-cyan-300 hidden sm:inline">Need help fast?</span>
+        <Link href="#help" className="rounded-full border border-cyan-500/40 bg-cyan-500/20 px-2 py-1 md:px-3 text-cyan-100 text-xs md:text-sm transition hover:bg-cyan-500/40">Visit Help Center</Link>
+        {auth?.user ? (
+          <Link href="/dashboard" className="rounded-full border border-[#FE580B] bg-[#FE580B]/20 px-2 py-1 md:px-3 font-semibold text-[#FE580B] text-xs md:text-sm transition hover:bg-[#FE580B]/30">Dashboard</Link>
+        ) : (
+          <Link href="/login" className="rounded-full border border-[#FE580B] bg-[#FE580B]/20 px-2 py-1 md:px-3 font-semibold text-[#FE580B] text-xs md:text-sm transition hover:bg-[#FE580B]/30">Sign in</Link>
+        )}
       </div>
 
       <section id="dashboard" className="relative overflow-hidden min-h-[85vh] pt-20 md:pt-24">

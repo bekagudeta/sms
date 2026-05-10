@@ -74,9 +74,15 @@ class AuthenticatedSessionController extends Controller
             return redirect('/change-password');
         }
 
-        // Keep the post-authentication experience on the public home page
-        // instead of forcing users onto a dashboard route.
-        return redirect()->to('/');
+        // Redirect users to their appropriate dashboard based on role
+        $dashboardRoutes = [
+            'admin' => '/admin/dashboard',
+            'scheduler' => '/scheduler/dashboard', 
+            'teacher' => '/teacher/dashboard',
+            'student' => '/student/dashboard',
+        ];
+
+        return redirect($dashboardRoutes[$role] ?? '/dashboard');
     }
 
     /**

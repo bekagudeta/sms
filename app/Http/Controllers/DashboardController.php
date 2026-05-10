@@ -372,8 +372,9 @@ class DashboardController extends Controller
                 'password' => bcrypt($validated['password']),
                 'must_change_password' => false,
                 'plain_password' => $validated['password'],
+                'role' => $validated['role'],
             ]);
-            $user->assignRole($validated['role']);
+            $user->syncRoles([$validated['role']]);
 
             if ($validated['role'] === 'student') {
                 $nameParts = explode(' ', $validated['name'], 2);
@@ -392,8 +393,7 @@ class DashboardController extends Controller
                     'section' => $validated['section'],
                     'enrollment_date' => now()->toDateString(),
                 ]);
-            }
-            if ($validated['role'] === 'teacher') {
+            } elseif ($validated['role'] === 'teacher') {
                 $nameParts = explode(' ', $validated['name'], 2);
                 $firstName = $nameParts[0] ?? '';
                 $lastName = $nameParts[1] ?? '';

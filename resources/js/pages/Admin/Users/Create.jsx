@@ -3,7 +3,6 @@ import DashboardLayout from '@/Layouts/DashboardLayout';
 import { useForm } from '@inertiajs/react';
 
 export default function CreateUser({ roles, departments }) {
-    const [selectedRole, setSelectedRole] = useState('');
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         email: '',
@@ -16,7 +15,6 @@ export default function CreateUser({ roles, departments }) {
     });
 
     const handleRoleChange = (e) => {
-        setSelectedRole(e.target.value);
         setData('role', e.target.value);
     };
 
@@ -49,7 +47,7 @@ export default function CreateUser({ roles, departments }) {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                                <select value={selectedRole} onChange={handleRoleChange} className="w-full px-3 py-2 border rounded-md" required>
+                                <select name="role" value={data.role} onChange={handleRoleChange} className="w-full px-3 py-2 border rounded-md" required>
                                     <option value="">Select Role</option>
                                     {roles.map(role => (
                                         <option key={role.name} value={role.name}>{role.name.charAt(0).toUpperCase() + role.name.slice(1)}</option>
@@ -58,7 +56,7 @@ export default function CreateUser({ roles, departments }) {
                                 {errors.role && <p className="text-red-500 text-sm mt-1">{errors.role}</p>}
                             </div>
                             {/* Student fields */}
-                            {selectedRole === 'student' && (
+                            {data.role === 'student' && (
                                 <>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
@@ -83,7 +81,7 @@ export default function CreateUser({ roles, departments }) {
                                 </>
                             )}
                             {/* Teacher fields */}
-                            {selectedRole === 'teacher' && (
+                            {data.role === 'teacher' && (
                                 <>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>

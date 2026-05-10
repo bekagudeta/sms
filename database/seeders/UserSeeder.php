@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Student;
+use App\Models\Teacher;
 use App\Models\Department;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -13,6 +14,12 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        // Ensure roles exist before assigning
+        $roles = ['admin', 'scheduler', 'teacher', 'student'];
+        foreach ($roles as $role) {
+            Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+        }
+
         // Admin user
         $admin = User::firstOrCreate(
             ['email' => 'admin@admin.com'],
@@ -61,23 +68,42 @@ class UserSeeder extends Seeder
         );
         $student->assignRole('student');
 
-        // Ensure this login user is linked to a Student record for schedule lookup
-        $studentProfile = Student::firstOrCreate(
-            ['email' => $student->email],
+        // Ensure this login user is linked to Teacher and Student records for schedule lookup
+        // Create a default department if none exists
+        $department = Department::firstOrCreate(
+            ['name' => 'Computer Science'],
+            [
+                'code' => 'CS',
+                'description' => 'Default department for system users',
+            ]
+        );
+
+        Teacher::firstOrCreate(
+            ['user_id' => $teacher->id],
+            [
+                'teacher_id' => 'T001',
+                'first_name' => 'Teacher',
+                'last_name' => 'User',
+                'email' => $teacher->email,
+                'department_id' => $department->id,
+                'phone' => '000-000-0000',
+                'qualification' => 'N/A',
+                'max_hours_per_week' => 20,
+            ]
+        );
+
+        Student::firstOrCreate(
+            ['user_id' => $student->id],
             [
                 'student_id' => 'STU999',
-                'user_id' => $student->id,
                 'first_name' => 'System',
                 'last_name' => 'Student',
-                'department_id' => Department::first()?->id,
+                'email' => $student->email,
+                'department_id' => $department->id,
                 'level' => 'Level 1',
                 'section' => 'A',
                 'enrollment_date' => now()->toDateString(),
             ]
         );
-        if (!$studentProfile->user_id) {
-            $studentProfile->user_id = $student->id;
-            $studentProfile->save();
-        }
     }
 }
