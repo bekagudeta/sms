@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link } from '@inertiajs/react';
 
 export default function TeacherDashboard({ recentSchedules }) {

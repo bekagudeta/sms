@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link } from '@inertiajs/react';
 
 export default function SchedulerDashboard({ stats, recentSchedules }) {
@@ -20,7 +20,7 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                                             <h3 className="text-lg font-semibold mb-2">Total Schedules</h3>
                                             <p className="text-3xl font-bold text-pearl-aqua">{stats.total_schedules}</p>
                                         </div>
-                                        <div className="text-4xl opacity-90">📅</div>
+                                        <div className="text-4xl opacity-90">??</div>
                                     </div>
                                 </div>
                                 <div className="bg-gradient-to-br from-pearl-aqua to-deep-jungle-green text-rich-black p-6 rounded-2xl shadow-2xl shadow-pearl-aqua/20 hover:shadow-pearl-aqua/40 transition-shadow duration-300">
@@ -29,7 +29,7 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                                             <h3 className="text-lg font-semibold mb-2">Pending</h3>
                                             <p className="text-3xl font-bold">{recentSchedules?.filter(s => s.status === 'pending').length || 0}</p>
                                         </div>
-                                        <div className="text-4xl opacity-90">⏳</div>
+                                        <div className="text-4xl opacity-90">?</div>
                                     </div>
                                 </div>
                                 <div className="bg-gradient-to-br from-vivid-orange via-pearl-aqua to-deep-jungle-green text-white p-6 rounded-2xl shadow-2xl shadow-vivid-orange/25 hover:shadow-vivid-orange/45 transition-shadow duration-300">
@@ -38,7 +38,7 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                                             <h3 className="text-lg font-semibold mb-2">Active</h3>
                                             <p className="text-3xl font-bold">{recentSchedules?.filter(s => s.status === 'active').length || 0}</p>
                                         </div>
-                                        <div className="text-4xl opacity-90">✅</div>
+                                        <div className="text-4xl opacity-90">?</div>
                                     </div>
                                 </div>
                                 <div className="bg-gradient-to-br from-rich-black to-deep-jungle-green text-white p-6 rounded-2xl shadow-2xl shadow-rich-black/25 hover:shadow-rich-black/45 transition-shadow duration-300">
@@ -55,7 +55,7 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                                                 return Math.abs(currentDay - scheduleDay) <= 3;
                                             }).length || 0}</p>
                                         </div>
-                                        <div className="text-4xl opacity-90">📊</div>
+                                        <div className="text-4xl opacity-90">??</div>
                                     </div>
                                 </div>
                             </div>
@@ -130,7 +130,7 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                                         className="group bg-gradient-to-r from-vivid-orange to-deep-jungle-green text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
                                     >
                                         <div className="text-center">
-                                            <div className="text-4xl mb-3">⚡</div>
+                                            <div className="text-4xl mb-3">?</div>
                                             <h4 className="text-lg font-semibold mb-2">Generate Schedule</h4>
                                             <p className="text-pearl-aqua/90 text-sm">Automatically create schedules for courses</p>
                                         </div>
@@ -140,7 +140,7 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                                         className="group bg-gradient-to-r from-pearl-aqua to-deep-jungle-green text-rich-black p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
                                     >
                                         <div className="text-center">
-                                            <div className="text-4xl mb-3">📥</div>
+                                            <div className="text-4xl mb-3">??</div>
                                             <h4 className="text-lg font-semibold mb-2">Import Data</h4>
                                             <p className="text-rich-black/80 text-sm">Upload Excel files to import data</p>
                                         </div>
@@ -150,7 +150,7 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                                         className="group bg-gradient-to-r from-deep-jungle-green to-vivid-orange text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 block"
                                     >
                                         <div className="text-center">
-                                            <div className="text-4xl mb-3">📤</div>
+                                            <div className="text-4xl mb-3">??</div>
                                             <h4 className="text-lg font-semibold mb-2">Export Schedule</h4>
                                             <p className="text-pearl-aqua/90 text-sm">Download schedules as Excel file</p>
                                         </div>
@@ -160,7 +160,7 @@ export default function SchedulerDashboard({ stats, recentSchedules }) {
                                         className="group bg-gradient-to-r from-deep-jungle-green to-pearl-aqua text-rich-black p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
                                     >
                                         <div className="text-center">
-                                            <div className="text-4xl mb-3">📋</div>
+                                            <div className="text-4xl mb-3">??</div>
                                             <h4 className="text-lg font-semibold mb-2">Manage Schedules</h4>
                                             <p className="text-rich-black/80 text-sm">View and edit existing schedules</p>
                                         </div>

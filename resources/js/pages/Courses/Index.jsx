@@ -1,6 +1,6 @@
 import React from 'react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
-import EntityManager from '@/components/EntityManager';
+import EntityManager from '@/Components/EntityManager';
 
 export default function CoursesIndex({ courses, permissions }) {
     return (

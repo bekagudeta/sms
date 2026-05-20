@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import logo from '../images/logo.png';
-import NavigationSidebar from '@/components/NavigationSidebar';
+import NavigationSidebar from '@/Components/NavigationSidebar';
 
 export default function DashboardLayout({ children }) {
     const { props } = usePage();
