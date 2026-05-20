@@ -3,10 +3,10 @@ import DashboardLayout from '@/Layouts/DashboardLayout';
 import { Link } from '@inertiajs/react';
 
 // role-specific dashboard fragments
-import AdminDashboard from '@/Pages/Dashboard/Admin';
-import SchedulerDashboard from '@/Pages/Dashboard/Scheduler';
-import TeacherDashboard from '@/Pages/Dashboard/Teacher';
-import StudentDashboard from '@/Pages/Dashboard/Student';
+import AdminDashboard from '@/pages/Dashboard/Admin';
+import SchedulerDashboard from '@/pages/Dashboard/Scheduler';
+import TeacherDashboard from '@/pages/Dashboard/Teacher';
+import StudentDashboard from '@/pages/Dashboard/Student';
 
 export default function Dashboard({ stats, recentSchedules, role }) {
     // choose sub-view based on role passed from controller
