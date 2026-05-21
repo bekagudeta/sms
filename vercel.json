@@ -7,6 +7,5 @@
     }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/api/lambda.php" }],
-  "buildCommand": "npm run build",
-  "installCommand": "composer install --no-dev && npm install"
+  "buildCommand": "composer install --no-dev --optimize-autoloader && npm install && npm run build"
 }
