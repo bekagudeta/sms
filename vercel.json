@@ -2,23 +2,27 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "framework": null,
-  "installCommand": "npm ci",
-  "buildCommand": "npm run build",
-  "functions": {
-    "api/index.php": {
-      "runtime": "vercel-php@0.8.0",
-      "maxDuration": 30,
-      "memory": 1024
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "public"
+      }
+    },
+    {
+      "src": "api/index.php",
+      "use": "vercel-php@0.8.0"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/build/(.*)",
-      "dest": "/public/build/$1"
+      "dest": "/build/$1"
     },
     {
       "src": "/(.*\\.(?:css|js|png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf|eot|map|json|txt))$",
-      "dest": "/public/$1"
+      "dest": "/$1"
     },
     {
       "src": "/(.*)",
