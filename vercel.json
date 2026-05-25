@@ -1,19 +1,40 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "builds": [
-    {
-      "src": "api/lambda.php",
-      "use": "vercel-php@0.7.4"
+  "framework": null,
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.8.0",
+      "maxDuration": 30,
+      "memory": 1024
     }
-  ],
+  },
   "routes": [
     {
       "src": "/build/(.*)",
       "dest": "/public/build/$1"
     },
     {
+      "src": "/(.*\\.(?:css|js|png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf|eot|map|json|txt))$",
+      "dest": "/public/$1"
+    },
+    {
       "src": "/(.*)",
-      "dest": "api/lambda.php"
+      "dest": "/api/index.php"
     }
-  ]
+  ],
+  "env": {
+    "APP_ENV": "production",
+    "APP_DEBUG": "false",
+    "APP_CONFIG_CACHE": "/tmp/config.php",
+    "APP_EVENTS_CACHE": "/tmp/events.php",
+    "APP_PACKAGES_CACHE": "/tmp/packages.php",
+    "APP_ROUTES_CACHE": "/tmp/routes.php",
+    "APP_SERVICES_CACHE": "/tmp/services.php",
+    "VIEW_COMPILED_PATH": "/tmp/views",
+    "CACHE_STORE": "array",
+    "LOG_CHANNEL": "stderr",
+    "SESSION_DRIVER": "cookie",
+    "QUEUE_CONNECTION": "sync"
+  }
 }
