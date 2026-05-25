@@ -49,6 +49,23 @@ Route::get('/auto-login', function () {
     return 'No users found in database';
 });
 
+Route::get('/debug-session-token', function () {
+    $appKey = env('APP_KEY');
+
+    return response()->json([
+        'driver' => config('session.driver'),
+        'app_key_set' => ! empty($appKey),
+        'app_key_prefix' => $appKey ? substr($appKey, 0, 8) : null,
+        'session_id' => session()->getId(),
+        'session_token' => session()->token(),
+        'helper_token' => csrf_token(),
+        'cookies' => [
+            'laravel_session_present' => request()->hasCookie('laravel-session'),
+            'xsrf_token_present' => request()->hasCookie('XSRF-TOKEN'),
+        ],
+    ]);
+});
+
 // authentication routes (login, register, password reset, etc.)
 require __DIR__.'/auth.php';
 
