@@ -78,10 +78,10 @@ class UserSeeder extends Seeder
             ]
         );
 
-        Teacher::firstOrCreate(
+        Teacher::updateOrCreate(
             ['user_id' => $teacher->id],
             [
-                'teacher_id' => 'T001',
+                'teacher_id' => 'TCH' . str_pad($teacher->id, 6, '0', STR_PAD_LEFT),
                 'first_name' => 'Teacher',
                 'last_name' => 'User',
                 'email' => $teacher->email,

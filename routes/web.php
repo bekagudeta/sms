@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
+use App\Models\User;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\StudentController;
@@ -27,13 +28,12 @@ use App\Http\Controllers\EntityController;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    if (!Auth::check()) {
-        return redirect('/login');
+    if (Auth::check()) {
+        return redirect('/dashboard');
     }
-
     return Inertia::render('Welcome', [
         'auth' => [
-            'user' => Auth::user(),
+            'user' => null,
         ],
         'status' => session('status'),
     ]);
@@ -41,7 +41,7 @@ Route::get('/', function () {
 
 // Auto-login route for development
 Route::get('/auto-login', function () {
-    $user = \App\Models\User::first();
+    $user = User::first();
     if ($user) {
         Auth::login($user);
         return redirect('/admin/dashboard');
