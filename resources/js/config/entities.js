@@ -64,8 +64,8 @@ export const ENTITY_CONFIG = {
       { key: "credits", label: "Credits", sortable: true },
       { key: "department.name", label: "Department", sortable: true, filterable: true }
     ],
-    requiredColumns: ["course_code", "course_name", "credits", "hours_per_week", "department_id"],
-    optionalColumns: ["description", "level", "required_room_type"],
+    requiredColumns: ["course_code", "course_name", "credits", "hours_per_week"],
+    optionalColumns: ["description", "department_id", "department_code", "department_name", "level", "required_room_type"],
     apiEndpoint: "/api/courses",
     routePrefix: "courses",
     permissions: {
@@ -136,8 +136,8 @@ export const ENTITY_CONFIG = {
       { key: "expected_students", label: "Expected Students", sortable: true },
       { key: "created_at", label: "Created", sortable: true }
     ],
-    requiredColumns: ["course_id", "semester_id", "expected_students"],
-    optionalColumns: [] ,
+    requiredColumns: ["course_code", "semester_code", "expected_students"],
+    optionalColumns: ["course_id", "semester_id"] ,
     apiEndpoint: "/api/course-offerings",
     routePrefix: "course-offerings",
     permissions: {
@@ -161,8 +161,8 @@ export const ENTITY_CONFIG = {
       { key: "enrolled_count", label: "Enrolled", sortable: true },
       { key: "created_at", label: "Created", sortable: true }
     ],
-    requiredColumns: ["course_offering_id", "section_name", "capacity"],
-    optionalColumns: [] ,
+    requiredColumns: ["course_code", "semester_code", "section_name", "capacity"],
+    optionalColumns: ["course_offering_id"] ,
     apiEndpoint: "/api/sections",
     routePrefix: "sections",
     permissions: {
@@ -213,8 +213,8 @@ export const ENTITY_CONFIG = {
       { key: "end_time", label: "End Time", sortable: true },
       { key: "slot_code", label: "Slot Code", sortable: true, searchable: true }
     ],
-    requiredColumns: ["day_of_week", "start_time", "end_time"],
-    optionalColumns: ["slot_code"],
+    requiredColumns: ["day_of_week", "start_time", "end_time", "slot_code"],
+    optionalColumns: [],
     apiEndpoint: "/api/timeslots",
     routePrefix: "timeslots",
     permissions: {
@@ -259,8 +259,8 @@ export const ENTITY_CONFIG = {
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
       { key: "teacher.full_name", label: "Teacher", sortable: true, searchable: true }
     ],
-    requiredColumns: ["section_id", "teacher_id"],
-    optionalColumns: [],
+    requiredColumns: ["section_id", "teacher_ids"],
+    optionalColumns: ["teacher_id", "append"],
     apiEndpoint: "/api/section-teachers",
     routePrefix: "section-teachers",
     permissions: {

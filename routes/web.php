@@ -1,36 +1,25 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
-use App\Models\User;
+use App\Http\Controllers\Auth\ChangePasswordController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\StudentController;
-use App\Http\Controllers\TeacherController;
-use App\Http\Controllers\CourseController;
-use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\SemesterController;
-use App\Http\Controllers\RoomController;
-use App\Http\Controllers\TimeslotController;
+use App\Http\Controllers\EntityController;
+use App\Http\Controllers\ExportController;
+use App\Http\Controllers\ImportController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SchedulingController;
-use App\Http\Controllers\ImportController;
-use App\Http\Controllers\ExportController;
-use App\Http\Controllers\SectionController;
-use App\Http\Controllers\CourseOfferingController;
-use App\Http\Controllers\TeacherImportController;
 use App\Http\Controllers\StudentImportController;
-use App\Http\Controllers\Auth\ChangePasswordController;
-use App\Http\Controllers\EntityController;
-
+use App\Http\Controllers\TeacherImportController;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     if (Auth::check()) {
         return redirect('/dashboard');
     }
+
     return Inertia::render('Welcome', [
         'auth' => [
             'user' => null,
@@ -39,15 +28,19 @@ Route::get('/', function () {
     ]);
 });
 
-// Auto-login route for development
-Route::get('/auto-login', function () {
-    $user = User::first();
-    if ($user) {
-        Auth::login($user);
-        return redirect('/admin/dashboard');
-    }
-    return 'No users found in database';
-});
+// Auto-login route for local development only.
+if (app()->environment('local')) {
+    Route::get('/auto-login', function () {
+        $user = User::first();
+        if ($user) {
+            Auth::login($user);
+
+            return redirect('/admin/dashboard');
+        }
+
+        return 'No users found in database';
+    });
+}
 
 // authentication routes (login, register, password reset, etc.)
 require __DIR__.'/auth.php';
@@ -94,22 +87,22 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('entities')->group(function () {
         Route::get('/{entityType}', [EntityController::class, 'index'])
             ->name('entities.index');
-            
+
         Route::post('/{entityType}', [EntityController::class, 'store'])
             ->name('entities.store');
-            
+
         Route::get('/{entityType}/{id}/edit', [EntityController::class, 'edit'])
             ->name('entities.edit');
-            
+
         Route::put('/{entityType}/{id}', [EntityController::class, 'update'])
             ->name('entities.update');
-            
+
         Route::delete('/{entityType}/{id}', [EntityController::class, 'destroy'])
             ->name('entities.destroy');
-            
+
         Route::post('/{entityType}/bulk-delete', [EntityController::class, 'bulkDelete'])
             ->name('entities.bulk-delete');
-            
+
         Route::get('/{entityType}/export', [EntityController::class, 'export'])
             ->name('entities.export');
     });
@@ -149,7 +142,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['permission:manage schedules'])->group(function () {
         Route::resource('schedules', ScheduleController::class)
-            ->except(['index','show']);
+            ->except(['index', 'show']);
 
         Route::post('/schedules/{schedule}/assign-teacher',
             [ScheduleController::class, 'assignTeacher'])
@@ -165,8 +158,8 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::get('/schedules',
-            [ScheduleController::class,'index'])
-            ->name('schedules.index');
+        [ScheduleController::class, 'index'])
+        ->name('schedules.index');
 
     Route::get('/settings', function () {
         return Inertia::render('Settings/Index');
@@ -185,8 +178,8 @@ Route::middleware(['auth'])->group(function () {
     })->name('settings.security');
 
     Route::get('/schedules/{schedule}',
-            [ScheduleController::class,'show'])
-            ->name('schedules.show');
+        [ScheduleController::class, 'show'])
+        ->name('schedules.show');
 
     // Import routes (should require permission)
     Route::middleware(['permission:import data'])->group(function () {
@@ -201,76 +194,76 @@ Route::middleware(['auth'])->group(function () {
             ->name('import.bulk');
 
         Route::post('/import/students',
-            [ImportController::class,'importStudents'])
+            [ImportController::class, 'importStudents'])
             ->name('import.students');
 
         Route::post('/import/teachers',
-            [ImportController::class,'importTeachers'])
+            [ImportController::class, 'importTeachers'])
             ->name('import.teachers');
 
         Route::post('/import/departments',
-            [ImportController::class,'importDepartments'])
+            [ImportController::class, 'importDepartments'])
             ->name('import.departments');
 
         Route::post('/import/semesters',
-            [ImportController::class,'importSemesters'])
+            [ImportController::class, 'importSemesters'])
             ->name('import.semesters');
 
         Route::post('/import/courses',
-            [ImportController::class,'importCourses'])
+            [ImportController::class, 'importCourses'])
             ->name('import.courses');
 
         Route::post('/import/course-offerings',
-            [ImportController::class,'importCourseOfferings'])
+            [ImportController::class, 'importCourseOfferings'])
             ->name('import.course-offerings');
 
         Route::post('/import/sections',
-            [ImportController::class,'importSections'])
+            [ImportController::class, 'importSections'])
             ->name('import.sections');
 
         Route::post('/import/section-teachers',
-            [ImportController::class,'importSectionTeachers'])
+            [ImportController::class, 'importSectionTeachers'])
             ->name('import.section-teachers');
 
         Route::post('/import/timeslots',
-            [ImportController::class,'importTimeslots'])
+            [ImportController::class, 'importTimeslots'])
             ->name('import.timeslots');
 
         Route::post('/import/preview',
-            [ImportController::class,'previewImport'])
+            [ImportController::class, 'previewImport'])
             ->name('import.preview');
 
         Route::post('/import/rooms',
-            [ImportController::class,'importRooms'])
+            [ImportController::class, 'importRooms'])
             ->name('import.rooms');
 
         Route::post('/import/enrollments',
-            [ImportController::class,'importEnrollments'])
+            [ImportController::class, 'importEnrollments'])
             ->name('import.enrollments');
     });
 
     Route::middleware(['permission:export schedule'])->group(function () {
         Route::get('/export/schedule',
-            [ExportController::class,'exportSchedule'])
+            [ExportController::class, 'exportSchedule'])
             ->name('export.schedule');
 
         Route::get('/export/students',
-            [ExportController::class,'exportStudents'])
+            [ExportController::class, 'exportStudents'])
             ->name('export.students');
 
         Route::get('/export/teachers',
-            [ExportController::class,'exportTeachers'])
+            [ExportController::class, 'exportTeachers'])
             ->name('export.teachers');
 
         Route::get('/export/credentials',
-            [ExportController::class,'exportCredentials'])
+            [ExportController::class, 'exportCredentials'])
             ->name('export.credentials');
     });
 
     Route::middleware(['role:admin'])->group(function () {
         Route::get('/admin/users/create', [DashboardController::class, 'create'])->name('admin.users.create');
         Route::post('/admin/users', [DashboardController::class, 'store'])->name('admin.users.store');
-        
+
         // Clean import routes (exports credentials immediately)
         Route::post('/import-students', [StudentImportController::class, 'import']);
         Route::post('/import-teachers', [TeacherImportController::class, 'import']);

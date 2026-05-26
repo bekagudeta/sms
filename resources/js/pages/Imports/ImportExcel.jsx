@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Link, useForm } from "@inertiajs/react";
 
-const importOptions = [
+const fallbackImportOptions = [
     {
         value: "departments",
         label: "Departments",
@@ -185,27 +185,27 @@ const importOptions = [
 const setupSteps = [
     {
         key: "foundation",
-        title: "Step 1 · Foundation",
+        title: "Step 1 - Foundation",
         description:
             "Create academic master data used by the rest of the system.",
         items: ["departments", "semesters"],
     },
     {
         key: "structure",
-        title: "Step 2 · Academic Structure",
+        title: "Step 2 - Academic Structure",
         description: "Define what should be offered and which sections exist.",
         items: ["courses", "course-offerings", "sections"],
     },
     {
         key: "resources",
-        title: "Step 3 · Resources & Constraints",
+        title: "Step 3 - Resources & Constraints",
         description:
             "Load teachers, rooms, timeslots, and section-teacher assignments.",
         items: ["teachers", "section-teachers", "rooms", "timeslots"],
     },
     {
         key: "students",
-        title: "Step 4 · Student Demand",
+        title: "Step 4 - Student Demand",
         description: "Load students and enrollments for conflict prevention.",
         items: ["students", "enrollments"],
     },
@@ -279,7 +279,33 @@ function getCsrfToken() {
     return null;
 }
 
-export default function ImportExcel({ entityCounts = {} }) {
+export default function ImportExcel({
+    entityCounts = {},
+    importOptions: backendImportOptions = [],
+}) {
+    const importOptions = useMemo(() => {
+        const sourceOptions =
+            Array.isArray(backendImportOptions) && backendImportOptions.length > 0
+                ? backendImportOptions
+                : fallbackImportOptions;
+
+        return sourceOptions.map((option) => ({
+            ...option,
+            requiredColumnList:
+                option.requiredColumnList ??
+                String(option.requiredColumns || "")
+                    .split(",")
+                    .map((column) => column.trim())
+                    .filter(Boolean),
+            optionalColumnList:
+                option.optionalColumnList ??
+                String(option.optionalColumns || "")
+                    .split(",")
+                    .map((column) => column.trim())
+                    .filter(Boolean),
+        }));
+    }, [backendImportOptions]);
+
     const [importType, setImportType] = useState("");
     const [errorMessage, setErrorMessage] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
@@ -307,7 +333,7 @@ export default function ImportExcel({ entityCounts = {} }) {
     const selectedOption = useMemo(
         () =>
             importOptions.find((option) => option.value === importType) ?? null,
-        [importType],
+        [importOptions, importType],
     );
 
     const dependencyIssues = useMemo(() => {
@@ -320,9 +346,10 @@ export default function ImportExcel({ entityCounts = {} }) {
                     importOptions.find((option) => option.value === dependency)
                         ?.label ?? dependency,
             );
-    }, [counts, selectedOption]);
+    }, [counts, importOptions, selectedOption]);
 
     const expectedHeaders = selectedOption?.templateHeaders ?? [];
+    const requiredHeaders = selectedOption?.requiredColumnList ?? expectedHeaders;
     const normalizedPreviewHeaders = useMemo(
         () => filePreview.headers.map((header) => normalizeHeader(header)),
         [filePreview.headers],
@@ -337,10 +364,57 @@ export default function ImportExcel({ entityCounts = {} }) {
             return [];
         }
 
-        let missing = expectedHeaders.filter(
+        const hasAnyHeader = (headers) =>
+            headers.some((header) =>
+                normalizedPreviewHeaders.includes(normalizeHeader(header)),
+            );
+
+        let missing = requiredHeaders.filter(
             (header) =>
                 !normalizedPreviewHeaders.includes(normalizeHeader(header)),
         );
+
+        if (
+            ["courses", "teachers", "students"].includes(
+                selectedOption.value,
+            ) &&
+            !hasAnyHeader([
+                "department_id",
+                "department_code",
+                "department_name",
+            ])
+        ) {
+            missing.push("department_id, department_code, or department_name");
+        }
+
+        if (selectedOption.value === "course-offerings") {
+            if (hasAnyHeader(["course_code", "course_id"])) {
+                missing = missing.filter(
+                    (header) => normalizeHeader(header) !== "course_code",
+                );
+            }
+
+            if (hasAnyHeader(["semester_code", "semester_id"])) {
+                missing = missing.filter(
+                    (header) => normalizeHeader(header) !== "semester_code",
+                );
+            }
+        }
+
+        if (selectedOption.value === "sections") {
+            if (hasAnyHeader(["course_offering_id"])) {
+                missing = missing.filter(
+                    (header) =>
+                        !["course_code", "semester_code"].includes(
+                            normalizeHeader(header),
+                        ),
+                );
+            } else if (hasAnyHeader(["semester_code", "semester_id"])) {
+                missing = missing.filter(
+                    (header) => normalizeHeader(header) !== "semester_code",
+                );
+            }
+        }
 
         if (selectedOption.value === "section-teachers") {
             const hasTeacherIdentifier =
@@ -359,6 +433,7 @@ export default function ImportExcel({ entityCounts = {} }) {
         filePreview.headers.length,
         filePreview.isCsv,
         normalizedPreviewHeaders,
+        requiredHeaders,
         selectedOption,
     ]);
 
@@ -672,7 +747,7 @@ export default function ImportExcel({ entityCounts = {} }) {
                     Accept: "application/json",
                 },
                 body: formData,
-                credentials: "same-origin",
+                credentials: "include",
             });
 
             if (!response.ok) {
@@ -1255,7 +1330,7 @@ export default function ImportExcel({ entityCounts = {} }) {
                                                                                                             {row[
                                                                                                                 columnIndex
                                                                                                             ] ||
-                                                                                                                "—"}
+                                                                                                                "-"}
                                                                                                         </td>
                                                                                                     ),
                                                                                                 )}
@@ -1467,3 +1542,4 @@ export default function ImportExcel({ entityCounts = {} }) {
         </DashboardLayout>
     );
 }
+

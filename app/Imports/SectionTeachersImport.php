@@ -3,17 +3,19 @@
 namespace App\Imports;
 
 use App\Models\Section;
-use App\Models\Teacher;
 use App\Models\SectionTeacher;
+use App\Models\Teacher;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
-use Illuminate\Support\Collection;
 
 class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidation
 {
     protected $processedCount = 0;
+
     protected $createdCount = 0;
+
     protected $errors = [];
 
     public function collection(Collection $rows)
@@ -22,9 +24,9 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
 
         foreach ($rows as $index => $row) {
             // Skip fully empty rows
-            $sectionIdentifier = trim((string)($row['section_id'] ?? ''));
-            $teacherIdentifiers = trim((string)($row['teacher_ids'] ?? $row['teacher_id'] ?? ''));
-            $appendFlag = trim((string)($row['append'] ?? ''));
+            $sectionIdentifier = trim((string) ($row['section_id'] ?? ''));
+            $teacherIdentifiers = trim((string) ($row['teacher_ids'] ?? $row['teacher_id'] ?? ''));
+            $appendFlag = trim((string) ($row['append'] ?? ''));
             $isAppend = in_array(strtolower($appendFlag), ['1', 'true', 'yes'], true);
 
             if ($sectionIdentifier === '' && $teacherIdentifiers === '') {
@@ -32,24 +34,26 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
             }
 
             if ($sectionIdentifier === '') {
-                $this->errors[] = "Row " . ($index + 2) . ": section_id is required";
+                $this->errors[] = 'Row '.($index + 2).': section_id is required';
+
                 continue;
             }
 
             if ($teacherIdentifiers === '') {
-                $this->errors[] = "Row " . ($index + 2) . ": teacher_id or teacher_ids is required";
+                $this->errors[] = 'Row '.($index + 2).': teacher_id or teacher_ids is required';
+
                 continue;
             }
 
-            // Find section by ID or name
             $section = $this->findSection($sectionIdentifier);
 
-            if (!$section) {
-                $this->errors[] = "Row " . ($index + 2) . ": Section '{$sectionIdentifier}' not found";
+            if (! $section) {
+                $this->errors[] = 'Row '.($index + 2).": Section '{$sectionIdentifier}' not found";
+
                 continue;
             }
 
-            if (!$isAppend && !in_array($section->id, $clearedSections, true)) {
+            if (! $isAppend && ! in_array($section->id, $clearedSections, true)) {
                 SectionTeacher::where('section_id', $section->id)->delete();
                 $clearedSections[] = $section->id;
             }
@@ -58,7 +62,8 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
             $teacherIds = array_filter(array_map('trim', explode(',', $teacherIdentifiers)));
 
             if (empty($teacherIds)) {
-                $this->errors[] = "Row " . ($index + 2) . ": No valid teacher identifiers found";
+                $this->errors[] = 'Row '.($index + 2).': No valid teacher identifiers found';
+
                 continue;
             }
 
@@ -69,8 +74,9 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
 
                 $teacher = $this->findTeacher($rawTeacherId);
 
-                if (!$teacher) {
-                    $this->errors[] = "Row " . ($index + 2) . ": Teacher '{$rawTeacherId}' not found";
+                if (! $teacher) {
+                    $this->errors[] = 'Row '.($index + 2).": Teacher '{$rawTeacherId}' not found";
+
                     continue;
                 }
 
@@ -79,7 +85,7 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
                         ->where('teacher_id', $teacher->id)
                         ->first();
 
-                    if (!$existingAssignment) {
+                    if (! $existingAssignment) {
                         SectionTeacher::create([
                             'section_id' => $section->id,
                             'teacher_id' => $teacher->id,
@@ -90,7 +96,7 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
                     // Count each assignment attempt to report progress
                     $this->processedCount++;
                 } catch (\Exception $e) {
-                    $this->errors[] = "Row " . ($index + 2) . ": Error assigning teacher '{$rawTeacherId}' to section '{$sectionIdentifier}': " . $e->getMessage();
+                    $this->errors[] = 'Row '.($index + 2).": Error assigning teacher '{$rawTeacherId}' to section '{$sectionIdentifier}': ".$e->getMessage();
                 }
             }
         }
@@ -99,18 +105,15 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
     private function findSection(string $sectionIdentifier)
     {
         if (is_numeric($sectionIdentifier)) {
-            $section = Section::find((int)$sectionIdentifier);
+            $section = Section::find((int) $sectionIdentifier);
             if ($section) {
                 return $section;
             }
         }
 
-        $section = Section::where('section_name', $sectionIdentifier)
+        return Section::where('section_name', $sectionIdentifier)
             ->orWhereRaw('LOWER(section_name) = ?', [strtolower($sectionIdentifier)])
-            ->orWhere('section_name', 'like', "%{$sectionIdentifier}%")
             ->first();
-
-        return $section;
     }
 
     private function findTeacher(string $teacherIdentifier)
@@ -123,8 +126,8 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
             ->orWhereRaw('LOWER(email) = ?', [strtolower($teacherIdentifier)])
             ->first();
 
-        if (!$teacher && is_numeric($teacherIdentifier)) {
-            $teacher = Teacher::find((int)$teacherIdentifier);
+        if (! $teacher && is_numeric($teacherIdentifier)) {
+            $teacher = Teacher::find((int) $teacherIdentifier);
         }
 
         return $teacher;
@@ -136,16 +139,17 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
             '*.section_id' => 'required',
             '*.teacher_ids' => 'nullable|string',
             '*.teacher_id' => 'nullable|string',
-            '*.append' => 'nullable|string'
+            '*.append' => 'nullable|string',
         ];
     }
 
     public function prepareForValidation($data, $index)
     {
         // Skip completely empty rows by returning null (will be filtered out)
-        if (empty(trim((string)($data['section_id'] ?? ''))) && empty(trim((string)($data['teacher_ids'] ?? '')))) {
+        if (empty(trim((string) ($data['section_id'] ?? ''))) && empty(trim((string) ($data['teacher_ids'] ?? '')))) {
             return null;
         }
+
         return $data;
     }
 

@@ -2,20 +2,21 @@
 
 namespace App\Imports;
 
-use App\Models\Teacher;
 use App\Models\Department;
+use App\Models\Teacher;
 use App\Models\User;
-use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
-use Illuminate\Support\Collection;
 use Spatie\Permission\Models\Role;
 
 class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
 {
     public $credentials = [];
+
     protected $rowCount = 0;
 
     public function collection(Collection $rows)
@@ -30,27 +31,22 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             $plainPassword = null;
 
             if ($user) {
-                if (empty($user->plain_password)) {
-                    $plainPassword = Str::random(8);
+                if (empty($user->password)) {
+                    $plainPassword = Str::random(12);
                     $user->update([
                         'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                        'plain_password' => $plainPassword,
+                        'plain_password' => '',
                         'must_change_password' => true,
                     ]);
-                } else {
-                    $plainPassword = $user->plain_password;
-                    if (empty($user->password)) {
-                        $user->update(['password' => Hash::make($plainPassword, ['rounds' => 8])]);
-                    }
                 }
             } else {
-                $plainPassword = Str::random(8);
+                $plainPassword = Str::random(12);
 
                 $user = User::create([
-                    'name' => trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')),
+                    'name' => trim(($row['first_name'] ?? '').' '.($row['last_name'] ?? '')),
                     'email' => $row['email'],
                     'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                    'plain_password' => $plainPassword,
+                    'plain_password' => '',
                     'must_change_password' => true,
                 ]);
             }
@@ -81,7 +77,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
                     'phone' => $row['phone'] ?? null,
                     'department_id' => $department->id,
                     'qualification' => $row['qualification'] ?? null,
-                    'max_hours_per_week' => $row['max_hours_per_week'] ?? 20
+                    'max_hours_per_week' => $row['max_hours_per_week'] ?? 20,
                 ]
             );
             $this->rowCount++;
@@ -100,7 +96,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             '*.department_name' => 'nullable|string|exists:departments,name',
             '*.phone' => 'nullable|string',
             '*.qualification' => 'nullable|string',
-            '*.max_hours_per_week' => 'nullable|integer|min:1|max:40'
+            '*.max_hours_per_week' => 'nullable|integer|min:1|max:40',
         ];
     }
 
@@ -124,6 +120,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             if (! $department) {
                 throw new \Exception("Import failed: department_id '{$departmentId}' not found for teacher row.");
             }
+
             return $department;
         }
 
@@ -132,6 +129,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             if (! $department) {
                 throw new \Exception("Import failed: department_code '{$departmentCode}' not found for teacher row.");
             }
+
             return $department;
         }
 
@@ -140,6 +138,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             if (! $department) {
                 throw new \Exception("Import failed: department_name '{$departmentName}' not found for teacher row.");
             }
+
             return $department;
         }
 

@@ -149,14 +149,20 @@ export default function ImportModal({
             formData.append("optional_columns[]", field),
         );
 
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.content : "";
+        if (csrfToken) {
+            formData.append("_token", csrfToken);
+        }
         try {
             const response = await fetch(route("import.preview"), {
                 method: "POST",
                 headers: {
-                    "X-CSRF-TOKEN": document.querySelector(
-                        'meta[name="csrf-token"]',
-                    ).content,
+                    "X-CSRF-TOKEN": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                    Accept: "application/json",
                 },
+                credentials: "include",
                 body: formData,
             });
 

@@ -49,10 +49,12 @@ class TimeslotsImport implements ToCollection, WithHeadingRow, WithValidation
                 $hours = floor($seconds / 3600);
                 $minutes = floor(($seconds % 3600) / 60);
                 $seconds = $seconds % 60;
+
                 return sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
             } else {
                 // Handle string time format
                 $carbon = Carbon::parse($time);
+
                 return $carbon->format('H:i:s');
             }
         } catch (\Exception $e) {
@@ -63,8 +65,10 @@ class TimeslotsImport implements ToCollection, WithHeadingRow, WithValidation
     public function rules(): array
     {
         return [
-            'day_of_week' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-            'slot_code' => 'required|string|unique:timeslots,slot_code'
+            '*.day_of_week' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+            '*.start_time' => 'required',
+            '*.end_time' => 'required',
+            '*.slot_code' => 'required|string',
         ];
     }
 

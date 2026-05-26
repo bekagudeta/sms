@@ -3,20 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Exports\CredentialsExport;
+use App\Http\Requests\ImportFileRequest;
+use App\Models\Course;
+use App\Models\CourseOffering;
+use App\Models\Department;
+use App\Models\Enrollment;
+use App\Models\Room;
+use App\Models\Section;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Teacher;
+use App\Models\Timeslot;
 use App\Services\ExcelImportService;
 use Illuminate\Http\Request;
-use App\Models\Section;
-use App\Models\CourseOffering;
-use App\Models\User;
-use App\Models\Teacher;
-use App\Models\Student;
-use App\Models\Semester;
-use App\Models\Department;
-use App\Models\Course;
-use App\Models\Room;
-use App\Models\Timeslot;
-use App\Models\Enrollment;
-
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -28,8 +27,7 @@ class ImportController extends Controller
     public function __construct(ExcelImportService $importService)
     {
         $this->importService = $importService;
-        // Temporarily removed permission middleware for testing
-        // $this->middleware('permission:import data');
+        $this->middleware('permission:import data');
     }
 
     public function index()
@@ -48,6 +46,7 @@ class ImportController extends Controller
                 'students' => Student::count(),
                 'enrollments' => Enrollment::count(),
             ],
+            'importOptions' => $this->getFrontendImportOptions(),
         ]);
     }
 
@@ -61,9 +60,9 @@ class ImportController extends Controller
 
         return response()->streamDownload(function () use ($template) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, $template['headers']);
+            fputcsv($handle, $template['template_headers']);
 
-            foreach ($template['rows'] as $row) {
+            foreach ($template['template_rows'] as $row) {
                 fputcsv($handle, $row);
             }
 
@@ -71,6 +70,38 @@ class ImportController extends Controller
         }, $template['filename'], [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    private function getImportDefinitions(): array
+    {
+        return config('imports.entities', []);
+    }
+
+    private function getTemplateDefinitions(): array
+    {
+        return $this->getImportDefinitions();
+    }
+
+    private function getFrontendImportOptions(): array
+    {
+        return collect($this->getImportDefinitions())
+            ->map(function (array $definition, string $value) {
+                return [
+                    'value' => $value,
+                    'label' => $definition['label'],
+                    'category' => $definition['category'],
+                    'description' => $definition['description'],
+                    'dependencies' => $definition['dependencies'],
+                    'requiredColumns' => implode(', ', $definition['required_columns']),
+                    'optionalColumns' => implode(', ', $definition['optional_columns']),
+                    'requiredColumnList' => $definition['required_columns'],
+                    'optionalColumnList' => $definition['optional_columns'],
+                    'templateHeaders' => $definition['template_headers'],
+                    'note' => $definition['note'],
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function normalizeHeader(string $value): string
@@ -87,11 +118,11 @@ class ImportController extends Controller
         }
 
         if ($skipHeader) {
-            $sourceHeaders = array_map('trim', (array)$rows[0]);
+            $sourceHeaders = array_map('trim', (array) $rows[0]);
             $dataRows = array_slice($rows, 1);
         } else {
-            $maxCols = max(array_map(fn($r) => count((array)$r), $rows));
-            $sourceHeaders = array_map(fn($i) => "column_{$i}", range(0, $maxCols - 1));
+            $maxCols = max(array_map(fn ($r) => count((array) $r), $rows));
+            $sourceHeaders = array_map(fn ($i) => "column_{$i}", range(0, $maxCols - 1));
             $dataRows = $rows;
         }
 
@@ -100,7 +131,7 @@ class ImportController extends Controller
         $mappingsPrepared = [];
 
         foreach ($mappings as $targetField => $sourceValue) {
-            $sourceValue = trim((string)$sourceValue);
+            $sourceValue = trim((string) $sourceValue);
             $targetField = trim($targetField);
 
             if ($sourceValue === '' || $targetField === '') {
@@ -108,10 +139,11 @@ class ImportController extends Controller
             }
 
             if (is_numeric($sourceValue)) {
-                $index = (int)$sourceValue;
+                $index = (int) $sourceValue;
                 if ($index >= 0 && $index < count($sourceHeaders)) {
                     $mappingsPrepared[$targetField] = $index;
                 }
+
                 continue;
             }
 
@@ -137,20 +169,20 @@ class ImportController extends Controller
         $missingRequired = [];
 
         foreach ($configuredFields as $field) {
-            if (!isset($mappingsPrepared[$field])) {
+            if (! isset($mappingsPrepared[$field])) {
                 $missingRequired[] = $field;
             }
         }
 
-        if (!empty($missingRequired)) {
-            throw new \Exception('Unable to map required field(s): ' . implode(', ', array_unique($missingRequired)));
+        if (! empty($missingRequired)) {
+            throw new \Exception('Unable to map required field(s): '.implode(', ', array_unique($missingRequired)));
         }
 
         $outputHeaders = array_keys($mappingsPrepared);
         $usedSourceIndices = array_values($mappingsPrepared);
 
         foreach ($sourceHeaders as $index => $sourceHeader) {
-            if (!in_array($index, $usedSourceIndices, true)) {
+            if (! in_array($index, $usedSourceIndices, true)) {
                 $outputHeaders[] = $sourceHeader ?: "column_{$index}";
                 $mappingsPrepared[$sourceHeader ?: "column_{$index}"] = $index;
             }
@@ -161,11 +193,11 @@ class ImportController extends Controller
             throw new \Exception('Unable to create temporary file for import processing.');
         }
 
-        $tmpCsv = $tmpPath . '.csv';
+        $tmpCsv = $tmpPath.'.csv';
         rename($tmpPath, $tmpCsv);
 
         $handle = fopen($tmpCsv, 'w');
-        if (!$handle) {
+        if (! $handle) {
             throw new \Exception('Unable to write temporary import file.');
         }
 
@@ -188,115 +220,33 @@ class ImportController extends Controller
         return $tmpCsv;
     }
 
-    private function getTemplateDefinitions(): array
-    {
-        return [
-            'departments' => [
-                'filename' => 'departments_template.csv',
-                'headers' => ['code', 'name', 'description'],
-                'rows' => [
-                    ['CS', 'Computer Science', 'Computing and software programs'],
-                ],
-            ],
-            'semesters' => [
-                'filename' => 'semesters_template.csv',
-                'headers' => ['name', 'code', 'start_date', 'end_date', 'is_active'],
-                'rows' => [
-                    ['1st Semester AY 2026-2027', '1ST-AY26', '2026-06-01', '2026-10-01', '1'],
-                ],
-            ],
-            'courses' => [
-                'filename' => 'courses_template.csv',
-                'headers' => ['course_code', 'course_name', 'description', 'credits', 'hours_per_week', 'department_id', 'level', 'required_room_type'],
-                'rows' => [
-                    ['CS101', 'Introduction to Programming', 'Programming fundamentals', '3', '3', 'CS', 'undergraduate', 'lab'],
-                ],
-            ],
-            'course-offerings' => [
-                'filename' => 'course_offerings_template.csv',
-                'headers' => ['course_code', 'semester_code', 'expected_students'],
-                'rows' => [
-                    ['CS101', '1ST-AY26', '40'],
-                ],
-            ],
-            'sections' => [
-                'filename' => 'sections_template.csv',
-                'headers' => ['course_code', 'semester_code', 'section_name', 'capacity'],
-                'rows' => [
-                    ['CS101', '1ST-AY26', 'BSCS-1A', '40'],
-                ],
-            ],
-            'teachers' => [
-                'filename' => 'teachers_template.csv',
-                'headers' => ['teacher_id', 'first_name', 'last_name', 'email', 'department_id', 'department_name', 'qualification', 'max_hours_per_week', 'phone'],
-                'rows' => [
-                    ['T-001', 'Maria', 'Santos', 'maria.santos@example.com', 'CS', 'Computer Science', 'MSCS', '18', '09171234567'],
-                ],
-            ],
-            'section-teachers' => [
-                'filename' => 'section_teachers_template.csv',
-                'headers' => ['section_id', 'teacher_ids', 'teacher_id', 'append'],
-                'rows' => [
-                    ['1', 'T-001', '', 'no'],
-                ],
-            ],
-            'rooms' => [
-                'filename' => 'rooms_template.csv',
-                'headers' => ['room_code', 'building', 'floor', 'capacity', 'type', 'has_projector', 'has_computers', 'computer_count'],
-                'rows' => [
-                    ['LAB-201', 'Main Building', '2', '40', 'lab', 'yes', 'yes', '40'],
-                ],
-            ],
-            'timeslots' => [
-                'filename' => 'timeslots_template.csv',
-                'headers' => ['day_of_week', 'start_time', 'end_time', 'slot_code'],
-                'rows' => [
-                    ['Monday', '08:00', '09:30', 'MON_0800_0930'],
-                ],
-            ],
-            'students' => [
-                'filename' => 'students_template.csv',
-                'headers' => ['student_id', 'first_name', 'last_name', 'email', 'department_id', 'department_name', 'level', 'section', 'phone', 'enrollment_date'],
-                'rows' => [
-                    ['STU0001', 'Juan', 'Dela Cruz', 'juan.delacruz@example.com', 'CS', 'Computer Science', '1', 'BSCS-1A', '09170000001', '2026-06-15'],
-                ],
-            ],
-            'enrollments' => [
-                'filename' => 'enrollments_template.csv',
-                'headers' => ['student_id', 'section_id'],
-                'rows' => [
-                    ['STU0001', 'BSCS-1A'],
-                ],
-            ],
-        ];
-    }
-
     public function previewImport(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv',
-            'entity_type' => 'required|string',
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
+            'entity_type' => 'required|string|in:'.implode(',', array_keys($this->getImportDefinitions())),
             'required_columns' => 'nullable|array',
             'optional_columns' => 'nullable|array',
             'skip_header' => 'nullable|boolean',
         ]);
 
         $file = $request->file('file');
-        $requiredColumns = array_map('trim', (array)$request->input('required_columns', []));
-        $optionalColumns = array_map('trim', (array)$request->input('optional_columns', []));
+        $definition = $this->getImportDefinitions()[$request->input('entity_type')];
+        $requiredColumns = $definition['required_columns'];
+        $optionalColumns = $definition['optional_columns'];
         $skipHeader = $request->boolean('skip_header', true);
 
         $raw = Excel::toArray([], $file)[0] ?? [];
         if (empty($raw)) {
-            return response()->json([ 'headers' => [], 'rows' => [], 'mapping' => [] ]);
+            return response()->json(['headers' => [], 'rows' => [], 'mapping' => []]);
         }
 
         if ($skipHeader) {
-            $sourceHeaders = array_map('trim', (array)$raw[0]);
+            $sourceHeaders = array_map('trim', (array) $raw[0]);
             $dataRows = array_slice($raw, 1);
         } else {
-            $columns = max(array_map(fn($r) => count((array)$r), $raw));
-            $sourceHeaders = array_map(fn($i) => "column_{$i}", range(0, $columns - 1));
+            $columns = max(array_map(fn ($r) => count((array) $r), $raw));
+            $sourceHeaders = array_map(fn ($i) => "column_{$i}", range(0, $columns - 1));
             $dataRows = $raw;
         }
 
@@ -335,7 +285,7 @@ class ImportController extends Controller
             }
 
             if ($match !== false) {
-                $mapping[$field] = (string)$match;
+                $mapping[$field] = (string) $match;
             }
         }
 
@@ -346,57 +296,26 @@ class ImportController extends Controller
         ]);
     }
 
-    public function bulkImport(Request $request)
+    public function bulkImport(ImportFileRequest $request)
     {
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv',
-            'entity_type' => 'required|string',
-            'mappings' => 'nullable|array',
-            'skip_header' => 'nullable|boolean',
-            'validation_mode' => 'nullable|string'
-        ]);
-
         $entityType = $request->input('entity_type');
         $file = $request->file('file');
         $mappings = $request->input('mappings', []);
         $skipHeader = $request->boolean('skip_header', true);
-
-        // Map entity types to import service methods
-        $entityServiceMethodMap = [
-            'students' => 'importStudents',
-            'teachers' => 'importTeachers',
-            'courses' => 'importCourses',
-            'departments' => 'importDepartments',
-            'semesters' => 'importSemesters',
-            'course-offerings' => 'importCourseOfferings',
-            'sections' => 'importSections',
-            'section-teachers' => 'importSectionTeachers',
-            'timeslots' => 'importTimeslots',
-            'rooms' => 'importRooms',
-            'enrollments' => 'importEnrollments',
-        ];
-
-        if (!isset($entityServiceMethodMap[$entityType])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unknown entity type: ' . $entityType
-            ], 400);
-        }
+        $serviceMethod = $this->getImportDefinitions()[$entityType]['service_method'];
 
         $processedFile = $file;
 
-        if (!empty($mappings)) {
+        if (! empty($mappings)) {
             try {
                 $processedFile = $this->prepareImportFile($file, $mappings, $skipHeader);
             } catch (\Exception $e) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Import failed: ' . $e->getMessage()
+                    'message' => 'Import failed: '.$e->getMessage(),
                 ], 422);
             }
         }
-
-        $serviceMethod = $entityServiceMethodMap[$entityType];
 
         try {
             $result = $this->importService->$serviceMethod($processedFile);
@@ -412,7 +331,7 @@ class ImportController extends Controller
     public function importStudents(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importStudents($request->file('file'));
@@ -430,7 +349,7 @@ class ImportController extends Controller
     public function importTeachers(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importTeachers($request->file('file'));
@@ -448,7 +367,7 @@ class ImportController extends Controller
     public function importCourses(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importCourses($request->file('file'));
@@ -459,7 +378,7 @@ class ImportController extends Controller
     public function importCourseOfferings(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importCourseOfferings($request->file('file'));
@@ -470,7 +389,7 @@ class ImportController extends Controller
     public function importSections(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importSections($request->file('file'));
@@ -481,7 +400,7 @@ class ImportController extends Controller
     public function importDepartments(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importDepartments($request->file('file'));
@@ -492,7 +411,7 @@ class ImportController extends Controller
     public function importTimeslots(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importTimeslots($request->file('file'));
@@ -503,7 +422,7 @@ class ImportController extends Controller
     public function importSemesters(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importSemesters($request->file('file'));
@@ -514,7 +433,7 @@ class ImportController extends Controller
     public function importEnrollments(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importEnrollments($request->file('file'));
@@ -525,7 +444,7 @@ class ImportController extends Controller
     public function importSectionTeachers(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importSectionTeachers($request->file('file'));
@@ -536,7 +455,7 @@ class ImportController extends Controller
     public function importRooms(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:'.config('imports.max_file_kb', 10240),
         ]);
 
         $result = $this->importService->importRooms($request->file('file'));
@@ -548,27 +467,27 @@ class ImportController extends Controller
     {
         $isInertia = request()->header('X-Inertia') || request()->header('X-Inertia-Partial-Data');
 
-        if (!$isInertia && (request()->wantsJson() || request()->ajax())) {
+        if (! $isInertia && (request()->wantsJson() || request()->ajax())) {
             $response = [
                 'success' => $result['success'],
                 'message' => $result['message'],
                 'count' => $result['count'] ?? 0,
             ];
-            
-            if (isset($result['errors']) && !empty($result['errors'])) {
+
+            if (isset($result['errors']) && ! empty($result['errors'])) {
                 $response['errors'] = $result['errors'];
             }
-            
+
             return response()->json($response, $result['success'] ? 200 : 500);
         }
 
         if ($result['success']) {
-            $message = $result['message'] . ' (' . ($result['count'] ?? 0) . ' records)';
-            
-            if (isset($result['errors']) && !empty($result['errors'])) {
-                $message .= ' with ' . count($result['errors']) . ' errors. Check logs for details.';
+            $message = $result['message'].' ('.($result['count'] ?? 0).' records)';
+
+            if (isset($result['errors']) && ! empty($result['errors'])) {
+                $message .= ' with '.count($result['errors']).' errors. Check logs for details.';
             }
-            
+
             return back()->with('success', $message);
         }
 

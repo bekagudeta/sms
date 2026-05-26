@@ -2,26 +2,24 @@
 
 namespace App\Imports;
 
-use App\Models\Student;
 use App\Models\Department;
+use App\Models\Student;
 use App\Models\User;
-use Illuminate\Support\Str;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Collection;
-use Carbon\Carbon;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
-use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Spatie\Permission\Models\Role;
-class StudentsImport implements 
-    ToCollection,
-    WithHeadingRow,
-    WithValidation,
-    WithChunkReading
+
+class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, WithValidation
 {
     public $credentials = [];
+
     protected $rowCount = 0;
 
     public function chunkSize(): int
@@ -46,7 +44,7 @@ class StudentsImport implements
                 // =========================
                 // 1. Department handling
                 // =========================
-                
+
                 // Try department_id first, then fallback to department_code
                 $departmentId = $row['department_id'] ?? null;
                 $deptCode = $row['department_code'] ?? 'UNK';
@@ -54,12 +52,12 @@ class StudentsImport implements
                 if ($departmentId) {
                     // Use existing department by ID
                     $department = Department::find($departmentId);
-                    if (!$department) {
+                    if (! $department) {
                         throw new \Exception("Department with ID {$departmentId} not found for student {$row['student_id']}");
                     }
                 } else {
                     // Fallback to department_code logic
-                    if (!isset($departmentCache[$deptCode])) {
+                    if (! isset($departmentCache[$deptCode])) {
                         $departmentCache[$deptCode] = Department::firstOrCreate(
                             ['code' => $deptCode],
                             ['name' => $row['department_name'] ?? 'Unknown']
@@ -76,28 +74,22 @@ class StudentsImport implements
                 $plainPassword = null;
 
                 if ($user) {
-                    // Student exists; if we don't have plain password, generate new secure token
-                    if (empty($user->plain_password)) {
-                        $plainPassword = Str::random(8);
+                    if (empty($user->password)) {
+                        $plainPassword = Str::random(12);
                         $user->update([
                             'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                            'plain_password' => $plainPassword,
+                            'plain_password' => '',
                             'must_change_password' => true,
                         ]);
-                    } else {
-                        $plainPassword = $user->plain_password;
-                        if (empty($user->password)) {
-                            $user->update([ 'password' => Hash::make($plainPassword, ['rounds' => 8]) ]);
-                        }
                     }
                 } else {
-                    $plainPassword = Str::random(8);
+                    $plainPassword = Str::random(12);
 
                     $user = User::create([
-                        'name' => trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')),
+                        'name' => trim(($row['first_name'] ?? '').' '.($row['last_name'] ?? '')),
                         'email' => $row['email'],
                         'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                        'plain_password' => $plainPassword,
+                        'plain_password' => '',
                         'must_change_password' => true,
                     ]);
                 }
@@ -112,7 +104,7 @@ class StudentsImport implements
 
                 // Ensure the role exists and is assigned
                 Role::firstOrCreate(['name' => 'student', 'guard_name' => 'web']);
-                if (!$user->hasRole('student')) {
+                if (! $user->hasRole('student')) {
                     $user->assignRole('student');
                 }
 
@@ -147,7 +139,7 @@ class StudentsImport implements
                         'status' => $row['status'] ?? 'active',
                         'level' => (string) ($row['level'] ?? ''),
                         'section' => (string) ($row['section'] ?? ''),
-                        'enrollment_date' => $enrollmentDate
+                        'enrollment_date' => $enrollmentDate,
                     ]
                 );
 
