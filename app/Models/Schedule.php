@@ -18,6 +18,7 @@ class Schedule extends Model
 
     protected $appends = [
         'course',
+        'teacher',
         'teacher_name',
         'semester'
     ];
@@ -40,7 +41,9 @@ class Schedule extends Model
 
     public function getTeacherAttribute()
     {
-        return $this->section?->teachers?->first();
+        $teacher = $this->section?->teachers?->first();
+
+        return $teacher ? $teacher->load('user') : null;
     }
 
     public function getTeacherNameAttribute()
@@ -48,7 +51,7 @@ class Schedule extends Model
         $teacher = $this->teacher;
 
         if ($teacher) {
-            if (!empty($teacher->full_name)) {
+            if (! empty($teacher->full_name)) {
                 return $teacher->full_name;
             }
             return $teacher->user?->name;
