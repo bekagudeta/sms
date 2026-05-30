@@ -149,6 +149,20 @@ class ExcelImportService
                 'message' => 'Semesters imported successfully',
                 'count' => $import->getRowCount()
             ];
+        } catch (ValidationException $e) {
+            Log::error('Semester import validation failed: ' . $e->getMessage());
+            $failures = $e->failures();
+            $messages = array_map(function ($failure) {
+                $row = $failure->row();
+                $attribute = $failure->attribute();
+                $errors = implode(' / ', $failure->errors());
+                return "Row {$row} [{$attribute}]: {$errors}";
+            }, $failures);
+
+            return [
+                'success' => false,
+                'message' => 'Validation failed: ' . implode(' | ', $messages)
+            ];
         } catch (\Exception $e) {
             Log::error('Semester import failed: ' . $e->getMessage());
             return [
