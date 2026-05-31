@@ -6,78 +6,67 @@ use App\Models\Semester;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
+use Carbon\Carbon;
 
 class SemestersImport implements ToModel, WithHeadingRow, WithValidation
 {
     protected $rowCount = 0;
 
+    /**
+     * Converts a value that may be an Excel serial date, a timestamp,
+     * or an already-formatted date string into a Y-m-d string.
+     * Returns null if the value is empty.
+     */
+    protected function parseDate(mixed $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        // Excel stores dates as numeric serial numbers (e.g. 45678)
+        if (is_numeric($value)) {
+            return Carbon::instance(ExcelDate::excelToDateTimeObject($value))
+                ->format('Y-m-d');
+        }
+
+        // Already a date string — normalise it to Y-m-d
+        return Carbon::parse($value)->format('Y-m-d');
+    }
+
     public function model(array $row)
     {
         $this->rowCount++;
 
-        // Convert string values to appropriate types
-        $isActive = $this->parseBoolean($row['is_active'] ?? '0');
-        
         return new Semester([
-            'name' => trim($row['name']),
-            'code' => strtoupper(trim($row['code'])),
+            'name'       => $row['name'],
+            'code'       => $row['code'],
             'start_date' => $this->parseDate($row['start_date']),
-            'end_date' => $this->parseDate($row['end_date']),
-            'is_active' => $isActive
+            'end_date'   => $this->parseDate($row['end_date']),
+            'is_active'  => $row['is_active'] ?? false,
         ]);
     }
 
     public function rules(): array
     {
         return [
-            'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:semesters,code',
-            'start_date' => 'required|date_format:Y-m-d',
-            'end_date' => 'required|date_format:Y-m-d|after:start_date',
-            'is_active' => 'nullable|in:0,1,true,false,yes,no'
+            'name'       => 'required|string',
+            'code'       => 'required|string|unique:semesters,code',
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after:start_date',
         ];
     }
 
     /**
-     * Convert string value to boolean
-     * Accepts: 1, true, yes (case-insensitive) = true
-     * Accepts: 0, false, no (case-insensitive) = false
+     * Transform raw row data BEFORE validation runs,
+     * so the validator always receives a proper date string.
      */
-    protected function parseBoolean($value): bool
+    public function prepareForValidation(array $data, int $index): array
     {
-        if (is_bool($value)) {
-            return $value;
-        }
+        $data['start_date'] = $this->parseDate($data['start_date'] ?? null);
+        $data['end_date']   = $this->parseDate($data['end_date']   ?? null);
 
-        $value = strtolower(trim((string) $value));
-        
-        return in_array($value, ['1', 'true', 'yes'], true);
-    }
-
-    /**
-     * Parse date string to ensure proper format
-     */
-    protected function parseDate($value): string
-    {
-        // If already in correct format, return as is
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
-            return $value;
-        }
-
-        // Try to parse and reformat common date formats
-        try {
-            $date = \DateTime::createFromFormat('d/m/Y', $value) ?: 
-                    \DateTime::createFromFormat('m/d/Y', $value) ?: 
-                    \DateTime::createFromFormat('Y-m-d', $value);
-            
-            if ($date) {
-                return $date->format('Y-m-d');
-            }
-        } catch (\Exception $e) {
-            // Fall through to return original value
-        }
-
-        return $value;
+        return $data;
     }
 
     public function getRowCount(): int
