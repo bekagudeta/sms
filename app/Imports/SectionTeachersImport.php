@@ -2,8 +2,11 @@
 
 namespace App\Imports;
 
+use App\Models\Course;
+use App\Models\CourseOffering;
 use App\Models\Section;
 use App\Models\SectionTeacher;
+use App\Models\Semester;
 use App\Models\Teacher;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -23,32 +26,47 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
         $clearedSections = [];
 
         foreach ($rows as $index => $row) {
-            // Skip fully empty rows
-            $sectionIdentifier = trim((string) ($row['section_id'] ?? ''));
-            $teacherIdentifiers = trim((string) ($row['teacher_ids'] ?? $row['teacher_id'] ?? ''));
+            $rowNumber = $index + 2;
+
+            $courseCode = trim((string) ($row['course_code'] ?? ''));
+            $semesterCode = trim((string) ($row['semester_code'] ?? ''));
+            $sectionName = trim((string) ($row['section_name'] ?? ''));
+            $legacySectionKey = trim((string) ($row['section_id'] ?? $row['section_code'] ?? ''));
+
+            $teacherIdentifiers = trim((string) (
+                $row['teacher_ids']
+                ?? $row['teacher_code']
+                ?? $row['teacher_id']
+                ?? ''
+            ));
+
             $appendFlag = trim((string) ($row['append'] ?? ''));
             $isAppend = in_array(strtolower($appendFlag), ['1', 'true', 'yes'], true);
 
-            if ($sectionIdentifier === '' && $teacherIdentifiers === '') {
-                continue;
-            }
-
-            if ($sectionIdentifier === '') {
-                $this->errors[] = 'Row '.($index + 2).': section_id is required';
-
+            if (
+                $courseCode === ''
+                && $semesterCode === ''
+                && $sectionName === ''
+                && $legacySectionKey === ''
+                && $teacherIdentifiers === ''
+            ) {
                 continue;
             }
 
             if ($teacherIdentifiers === '') {
-                $this->errors[] = 'Row '.($index + 2).': teacher_id or teacher_ids is required';
+                $this->errors[] = "Row {$rowNumber}: teacher_code (or teacher_id) is required";
 
                 continue;
             }
 
-            $section = $this->findSection($sectionIdentifier);
+            $section = $this->resolveSection($courseCode, $semesterCode, $sectionName, $legacySectionKey);
 
             if (! $section) {
-                $this->errors[] = 'Row '.($index + 2).": Section '{$sectionIdentifier}' not found";
+                if ($courseCode !== '' || $semesterCode !== '' || $sectionName !== '') {
+                    $this->errors[] = "Row {$rowNumber}: Section not found for course_code '{$courseCode}', semester_code '{$semesterCode}', section_name '{$sectionName}'";
+                } else {
+                    $this->errors[] = "Row {$rowNumber}: Section '{$legacySectionKey}' not found";
+                }
 
                 continue;
             }
@@ -58,24 +76,23 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
                 $clearedSections[] = $section->id;
             }
 
-            // Parse teacher IDs (comma-separated)
-            $teacherIds = array_filter(array_map('trim', explode(',', $teacherIdentifiers)));
+            $teacherCodes = array_filter(array_map('trim', explode(',', $teacherIdentifiers)));
 
-            if (empty($teacherIds)) {
-                $this->errors[] = 'Row '.($index + 2).': No valid teacher identifiers found';
+            if (empty($teacherCodes)) {
+                $this->errors[] = "Row {$rowNumber}: No valid teacher identifier found";
 
                 continue;
             }
 
-            foreach ($teacherIds as $rawTeacherId) {
-                if ($rawTeacherId === '') {
+            foreach ($teacherCodes as $rawTeacherCode) {
+                if ($rawTeacherCode === '') {
                     continue;
                 }
 
-                $teacher = $this->findTeacher($rawTeacherId);
+                $teacher = $this->findTeacher($rawTeacherCode);
 
                 if (! $teacher) {
-                    $this->errors[] = 'Row '.($index + 2).": Teacher '{$rawTeacherId}' not found";
+                    $this->errors[] = "Row {$rowNumber}: Teacher '{$rawTeacherCode}' not found";
 
                     continue;
                 }
@@ -93,16 +110,82 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
                         $this->createdCount++;
                     }
 
-                    // Count each assignment attempt to report progress
                     $this->processedCount++;
                 } catch (\Exception $e) {
-                    $this->errors[] = 'Row '.($index + 2).": Error assigning teacher '{$rawTeacherId}' to section '{$sectionIdentifier}': ".$e->getMessage();
+                    $sectionLabel = $courseCode !== ''
+                        ? "{$courseCode} / {$semesterCode} / {$sectionName}"
+                        : $legacySectionKey;
+
+                    $this->errors[] = "Row {$rowNumber}: Error assigning teacher '{$rawTeacherCode}' to section '{$sectionLabel}': ".$e->getMessage();
                 }
             }
         }
     }
 
-    private function findSection(string $sectionIdentifier)
+    /**
+     * Resolve a section using course_code + semester_code + section_name (preferred),
+     * or fall back to legacy section_id / section_code lookup.
+     */
+    private function resolveSection(
+        string $courseCode,
+        string $semesterCode,
+        string $sectionName,
+        string $legacySectionKey
+    ): ?Section {
+        if ($courseCode !== '' && $semesterCode !== '' && $sectionName !== '') {
+            return $this->findSectionByOffering($courseCode, $semesterCode, $sectionName);
+        }
+
+        if ($legacySectionKey !== '') {
+            return $this->findSectionLegacy($legacySectionKey);
+        }
+
+        return null;
+    }
+
+    private function findSectionByOffering(string $courseCode, string $semesterCode, string $sectionName): ?Section
+    {
+        $course = Course::where('course_code', $courseCode)
+            ->orWhereRaw('LOWER(course_code) = ?', [strtolower($courseCode)])
+            ->first();
+
+        if (! $course) {
+            return null;
+        }
+
+        $semester = Semester::where('code', $semesterCode)
+            ->orWhereRaw('LOWER(code) = ?', [strtolower($semesterCode)])
+            ->first();
+
+        if (! $semester) {
+            return null;
+        }
+
+        $courseOffering = CourseOffering::where('course_id', $course->id)
+            ->where('semester_id', $semester->id)
+            ->first();
+
+        if (! $courseOffering) {
+            return null;
+        }
+
+        $candidates = array_unique(array_filter([
+            $sectionName,
+            $this->withSectionPrefix($sectionName),
+            $this->withoutSectionPrefix($sectionName),
+        ]));
+
+        return Section::where('course_offering_id', $courseOffering->id)
+            ->where(function ($query) use ($candidates) {
+                foreach ($candidates as $candidate) {
+                    $query->orWhere('section_name', $candidate)
+                        ->orWhereRaw('LOWER(section_name) = ?', [strtolower($candidate)]);
+                }
+            })
+            ->first();
+    }
+
+    private function findSectionLegacy(string $sectionIdentifier): ?Section
     {
         if (is_numeric($sectionIdentifier)) {
             $section = Section::find((int) $sectionIdentifier);
@@ -116,7 +199,7 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
             ->first();
     }
 
-    private function findTeacher(string $teacherIdentifier)
+    private function findTeacher(string $teacherIdentifier): ?Teacher
     {
         $teacherIdentifier = trim($teacherIdentifier);
 
@@ -133,20 +216,51 @@ class SectionTeachersImport implements ToCollection, WithHeadingRow, WithValidat
         return $teacher;
     }
 
+    private function withSectionPrefix(string $sectionName): string
+    {
+        if (preg_match('/^section\s+/i', $sectionName)) {
+            return $sectionName;
+        }
+
+        return 'Section '.$sectionName;
+    }
+
+    private function withoutSectionPrefix(string $sectionName): string
+    {
+        return preg_replace('/^section\s+/i', '', $sectionName) ?? $sectionName;
+    }
+
     public function rules(): array
     {
         return [
-            '*.section_id' => 'required',
-            '*.teacher_ids' => 'nullable|string',
+            '*.course_code' => 'nullable|string',
+            '*.semester_code' => 'nullable|string',
+            '*.section_name' => 'nullable|string',
+            '*.teacher_code' => 'nullable|string',
             '*.teacher_id' => 'nullable|string',
+            '*.teacher_ids' => 'nullable|string',
+            '*.section_id' => 'nullable',
+            '*.section_code' => 'nullable|string',
             '*.append' => 'nullable|string',
         ];
     }
 
     public function prepareForValidation($data, $index)
     {
-        // Skip completely empty rows by returning null (will be filtered out)
-        if (empty(trim((string) ($data['section_id'] ?? ''))) && empty(trim((string) ($data['teacher_ids'] ?? '')))) {
+        $hasComposite = ! empty(trim((string) ($data['course_code'] ?? '')))
+            && ! empty(trim((string) ($data['semester_code'] ?? '')))
+            && ! empty(trim((string) ($data['section_name'] ?? '')));
+
+        $hasLegacySection = ! empty(trim((string) ($data['section_id'] ?? $data['section_code'] ?? '')));
+
+        $hasTeacher = ! empty(trim((string) (
+            $data['teacher_code']
+            ?? $data['teacher_id']
+            ?? $data['teacher_ids']
+            ?? ''
+        )));
+
+        if (! $hasComposite && ! $hasLegacySection && ! $hasTeacher) {
             return null;
         }
 

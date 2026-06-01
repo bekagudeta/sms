@@ -112,9 +112,15 @@ const fallbackImportOptions = [
             "Assign one or more teachers to each section before generation.",
         dependencies: ["sections", "teachers"],
         requiredColumns:
-            "section_id, teacher_ids or teacher_id (comma-separated), append (optional: yes / no)",
-        templateHeaders: ["section_id", "teacher_ids", "teacher_id", "append"],
-        note: "Every section should have at least one teacher; otherwise automatic generation will fail.",
+            "course_code, semester_code, section_name, teacher_code, append (optional: yes / no)",
+        templateHeaders: [
+            "course_code",
+            "semester_code",
+            "section_name",
+            "teacher_code",
+            "append",
+        ],
+        note: "Use the same course_code, semester_code, and section_name as your Sections sheet. teacher_code matches the teacher_id from Teachers import. Multiple teachers: one row per teacher.",
     },
     {
         value: "rooms",
@@ -154,20 +160,17 @@ const fallbackImportOptions = [
         description: "Create student records and login credentials.",
         dependencies: ["departments"],
         requiredColumns:
-            "student_id, first_name, last_name, email, department_id OR (department_code, department_name), level, section, phone (optional), enrollment_date (optional)",
+            "student_id, first_name, last_name, email, department_code (must match an existing department code)",
         templateHeaders: [
             "student_id",
             "first_name",
             "last_name",
             "email",
-            "department_id",
-            "department_name",
-            "level",
-            "section",
+            "department_code",
             "phone",
-            "enrollment_date",
+            "date_of_birth",
         ],
-        note: "A credentials file is downloaded after a successful student import.",
+        note: "department_code must match a department imported earlier (unique code). level and section are optional. A credentials file downloads after a successful import.",
     },
     {
         value: "enrollments",
@@ -418,11 +421,12 @@ export default function ImportExcel({
 
         if (selectedOption.value === "section-teachers") {
             const hasTeacherIdentifier =
-                normalizedPreviewHeaders.includes("teacher_ids") ||
-                normalizedPreviewHeaders.includes("teacher_id");
+                normalizedPreviewHeaders.includes("teacher_code") ||
+                normalizedPreviewHeaders.includes("teacher_id") ||
+                normalizedPreviewHeaders.includes("teacher_ids");
             if (hasTeacherIdentifier) {
                 missing = missing.filter(
-                    (header) => normalizeHeader(header) !== "teacher_ids",
+                    (header) => normalizeHeader(header) !== "teacher_code",
                 );
             }
         }
@@ -450,7 +454,7 @@ export default function ImportExcel({
             const normalized = normalizeHeader(header);
             if (
                 selectedOption.value === "section-teachers" &&
-                normalized === "teacher_id"
+                (normalized === "teacher_id" || normalized === "teacher_ids")
             ) {
                 return false;
             }

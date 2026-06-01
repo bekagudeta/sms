@@ -19,7 +19,6 @@ class Student extends Model
         'phone',
         'level',
         'section',
-        'grade',
         'status',
         'enrollment_date',
     ];

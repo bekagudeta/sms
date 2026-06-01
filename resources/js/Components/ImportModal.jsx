@@ -79,6 +79,7 @@ export default function ImportModal({
                 "weekly_hours",
                 "prerequisites",
             ],
+            teacher_code: ["teacher_code", "teacher_id", "teacher_ids"],
         };
 
         allFields.forEach((field) => {

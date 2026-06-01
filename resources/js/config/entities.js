@@ -14,8 +14,8 @@ export const ENTITY_CONFIG = {
       { key: "section", label: "Section", sortable: true },
       { key: "phone", label: "Phone", sortable: true }
     ],
-    requiredColumns: ["student_id", "first_name", "last_name", "email"],
-    optionalColumns: ["level", "section", "phone", "department_id"],
+    requiredColumns: ["student_id", "first_name", "last_name", "email", "department_code"],
+    optionalColumns: ["level", "section", "phone", "date_of_birth", "enrollment_date", "department_id"],
     apiEndpoint: "/api/students",
     routePrefix: "students",
     permissions: {
@@ -259,8 +259,8 @@ export const ENTITY_CONFIG = {
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
       { key: "teacher.full_name", label: "Teacher", sortable: true, searchable: true }
     ],
-    requiredColumns: ["section_id", "teacher_ids"],
-    optionalColumns: ["teacher_id", "append"],
+    requiredColumns: ["course_code", "semester_code", "section_name", "teacher_code"],
+    optionalColumns: ["append"],
     apiEndpoint: "/api/section-teachers",
     routePrefix: "section-teachers",
     permissions: {

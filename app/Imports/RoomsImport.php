@@ -21,13 +21,20 @@ class RoomsImport implements ToCollection, WithHeadingRow, WithValidation
 
         foreach ($rows as $index => $row) {
 
-            if (empty($row['room_code'])) {
+            $roomCode = trim((string) ($row['room_code'] ?? ''));
+            $building = trim((string) ($row['building'] ?? ''));
+
+            if ($roomCode === '' && $building === '') {
                 continue;
+            }
+
+            if ($roomCode === '' && $building !== '') {
+                $roomCode = $this->deriveRoomCode($building, (int) ($row['floor'] ?? 0));
             }
 
             try {
                 $batch[] = [
-                    'room_code' => trim((string) $row['room_code']),
+                    'room_code' => $roomCode,
                     'building' => trim((string) ($row['building'] ?? '')),
                     'floor' => (int) ($row['floor'] ?? 0),
                     'capacity' => (int) ($row['capacity'] ?? 0),
@@ -85,6 +92,43 @@ class RoomsImport implements ToCollection, WithHeadingRow, WithValidation
     protected function toBoolean($value): bool
     {
         return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'y'], true);
+    }
+
+    protected function deriveRoomCode(string $building, int $floor): string
+    {
+        return preg_replace('/\s+/', '-', $building).'-'.$floor;
+    }
+
+    public function prepareForValidation($data, $index)
+    {
+        $roomCode = trim((string) ($data['room_code'] ?? ''));
+        $building = trim((string) ($data['building'] ?? ''));
+
+        if ($roomCode === '' && $building === '') {
+            return null;
+        }
+
+        if ($roomCode === '' && $building !== '') {
+            $roomCode = $this->deriveRoomCode($building, (int) ($data['floor'] ?? 0));
+        }
+
+        $data['room_code'] = $roomCode;
+
+        if ($building !== '') {
+            $data['building'] = $building;
+        }
+
+        if (isset($data['type']) && $data['type'] !== '') {
+            $data['type'] = strtolower(trim((string) $data['type']));
+        }
+
+        foreach (['floor', 'capacity', 'computer_count'] as $field) {
+            if (isset($data[$field]) && $data[$field] !== '' && $data[$field] !== null) {
+                $data[$field] = (int) $data[$field];
+            }
+        }
+
+        return $data;
     }
 
     public function rules(): array
