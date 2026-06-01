@@ -166,6 +166,7 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
         const configs = {
             students: {
                 email: { type: 'email', label: 'Email Address' },
+                academic_section: { type: 'text', label: 'Academic Section (cohort, e.g. SE-3A)' },
                 level: {
                     type: 'select',
                     options: relatedOptions.levels || [
@@ -283,7 +284,7 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                 },
                 section_id: {
                     type: 'select',
-                    label: 'Section',
+                    label: 'Course Section',
                     options: (relatedOptions.sections || []).map(section => ({ value: section.id, label: section.label }))
                 },
                 enrolled_at: { type: 'date', label: 'Enrolled At' },

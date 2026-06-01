@@ -12,7 +12,7 @@ export default function Edit({ student, departments }) {
         phone: student.phone || '',
         department_id: student.department_id || '',
         level: student.level || '',
-        section: student.section || '',
+        academic_section: student.academic_section || student.section || '',
         grade: student.grade || '',
         status: student.status || '',
         enrollment_date: student.enrollment_date ? student.enrollment_date.split(' ')[0] : ''
@@ -31,7 +31,7 @@ export default function Edit({ student, departments }) {
         { name: 'phone', label: 'Phone', type: 'text' },
         { name: 'department_id', label: 'Department', type: 'select', required: false, options: departments.map(dept => ({ value: dept.id, label: dept.name })) },
         { name: 'level', label: 'Level', type: 'text' },
-        { name: 'section', label: 'Section', type: 'text' },
+        { name: 'academic_section', label: 'Academic Section (cohort)', type: 'text', required: true },
         { name: 'grade', label: 'Grade', type: 'number', min: 1, max: 12 },
         { name: 'status', label: 'Status', type: 'select', options: [
             { value: 'active', label: 'Active' },

@@ -565,8 +565,8 @@ class SchedulingEngine
         $course = $section->courseOffering->course;
         $requiredCapacity = $section->capacity;
         $requiredRoomType = $this->getRequiredRoomType($course);
-        
-        return $rooms->filter(function ($room) use ($requiredCapacity, $requiredRoomType) {
+
+        $eligibleRooms = $rooms->filter(function ($room) use ($requiredCapacity, $requiredRoomType) {
             if ($room->capacity < $requiredCapacity) {
                 return false;
             }
@@ -584,9 +584,16 @@ class SchedulingEngine
             if ($requiredRoomType === 'lecture') {
                 return in_array($roomType, ['lecture', 'seminar', 'conference'], true);
             }
-            
             return $roomType === $requiredRoomType;
-        });
+        })->values();
+
+        if ($eligibleRooms->isNotEmpty()) {
+            return $eligibleRooms;
+        }
+
+        return $rooms->filter(function ($room) use ($requiredCapacity) {
+            return $room->capacity >= $requiredCapacity;
+        })->values();
     }
 
     /**

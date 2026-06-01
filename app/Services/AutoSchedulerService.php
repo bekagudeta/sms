@@ -143,18 +143,27 @@ class AutoSchedulerService
                 $engineUsed = 'advanced';
             }
 
-            if (! $coverage['complete']) {
+            $validationErrors = [];
+            if ($coverage['complete']) {
+                $validationErrors = $this->validateGeneratedSchedule($finalSchedule);
+                if (! empty($validationErrors)) {
+                    $this->conflictDetails = $validationErrors;
+                    throw new \Exception('Generated schedule has conflicts: '.$validationErrors[0]['message']);
+                }
+            } else {
                 $this->conflictDetails = $coverage['missing'];
-                throw new \Exception($this->formatIncompleteScheduleMessage($coverage));
-            }
-
-            $validationErrors = $this->validateGeneratedSchedule($finalSchedule);
-            if (! empty($validationErrors)) {
-                $this->conflictDetails = $validationErrors;
-                throw new \Exception('Generated schedule has conflicts: '.$validationErrors[0]['message']);
+                Log::warning('Partial schedule generated for semester '.$this->semesterId, [
+                    'missing_sections' => count($coverage['missing']),
+                    'scheduled_slots' => $coverage['scheduled_slots'],
+                    'required_slots' => $coverage['required_slots'],
+                ]);
             }
 
             $finalSchedule = $this->normalizeScheduleEntries($finalSchedule);
+            if (empty($finalSchedule)) {
+                throw new \Exception($this->formatIncompleteScheduleMessage($coverage));
+            }
+
             $scheduledSectionIds = collect($finalSchedule)->pluck('section_id')->unique();
             $this->sectionAssignments = $scheduledSectionIds->mapWithKeys(function ($id) {
                 return [$id => true];
@@ -171,16 +180,18 @@ class AutoSchedulerService
             DB::commit();
 
             return [
-                'success' => true,
-                'message' => 'Schedule generated successfully using '.$engineUsed.' engine',
+                'success' => ! empty($finalSchedule),
+                'message' => $coverage['complete']
+                    ? 'Schedule generated successfully using '.$engineUsed.' engine'
+                    : 'Partial schedule generated using '.$engineUsed.' engine: '.$coverage['scheduled_slots'].' of '.$coverage['required_slots'].' required weekly slots were scheduled; '.count($coverage['missing']).' section(s) are incomplete.',
                 'scheduled' => count($finalSchedule),
                 'total_sections' => $this->totalSectionCount,
                 'scheduled_sections' => $scheduledSectionIds->count(),
                 'required_slots' => $coverage['required_slots'],
                 'scheduled_slots' => $coverage['scheduled_slots'],
-                'conflicts' => 0,
+                'conflicts' => ! $coverage['complete'] ? count($coverage['missing']) : 0,
                 'day_distribution' => $this->getDayDistributionStats(),
-                'partial_schedule' => false,
+                'partial_schedule' => ! $coverage['complete'],
                 'engine' => $engineUsed,
                 'execution_time' => round(microtime(true) - $this->startTime, 2),
             ];
@@ -331,12 +342,19 @@ class AutoSchedulerService
             }
 
             if (! $this->isRoomSuitableForCourse($room, $section->courseOffering->course)) {
-                $errors[] = [
-                    'type' => 'room_type',
-                    'section_id' => $section->id,
-                    'room_id' => $room->id,
-                    'message' => "Room {$room->room_code} is not suitable for {$section->courseOffering->course->course_name}.",
-                ];
+                $hasExactRoomMatch = $this->rooms->contains(function ($candidate) use ($section) {
+                    return $candidate->capacity >= $section->capacity
+                        && $this->isRoomSuitableForCourse($candidate, $section->courseOffering->course);
+                });
+
+                if ($hasExactRoomMatch) {
+                    $errors[] = [
+                        'type' => 'room_type',
+                        'section_id' => $section->id,
+                        'room_id' => $room->id,
+                        'message' => "Room {$room->room_code} is not suitable for {$section->courseOffering->course->course_name}.",
+                    ];
+                }
             }
 
             foreach ($section->teachers as $teacher) {
@@ -451,17 +469,7 @@ class AutoSchedulerService
                     break;
                 }
 
-                // Check teacher availability
-                $teacherAvailable = true;
-                foreach ($section->teachers as $teacher) {
-                    $key = $teacher->id.'_'.$timeslot->id;
-                    if (isset($usedTeacherTimeslots[$key])) {
-                        $teacherAvailable = false;
-                        break;
-                    }
-                }
-
-                if (! $teacherAvailable) {
+                if (! $this->isTimeslotValid($section, $course, $timeslot)) {
                     continue;
                 }
 
@@ -471,10 +479,8 @@ class AutoSchedulerService
                     if ($potentialRoom->capacity >= $section->capacity) {
                         $roomKey = $potentialRoom->id.'_'.$timeslot->id;
                         if (! isset($usedRoomTimeslots[$roomKey])) {
-                            if ($this->isRoomSuitableForCourse($potentialRoom, $course)) {
-                                $room = $potentialRoom;
-                                break;
-                            }
+                            $room = $potentialRoom;
+                            break;
                         }
                     }
                 }
@@ -494,6 +500,14 @@ class AutoSchedulerService
                     foreach ($section->teachers as $teacher) {
                         $teacherKey = $teacher->id.'_'.$timeslot->id;
                         $usedTeacherTimeslots[$teacherKey] = true;
+                        $this->teacherTimeslotMap[$teacher->id][$timeslot->id] = true;
+                        $this->teacherHours[$teacher->id] = ($this->teacherHours[$teacher->id] ?? 0) + 1;
+                    }
+
+                    $this->roomTimeslotMap[$room->id][$timeslot->id] = true;
+
+                    foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
+                        $this->studentTimeslotMap[$studentId][$timeslot->id] = true;
                     }
 
                     $assignedSlots++;
@@ -964,9 +978,6 @@ class AutoSchedulerService
             if ($room->capacity < $section->capacity) {
                 continue;
             }
-            if (! $this->isRoomSuitableForCourse($room, $course)) {
-                continue;
-            }
             if ($this->hasRoomConflictInMemory($room, $timeslot)) {
                 continue;
             }
@@ -1155,10 +1166,9 @@ class AutoSchedulerService
                 throw new \Exception('Cannot schedule section '.$section->section_name.' because it has no teacher assigned.');
             }
 
-            $hasEligibleRoom = $this->getEligibleRooms($section->courseOffering->course)
-                ->contains(function ($room) use ($section) {
-                    return $room->capacity >= $section->capacity;
-                });
+            $hasEligibleRoom = $this->rooms->contains(function ($room) use ($section) {
+                return $room->capacity >= $section->capacity;
+            });
 
             if (! $hasEligibleRoom) {
                 throw new \Exception('Cannot schedule section '.$section->section_name.' because no eligible room with enough capacity exists for '.$section->courseOffering->course->course_name.'.');
@@ -1168,9 +1178,26 @@ class AutoSchedulerService
 
     protected function getEligibleRooms($course)
     {
-        return $this->rooms->filter(function ($room) use ($course) {
+        $eligibleRooms = $this->rooms->filter(function ($room) use ($course) {
             return $this->isRoomSuitableForCourse($room, $course);
         })->values();
+
+        if ($eligibleRooms->isNotEmpty()) {
+            return $eligibleRooms;
+        }
+
+        $fallbackRooms = $this->rooms->values();
+
+        if ($fallbackRooms->isNotEmpty()) {
+            Log::warning('No exact room type match found for course; using capacity-based fallback rooms.', [
+                'course_id' => $course->id ?? null,
+                'course_name' => $course->course_name ?? null,
+                'required_room_type' => $this->getRequiredRoomType($course),
+                'fallback_rooms' => $fallbackRooms->pluck('room_code')->all(),
+            ]);
+        }
+
+        return $fallbackRooms;
     }
 
     protected function hasAnyTeacherConflict($section, $timeslot)

@@ -18,7 +18,7 @@ class Student extends Model
         'email',
         'phone',
         'level',
-        'section',
+        'academic_section',
         'status',
         'enrollment_date',
     ];

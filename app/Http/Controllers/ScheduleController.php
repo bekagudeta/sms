@@ -387,15 +387,8 @@ class ScheduleController extends Controller
         $result = $this->autoSchedulerService->generateSchedule($semesterId);
 
         if ($result['success']) {
-            $scheduledSections = $result['scheduled_sections'] ?? 0;
-            $totalSections = $result['total_sections'] ?? 0;
-            $scheduledSlots = $result['scheduled_slots'] ?? $result['scheduled'] ?? 0;
-            $requiredSlots = $result['required_slots'] ?? $scheduledSlots;
-            $engine = $result['engine'] ?? 'automatic';
-            $message = "Complete semester schedule generated with {$engine} engine: {$scheduledSections}/{$totalSections} sections and {$scheduledSlots}/{$requiredSlots} weekly slots scheduled.";
-
-            return redirect()->route('schedules.index')
-                ->with('success', $message);
+            return redirect()->route('schedules.generate.show')
+                ->with('success', $result['message'] ?? 'Schedule generated successfully');
         }
 
         return back()->with('error', $result['message'] ?? 'Schedule generation failed');

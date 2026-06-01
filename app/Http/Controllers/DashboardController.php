@@ -106,8 +106,9 @@ class DashboardController extends Controller
                                 'email' => $user->email,
                                 'first_name' => explode(' ', trim($user->name))[0] ?? null,
                                 'last_name' => trim(str_replace(explode(' ', trim($user->name))[0] ?? '', '', $user->name)),
-                                'semester' => 1,
-                                'section' => 'A',
+                                'academic_section' => 'Unassigned',
+                                'department_id' => Department::query()->value('id'),
+                                'enrollment_date' => now(),
                             ]
                         );
                     }
@@ -242,12 +243,6 @@ class DashboardController extends Controller
                     ->take(5)
                     ->get();
 
-                if ($recentSchedules->isEmpty()) {
-                    $recentSchedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
-                        ->latest()
-                        ->take(5)
-                        ->get();
-                }
             } catch (\Exception $e) {
                 // Log the error for debugging but don't expose it to the user
                 \Log::error('Error building student schedule query: ' . $e->getMessage(), [
@@ -263,10 +258,38 @@ class DashboardController extends Controller
             }
         }
 
+        $studentProfile = null;
+        $enrolledCourses = [];
+
+        if ($student) {
+            $student->load(['department', 'enrollments.section.courseOffering.course', 'enrollments.section.courseOffering.semester']);
+
+            $studentProfile = [
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'academic_section' => $student->academic_section,
+                'department' => $student->department?->name,
+            ];
+
+            $enrolledCourses = $student->enrollments->map(function ($enrollment) {
+                $section = $enrollment->section;
+                $course = $section?->courseOffering?->course;
+
+                return [
+                    'course_code' => $course?->course_code,
+                    'course_name' => $course?->course_name,
+                    'section_name' => $section?->section_name,
+                    'semester' => $section?->courseOffering?->semester?->name,
+                ];
+            })->filter(fn ($row) => $row['course_code'])->values()->all();
+        }
+
         return Inertia::render('Dashboard/Index', [
             'stats' => $stats,
             'recentSchedules' => $recentSchedules,
             'role' => $role,
+            'studentProfile' => $studentProfile,
+            'enrolledCourses' => $enrolledCourses,
         ]);
     }
 
@@ -291,7 +314,8 @@ class DashboardController extends Controller
                 'first_name' => explode(' ', trim($user->name))[0] ?? null,
                 'last_name' => trim(str_replace(explode(' ', trim($user->name))[0] ?? '', '', $user->name)),
                 'semester' => 1,
-                'section' => 'A'
+                'academic_section' => 'Unassigned',
+                'enrollment_date' => now(),
             ]);
         }
 
@@ -324,19 +348,12 @@ class DashboardController extends Controller
             }
         }
 
-        // Flexible section filtering - try exact match first, then partial match
-        if (!empty($student->section)) {
-            $query->where(function ($q) use ($student) {
-                // Exact match
-                $q->whereHas('section', function ($subQ) use ($student) {
-                    $subQ->where('section_name', $student->section);
-                });
-                
-                // Partial match for sections like "BSSE-1B" containing "B"
-                $q->orWhereHas('section', function ($subQ) use ($student) {
-                    $subQ->where('section_name', 'like', '%' . $student->section . '%');
-                });
-            });
+        $enrolledSectionIds = $student->enrollments()->pluck('section_id');
+
+        if ($enrolledSectionIds->isNotEmpty()) {
+            $query->whereIn('section_id', $enrolledSectionIds);
+        } else {
+            $query->whereRaw('1 = 0');
         }
 
         return $query;
@@ -361,7 +378,7 @@ class DashboardController extends Controller
             'role' => 'required|exists:roles,name',
             'department_id' => 'required_if:role,student,teacher|nullable|exists:departments,id',
             'level' => 'required_if:role,student|nullable|string',
-            'section' => 'required_if:role,student|nullable|string',
+            'academic_section' => 'required_if:role,student|nullable|string|max:50',
             'max_hours_per_week' => 'required_if:role,teacher|nullable|integer|min:1|max:40',
         ]);
 
@@ -390,7 +407,7 @@ class DashboardController extends Controller
                     'department_id' => $validated['department_id'],
                     'semester' => 1, // Default to first semester
                     'level' => $validated['level'],
-                    'section' => $validated['section'],
+                    'academic_section' => $validated['academic_section'],
                     'enrollment_date' => now()->toDateString(),
                 ]);
             } elseif ($validated['role'] === 'teacher') {

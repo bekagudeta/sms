@@ -86,4 +86,9 @@ class Section extends Model
     {
         return $this->capacity - $this->getEnrolledCountAttribute();
     }
+
+    public function getImportSectionCodeAttribute(): string
+    {
+        return \App\Support\CourseSectionResolver::buildSectionCode($this);
+    }
 }

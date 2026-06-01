@@ -10,7 +10,7 @@ export default function CreateUser({ roles, departments }) {
         role: '',
         department_id: '',
         level: '',
-        section: '',
+        academic_section: '',
         max_hours_per_week: ''
     });
 
@@ -74,9 +74,9 @@ export default function CreateUser({ roles, departments }) {
                                         {errors.level && <p className="text-red-500 text-sm mt-1">{errors.level}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
-                                        <input type="text" value={data.section} onChange={e => setData('section', e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
-                                        {errors.section && <p className="text-red-500 text-sm mt-1">{errors.section}</p>}
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Academic Section (cohort)</label>
+                                        <input type="text" value={data.academic_section} onChange={e => setData('academic_section', e.target.value)} className="w-full px-3 py-2 border rounded-md" required placeholder="e.g. SE-3A" />
+                                        {errors.academic_section && <p className="text-red-500 text-sm mt-1">{errors.academic_section}</p>}
                                     </div>
                                 </>
                             )}

@@ -8,7 +8,7 @@ import SchedulerDashboard from '@/pages/Dashboard/Scheduler';
 import TeacherDashboard from '@/pages/Dashboard/Teacher';
 import StudentDashboard from '@/pages/Dashboard/Student';
 
-export default function Dashboard({ stats, recentSchedules, role }) {
+export default function Dashboard({ stats, recentSchedules, role, studentProfile, enrolledCourses }) {
     // choose sub-view based on role passed from controller
     let content;
 
@@ -23,7 +23,13 @@ export default function Dashboard({ stats, recentSchedules, role }) {
             content = <TeacherDashboard recentSchedules={recentSchedules} />;
             break;
         default:
-            content = <StudentDashboard recentSchedules={recentSchedules} />;
+            content = (
+                <StudentDashboard
+                    recentSchedules={recentSchedules}
+                    studentProfile={studentProfile}
+                    enrolledCourses={enrolledCourses}
+                />
+            );
             break;
     }
 

@@ -60,7 +60,7 @@ class RegisteredUserController extends Controller
                     'department_id' => \App\Models\Department::first()?->id ?? 1,
                     'semester' => 1,
                     'level' => 'undergraduate',
-                    'section' => 'A',
+                    'academic_section' => 'Unassigned',
                     'enrollment_date' => now()->toDateString(),
                 ]);
             } catch (\Exception $e) {

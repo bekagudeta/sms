@@ -23,7 +23,7 @@ class StoreUserRequest extends FormRequest
         if ($this->input('role') === 'student') {
             $rules['department_id'] = 'required|exists:departments,id';
             $rules['level'] = 'required|integer|min:1';
-            $rules['section'] = 'required|string|max:10';
+            $rules['academic_section'] = 'required|string|max:50';
         }
 
         return $rules;

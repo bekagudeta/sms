@@ -38,7 +38,7 @@ class FixStudentUserIntegrity extends Command
                     'user_id' => $user->id,
                     'department_id' => null, // Set to a default or prompt
                     'level' => null,         // Set to a default or prompt
-                    'section' => null,       // Set to a default or prompt
+                    'academic_section' => 'Unassigned',
                 ]);
                 $this->info("Created students record for user ID {$user->id} ({$user->name})");
             }

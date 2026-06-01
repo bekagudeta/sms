@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\Enrollment;
 use App\Models\Section;
 use App\Models\Student;
+use App\Support\CourseSectionResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,7 +35,6 @@ class EnrollmentsImport implements SkipsOnFailure, ToCollection, WithHeadingRow,
             }
 
             DB::commit();
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Enrollment import failed: '.$e->getMessage());
@@ -42,64 +42,91 @@ class EnrollmentsImport implements SkipsOnFailure, ToCollection, WithHeadingRow,
         }
     }
 
-    private function processRow($row, $rowNumber)
+    private function processRow($row, int $rowNumber): void
     {
-        $rowData = $row->toArray();
+        $rowData = $row instanceof Collection ? $row->toArray() : (array) $row;
 
-        if (empty(array_filter($rowData))) {
+        if (empty(array_filter($rowData, fn ($v) => trim((string) $v) !== ''))) {
             return;
         }
 
         $studentIdentifier = trim((string) ($rowData['student_id'] ?? ''));
-        $sectionIdentifier = trim((string) ($rowData['section_id'] ?? ''));
+        $academicSection = trim((string) ($rowData['academic_section'] ?? ''));
+        $courseCode = trim((string) ($rowData['course_code'] ?? ''));
+        $semesterCode = trim((string) ($rowData['semester_code'] ?? ''));
+        $sectionName = trim((string) ($rowData['section_name'] ?? ''));
+        $sectionCode = trim((string) ($rowData['section_code'] ?? ''));
+        $sectionId = trim((string) ($rowData['section_id'] ?? ''));
         $enrolledAt = trim((string) ($rowData['enrolled_at'] ?? '')) ?: null;
         $studentCodeValue = trim((string) ($rowData['student_code_value'] ?? $rowData['student_code'] ?? '')) ?: null;
 
-        if (! $studentIdentifier || ! $sectionIdentifier) {
-            $this->errors[] = "Row {$rowNumber}: Both student_id and section_id are required";
-
-            return;
-        }
-
-        $student = $this->findStudent($studentIdentifier, $rowNumber);
-        if (! $student) {
-            return;
-        }
-
-        $section = $this->findExistingSection($sectionIdentifier, $rowNumber);
-        if (! $section) {
-            return;
-        }
-
-        $this->createOrUpdateEnrollment(
-            $student->id,
-            $section->id,
-            $studentCodeValue ?? $student->student_id,
-            $enrolledAt,
+        $section = CourseSectionResolver::resolve(
+            $courseCode,
+            $semesterCode,
+            $sectionName,
+            $sectionCode,
+            $sectionId,
         );
 
-        $this->rowCount++;
+        if (! $section) {
+            $this->errors[] = "Row {$rowNumber}: Course section not found. Use course_code + semester_code + section_name (e.g. CS101, F2024, A), or section_code (e.g. CS101_F2024_A). Import course sections before enrollments.";
+
+            return;
+        }
+
+        if ($studentIdentifier !== '') {
+            $student = $this->findStudent($studentIdentifier, $rowNumber);
+            if (! $student) {
+                return;
+            }
+
+            $this->createOrUpdateEnrollment(
+                $student->id,
+                $section->id,
+                $studentCodeValue ?? $student->student_id,
+                $enrolledAt,
+            );
+
+            $this->rowCount++;
+
+            return;
+        }
+
+        if ($academicSection === '') {
+            $this->errors[] = "Row {$rowNumber}: Provide student_id for one student, or academic_section to enroll an entire cohort.";
+
+            return;
+        }
+
+        $students = Student::where('academic_section', $academicSection)
+            ->orWhereRaw('LOWER(academic_section) = ?', [strtolower($academicSection)])
+            ->get();
+
+        if ($students->isEmpty()) {
+            $this->errors[] = "Row {$rowNumber}: No students found in academic_section '{$academicSection}'.";
+
+            return;
+        }
+
+        foreach ($students as $student) {
+            $this->createOrUpdateEnrollment(
+                $student->id,
+                $section->id,
+                $studentCodeValue ?? $student->student_id,
+                $enrolledAt,
+            );
+            $this->rowCount++;
+        }
     }
 
-    private function findStudent($identifier, $rowNumber)
+    private function findStudent(string $identifier, int $rowNumber): ?Student
     {
         $student = Student::where('student_id', $identifier)
             ->orWhereRaw('LOWER(student_id) = ?', [strtolower($identifier)])
             ->first();
 
         if (! $student && preg_match('/^\d+$/', $identifier)) {
-            $padded = str_pad($identifier, 4, '0', STR_PAD_LEFT);
-            $student = Student::where('student_id', 'STU'.$padded)
-                ->orWhere('student_id', 'STU'.ltrim($identifier, '0'))
-                ->first();
-
-            if (! $student) {
-                $student = Student::find((int) $identifier);
-            }
-        }
-
-        if (! $student && stripos($identifier, 'STU') !== 0 && ! preg_match('/^\d+$/', $identifier)) {
-            $student = Student::where('student_id', 'STU'.strtoupper($identifier))->first();
+            $student = Student::find((int) $identifier);
         }
 
         if (! $student && filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
@@ -107,35 +134,13 @@ class EnrollmentsImport implements SkipsOnFailure, ToCollection, WithHeadingRow,
         }
 
         if (! $student) {
-            $this->errors[] = "Row {$rowNumber}: Student '{$identifier}' not found";
+            $this->errors[] = "Row {$rowNumber}: Student '{$identifier}' not found.";
         }
 
         return $student;
     }
 
-    private function findExistingSection($identifier, $rowNumber)
-    {
-        if (is_numeric($identifier)) {
-            $section = Section::find((int) $identifier);
-            if ($section) {
-                return $section;
-            }
-        }
-
-        $section = Section::where('section_name', $identifier)
-            ->orWhereRaw('LOWER(section_name) = ?', [strtolower($identifier)])
-            ->first();
-
-        if ($section) {
-            return $section;
-        }
-
-        $this->errors[] = "Row {$rowNumber}: Section '{$identifier}' not found. Import sections before enrollments.";
-
-        return null;
-    }
-
-    private function createOrUpdateEnrollment($studentId, $sectionId, $studentCode = null, $enrolledAt = null)
+    private function createOrUpdateEnrollment(int $studentId, int $sectionId, ?string $studentCode = null, ?string $enrolledAt = null): void
     {
         $existing = Enrollment::where('student_id', $studentId)
             ->where('section_id', $sectionId)
@@ -154,29 +159,36 @@ class EnrollmentsImport implements SkipsOnFailure, ToCollection, WithHeadingRow,
 
             $existing->touch();
             $existing->save();
-        } else {
-            $createData = [
-                'student_id' => $studentId,
-                'section_id' => $sectionId,
-            ];
 
-            if ($hasStudentCode && $studentCode) {
-                $createData['student_code'] = $studentCode;
-            }
-
-            if ($enrolledAt) {
-                $createData['enrolled_at'] = $enrolledAt;
-            }
-
-            Enrollment::create($createData);
+            return;
         }
+
+        $createData = [
+            'student_id' => $studentId,
+            'section_id' => $sectionId,
+        ];
+
+        if ($hasStudentCode && $studentCode) {
+            $createData['student_code'] = $studentCode;
+        }
+
+        if ($enrolledAt) {
+            $createData['enrolled_at'] = $enrolledAt;
+        }
+
+        Enrollment::create($createData);
     }
 
     public function rules(): array
     {
         return [
-            '*.student_id' => 'required|string',
-            '*.section_id' => 'required|string',
+            '*.student_id' => 'nullable|string',
+            '*.academic_section' => 'nullable|string',
+            '*.course_code' => 'nullable|string',
+            '*.semester_code' => 'nullable|string',
+            '*.section_name' => 'nullable|string',
+            '*.section_code' => 'nullable|string',
+            '*.section_id' => 'nullable',
             '*.enrolled_at' => 'nullable|date',
             '*.student_code_value' => 'nullable|string',
         ];
@@ -184,24 +196,20 @@ class EnrollmentsImport implements SkipsOnFailure, ToCollection, WithHeadingRow,
 
     public function prepareForValidation($data, $index)
     {
-        if (empty($data['student_id']) && empty($data['section_id'])) {
+        $hasStudent = ! empty(trim((string) ($data['student_id'] ?? '')));
+        $hasCohort = ! empty(trim((string) ($data['academic_section'] ?? '')));
+        $hasComposite = ! empty(trim((string) ($data['course_code'] ?? '')))
+            && ! empty(trim((string) ($data['semester_code'] ?? '')))
+            && ! empty(trim((string) ($data['section_name'] ?? '')));
+        $hasSectionCode = ! empty(trim((string) ($data['section_code'] ?? '')));
+        $hasSectionId = ! empty(trim((string) ($data['section_id'] ?? '')));
+
+        if (! $hasStudent && ! $hasCohort) {
             return null;
         }
 
-        if (isset($data['student_id'])) {
-            $data['student_id'] = trim((string) $data['student_id']);
-        }
-
-        if (isset($data['section_id'])) {
-            $data['section_id'] = trim((string) $data['section_id']);
-        }
-
-        if (isset($data['enrolled_at'])) {
-            $data['enrolled_at'] = trim((string) $data['enrolled_at']);
-        }
-
-        if (isset($data['student_code_value'])) {
-            $data['student_code_value'] = trim((string) $data['student_code_value']);
+        if (! $hasComposite && ! $hasSectionCode && ! $hasSectionId) {
+            return null;
         }
 
         return $data;

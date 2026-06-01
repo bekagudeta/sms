@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->foreignId('department_id')->constrained();
             $table->string('level')->nullable();
-            $table->string('section')->required();
+            $table->string('academic_section');
             $table->enum('status', ['active', 'inactive', 'pending', 'graduated', 'suspended'])
                 ->default('active');
             $table->date('enrollment_date');

@@ -160,28 +160,35 @@ const fallbackImportOptions = [
         description: "Create student records and login credentials.",
         dependencies: ["departments"],
         requiredColumns:
-            "student_id, first_name, last_name, email, department_code (must match an existing department code)",
+            "student_id, first_name, last_name, email, department_code, academic_section (cohort e.g. SE-3A)",
         templateHeaders: [
             "student_id",
             "first_name",
             "last_name",
             "email",
             "department_code",
+            "academic_section",
             "phone",
-            "date_of_birth",
         ],
-        note: "department_code must match a department imported earlier (unique code). level and section are optional. A credentials file downloads after a successful import.",
+        note: "academic_section is the student's homeroom/cohort (SE-3A), not a course class. department_code must exist in Departments. Credentials download after import.",
     },
     {
         value: "enrollments",
         label: "Enrollments",
         category: "Student Demand",
         description:
-            "Link students to sections so the system can prevent student conflicts.",
+            "Enroll students in course sections (classes) for timetable conflict detection.",
         dependencies: ["students", "sections"],
-        requiredColumns: "student_id, section_id (or section_name)",
-        templateHeaders: ["student_id", "section_id"],
-        note: "Recommended for conflict-free scheduling; this powers student conflict detection.",
+        requiredColumns:
+            "student_id + course_code + semester_code + section_name (or section_code; or academic_section for whole cohort)",
+        templateHeaders: [
+            "student_id",
+            "course_code",
+            "semester_code",
+            "section_name",
+            "academic_section",
+        ],
+        note: "Course sections are classes (e.g. CS101 / F2024 / A). Leave student_id blank and set academic_section to enroll every student in that cohort.",
     },
 ];
 
@@ -427,6 +434,43 @@ export default function ImportExcel({
             if (hasTeacherIdentifier) {
                 missing = missing.filter(
                     (header) => normalizeHeader(header) !== "teacher_code",
+                );
+            }
+        }
+
+        if (selectedOption.value === "students") {
+            if (
+                hasAnyHeader(["academic_section", "section"])
+            ) {
+                missing = missing.filter((header) => {
+                    const key = normalizeHeader(header);
+                    return !["academic_section", "section"].includes(key);
+                });
+            }
+        }
+
+        if (selectedOption.value === "enrollments") {
+            const hasCourseSection =
+                hasAnyHeader(["course_code"]) &&
+                hasAnyHeader(["semester_code"]) &&
+                hasAnyHeader(["section_name"]);
+
+            if (hasCourseSection) {
+                missing = missing.filter((header) => {
+                    const key = normalizeHeader(header);
+                    return !["course_code", "semester_code", "section_name", "section_code"].includes(
+                        key,
+                    );
+                });
+            } else if (hasAnyHeader(["section_code"])) {
+                missing = missing.filter(
+                    (header) => normalizeHeader(header) !== "section_code",
+                );
+            }
+
+            if (hasAnyHeader(["academic_section"])) {
+                missing = missing.filter(
+                    (header) => normalizeHeader(header) !== "student_id",
                 );
             }
         }
@@ -1105,7 +1149,7 @@ export default function ImportExcel({
                                                 "section-teachers") && (
                                             <div className="rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
                                                 {importType === "enrollments"
-                                                    ? "Import enrollments after students and sections so the scheduler can prevent student timetable conflicts."
+                                                    ? "Enroll students in course sections (classes), not academic cohorts. Import students with academic_section (e.g. SE-3A) first, then course sections, then enrollments."
                                                     : "Assign teachers to sections before generating schedules. Use append=yes if you want to add teachers without replacing current assignments."}
                                             </div>
                                         )}

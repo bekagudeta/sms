@@ -36,6 +36,7 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
         try {
             foreach ($rows as $row) {
                 $department = $this->resolveDepartment($row);
+                $academicSection = $this->resolveAcademicSection($row);
 
                 $user = User::where('email', $row['email'])->first();
 
@@ -54,7 +55,7 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
                     $plainPassword = Str::random(12);
 
                     $user = User::create([
-                        'name' => trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')),
+                        'name' => trim(($row['first_name'] ?? '').' '.($row['last_name'] ?? '')),
                         'email' => $row['email'],
                         'password' => Hash::make($plainPassword, ['rounds' => 8]),
                         'plain_password' => '',
@@ -71,26 +72,24 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
                 }
 
                 Role::firstOrCreate(['name' => 'student', 'guard_name' => 'web']);
-                if (!$user->hasRole('student')) {
+                if (! $user->hasRole('student')) {
                     $user->assignRole('student');
                 }
 
-                $enrollmentDate = $this->parseOptionalDate(
-                    $row['enrollment_date'] ?? $row['date_of_birth'] ?? null
-                ) ?? now();
+                $enrollmentDate = $this->parseOptionalDate($row['enrollment_date'] ?? null) ?? now();
 
                 Student::updateOrCreate(
                     ['student_id' => $row['student_id']],
                     [
-                        'user_id'         => $user->id,
-                        'first_name'      => trim($row['first_name'] ?? ''),
-                        'last_name'       => trim($row['last_name'] ?? ''),
-                        'email'           => trim($row['email'] ?? ''),
-                        'phone'           => $row['phone'] ?? null,
-                        'department_id'   => $department->id,
-                        'status'          => $row['status'] ?? 'active',
-                        'level'           => $this->optionalString($row['level'] ?? null),
-                        'section'         => $this->optionalString($row['section'] ?? null) ?? '',
+                        'user_id' => $user->id,
+                        'first_name' => trim($row['first_name'] ?? ''),
+                        'last_name' => trim($row['last_name'] ?? ''),
+                        'email' => trim($row['email'] ?? ''),
+                        'phone' => $row['phone'] ?? null,
+                        'department_id' => $department->id,
+                        'status' => $row['status'] ?? 'active',
+                        'level' => $this->optionalString($row['level'] ?? null),
+                        'academic_section' => $academicSection,
                         'enrollment_date' => $enrollmentDate,
                     ]
                 );
@@ -108,22 +107,37 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
     public function rules(): array
     {
         return [
-            '*.student_id'      => 'required|string',
-            '*.first_name'      => 'required|string',
-            '*.last_name'       => 'required|string',
-            '*.email'           => 'required|email',
-            '*.department_id'   => 'nullable',
+            '*.student_id' => 'required|string',
+            '*.first_name' => 'required|string',
+            '*.last_name' => 'required|string',
+            '*.email' => 'required|email',
+            '*.department_id' => 'nullable',
             '*.department_code' => 'required_without:*.department_id|nullable|string',
             '*.department_name' => 'nullable|string',
-            '*.level'           => 'nullable|string',
-            '*.section'         => 'required|string',
-            '*.phone'           => 'nullable|string',
-            // Removed strict date validation — handled manually in parseOptionalDate()
-            // because Excel stores dates as numeric serial numbers
+            '*.academic_section' => 'required_without:*.section|nullable|string',
+            '*.section' => 'nullable|string',
+            '*.level' => 'nullable|string',
+            '*.phone' => 'nullable|string',
             '*.enrollment_date' => 'nullable',
-            '*.date_of_birth'   => 'nullable',
-            '*.status'          => 'nullable|string',
+            '*.status' => 'nullable|string',
         ];
+    }
+
+    protected function resolveAcademicSection($row): string
+    {
+        if ($row instanceof Collection) {
+            $row = $row->toArray();
+        }
+
+        $academicSection = trim((string) ($row['academic_section'] ?? $row['section'] ?? ''));
+
+        if ($academicSection === '') {
+            throw new \Exception(
+                "Import failed: academic_section is required for student {$row['student_id']} (e.g. SE-3A). This is the student's cohort, not a course section."
+            );
+        }
+
+        return $academicSection;
     }
 
     protected function resolveDepartment($row): Department
@@ -132,7 +146,7 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
             $row = $row->toArray();
         }
 
-        $departmentId   = trim((string) ($row['department_id'] ?? ''));
+        $departmentId = trim((string) ($row['department_id'] ?? ''));
         $departmentCode = trim((string) ($row['department_code'] ?? ''));
         $departmentName = trim((string) ($row['department_name'] ?? ''));
 
@@ -143,7 +157,7 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
                 $department = Department::whereRaw('LOWER(code) = ?', [Str::lower($departmentId)])->first();
             }
 
-            if (!$department) {
+            if (! $department) {
                 throw new \Exception("Import failed: department_id '{$departmentId}' not found for student {$row['student_id']}.");
             }
 
@@ -152,9 +166,9 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
 
         if ($departmentCode !== '') {
             $department = Department::whereRaw('LOWER(code) = ?', [Str::lower($departmentCode)])->first();
-            if (!$department) {
+            if (! $department) {
                 throw new \Exception(
-                    "Import failed: department_code '{$departmentCode}' not found for student {$row['student_id']}. Import departments first; codes must match exactly (case-insensitive)."
+                    "Import failed: department_code '{$departmentCode}' not found for student {$row['student_id']}. Import departments first."
                 );
             }
 
@@ -163,7 +177,7 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
 
         if ($departmentName !== '') {
             $department = Department::whereRaw('LOWER(name) = ?', [Str::lower($departmentName)])->first();
-            if (!$department) {
+            if (! $department) {
                 throw new \Exception("Import failed: department_name '{$departmentName}' not found for student {$row['student_id']}.");
             }
 
@@ -171,24 +185,16 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
         }
 
         throw new \Exception(
-            "Import failed: department_id, department_code, or department_name is required for student {$row['student_id']}."
+            "Import failed: department_code (or department_id) is required for student {$row['student_id']}."
         );
     }
 
-    /**
-     * Parse a date value that may be:
-     * - An Excel numeric serial number (e.g. 37756)
-     * - A string date (e.g. "2003-05-15", "5/15/2003")
-     * - Already a Carbon instance
-     * - null or empty
-     */
     protected function parseOptionalDate(mixed $value): ?Carbon
     {
         if ($value === null) {
             return null;
         }
 
-        // Handle string values
         if (is_string($value)) {
             $value = trim($value);
             if ($value === '') {
@@ -201,17 +207,16 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
             }
         }
 
-        // Handle Excel numeric serial date (e.g. 37756.0)
         if (is_numeric($value)) {
             try {
                 $dateTime = ExcelDate::excelToDateTimeObject((float) $value);
+
                 return Carbon::instance($dateTime);
             } catch (\Exception $e) {
                 return null;
             }
         }
 
-        // Handle if it's already a DateTime or Carbon instance
         if ($value instanceof \DateTimeInterface) {
             return Carbon::instance($value);
         }

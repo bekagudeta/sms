@@ -101,7 +101,7 @@ class UserSeeder extends Seeder
                 'email' => $student->email,
                 'department_id' => $department->id,
                 'level' => 'Level 1',
-                'section' => 'A',
+                'academic_section' => 'SE-3A',
                 'enrollment_date' => now()->toDateString(),
             ]
         );

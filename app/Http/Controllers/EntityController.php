@@ -526,7 +526,7 @@ class EntityController extends Controller
                 'last_name' => 'required|string|max:100',
                 'email' => 'required|email|max:255|unique:students,email'.($id ? ",{$id}" : ''),
                 'level' => 'nullable|string|max:50',
-                'section' => 'required|string|max:50',
+                'academic_section' => 'required|string|max:50',
                 'phone' => 'nullable|string|max:20',
                 'department_id' => 'required|exists:departments,id',
                 'grade' => 'nullable|integer|min:1|max:12',

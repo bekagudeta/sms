@@ -11,11 +11,11 @@ export const ENTITY_CONFIG = {
       { key: "last_name", label: "Last Name", sortable: true, searchable: true },
       { key: "email", label: "Email", sortable: true, searchable: true },
       { key: "level", label: "Level", sortable: true },
-      { key: "section", label: "Section", sortable: true },
+      { key: "academic_section", label: "Academic Section", sortable: true },
       { key: "phone", label: "Phone", sortable: true }
     ],
-    requiredColumns: ["student_id", "first_name", "last_name", "email", "department_code"],
-    optionalColumns: ["level", "section", "phone", "date_of_birth", "enrollment_date", "department_id"],
+    requiredColumns: ["student_id", "first_name", "last_name", "email", "department_code", "academic_section"],
+    optionalColumns: ["level", "phone", "enrollment_date", "department_id"],
     apiEndpoint: "/api/students",
     routePrefix: "students",
     permissions: {
@@ -237,8 +237,8 @@ export const ENTITY_CONFIG = {
       { key: "enrolled_at", label: "Enrolled Date", sortable: true },
       { key: "student_code_value", label: "Student Code", sortable: true }
     ],
-    requiredColumns: ["student_id", "section_id"],
-    optionalColumns: ["enrolled_at", "student_code_value"],
+    requiredColumns: ["student_id", "course_code", "semester_code", "section_name"],
+    optionalColumns: ["section_code", "academic_section", "enrolled_at", "student_code_value"],
     apiEndpoint: "/api/enrollments",
     routePrefix: "enrollments",
     permissions: {
