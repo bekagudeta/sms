@@ -110,7 +110,8 @@ class SchedulingService
 
     protected function isRoomEligible($room, $section)
     {
-        return $room->capacity >= $section->capacity;
+        return $room->capacity >= $section->capacity
+            && $this->canSectionUseRoom($section, $room);
     }
 
     protected function hasTeacherConflict($section, $timeslot)
@@ -157,7 +158,12 @@ class SchedulingService
             })
             ->count();
 
-        return $hours < $teacher->max_hours_per_week;
+        $maxHours = min(
+            (int) ($teacher->max_hours_per_week ?? config('scheduling.max_teacher_hours_per_week', 38)),
+            (int) config('scheduling.max_teacher_hours_per_week', 38)
+        );
+
+        return $hours < $maxHours;
     }
 
     protected function checkTeacherDailyLoad($teacher, $timeslot, $semesterId)
@@ -175,6 +181,90 @@ class SchedulingService
             ->count();
 
         return $hours < ($teacher->max_hours_per_day ?? 6);
+    }
+
+    protected function canSectionUseRoom($section, $room): bool
+    {
+        $scheduledSections = Schedule::where('room_id', $room->id)
+            ->whereHas('section.courseOffering.course')
+            ->with(['section.courseOffering.course'])
+            ->get()
+            ->pluck('section')
+            ->filter()
+            ->unique('id')
+            ->values();
+
+        if ($scheduledSections->contains('id', $section->id)) {
+            return true;
+        }
+
+        $maxSections = (int) config('scheduling.room_max_sections', 0);
+        if ($maxSections > 0 && $scheduledSections->count() >= $maxSections) {
+            return false;
+        }
+
+        if ($scheduledSections->isEmpty()) {
+            return true;
+        }
+
+        $existingSection = $scheduledSections->first();
+        if (! $existingSection) {
+            return false;
+        }
+
+        if (! $this->isSectionRoomPairCompatible($section, $existingSection)) {
+            return false;
+        }
+
+        $combinedHours = $this->getSectionWeeklyHours($section) + $this->getSectionWeeklyHours($existingSection);
+
+        return $combinedHours <= (int) config('scheduling.room_combined_hours_limit', 38);
+    }
+
+    protected function getSectionWeeklyHours($section): int
+    {
+        return max(1, (int) ($section->courseOffering->course->credits ?? $section->courseOffering->course->hours_per_week ?? 3));
+    }
+
+    protected function getSectionDepartmentId($section): ?int
+    {
+        return $section->courseOffering?->course?->department_id ? (int) $section->courseOffering->course->department_id : null;
+    }
+
+    protected function getSectionBatchKey($section): string
+    {
+        return (string) ($section->courseOffering?->semester_id ?? '');
+    }
+
+    protected function isAdjacentBatch($batchA, $batchB): bool
+    {
+        if (! is_numeric($batchA) || ! is_numeric($batchB)) {
+            return false;
+        }
+
+        return abs((int) $batchA - (int) $batchB) === 1;
+    }
+
+    protected function isSectionRoomPairCompatible($sectionA, $sectionB): bool
+    {
+        $deptA = $this->getSectionDepartmentId($sectionA);
+        $deptB = $this->getSectionDepartmentId($sectionB);
+        $batchA = $this->getSectionBatchKey($sectionA);
+        $batchB = $this->getSectionBatchKey($sectionB);
+
+        if ($deptA === $deptB && $batchA === $batchB) {
+            return true;
+        }
+
+        if ($deptA === $deptB && $this->isAdjacentBatch($batchA, $batchB)) {
+            return true;
+        }
+
+        if ($deptA !== $deptB && $batchA === $batchB) {
+            return true;
+        }
+
+        return false;
     }
 
     public function assignTeacher($scheduleId, $teacherId)
@@ -201,6 +291,13 @@ class SchedulingService
             return [
                 'success' => false,
                 'message' => 'Teacher time conflict'
+            ];
+        }
+
+        if (! $this->checkTeacherWeeklyLoad($teacher, $schedule->section->courseOffering->semester_id)) {
+            return [
+                'success' => false,
+                'message' => 'Teacher has reached the maximum weekly load limit'
             ];
         }
 

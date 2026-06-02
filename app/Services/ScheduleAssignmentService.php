@@ -53,6 +53,21 @@ class ScheduleAssignmentService
                 return ['success' => false, 'message' => 'The selected teacher has another class at this timeslot'];
             }
 
+            $teacherWeeklyLoad = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
+                $q->where('teachers.id', $teacher->id);
+            })->whereHas('section.courseOffering', function ($q) use ($semester) {
+                $q->where('semester_id', $semester->id);
+            })->count();
+
+            $maxHours = min(
+                (int) ($teacher->max_hours_per_week ?? config('scheduling.max_teacher_hours_per_week', 38)),
+                (int) config('scheduling.max_teacher_hours_per_week', 38)
+            );
+
+            if ($teacherWeeklyLoad >= $maxHours) {
+                return ['success' => false, 'message' => 'Teacher has reached the maximum weekly load limit'];
+            }
+
             if (Schedule::where('room_id', $room->id)->where('timeslot_id', $timeslot->id)->exists()) {
                 return ['success' => false, 'message' => 'Room is already booked for this timeslot'];
             }
@@ -68,6 +83,10 @@ class ScheduleAssignmentService
             $course = $section->courseOffering->course;
             if (! $this->isRoomSuitableForCourse($room, $course)) {
                 return ['success' => false, 'message' => 'Room type is not suitable for this course'];
+            }
+
+            if (! $this->canSectionUseRoom($section, $room)) {
+                return ['success' => false, 'message' => 'Room cannot be shared with this section under the current scheduling rules'];
             }
 
             Schedule::updateOrCreate(
@@ -122,5 +141,87 @@ class ScheduleAssignmentService
         }
 
         return $room->type === $course->course_type;
+    }
+
+    protected function canSectionUseRoom(Section $section, Room $room): bool
+    {
+        $scheduledSections = Schedule::where('room_id', $room->id)
+            ->with(['section.courseOffering.course'])
+            ->get()
+            ->pluck('section')
+            ->filter()
+            ->unique('id')
+            ->values();
+
+        if ($scheduledSections->contains('id', $section->id)) {
+            return true;
+        }
+
+        if ($scheduledSections->count() >= (int) config('scheduling.room_max_sections', 2)) {
+            return false;
+        }
+
+        if ($scheduledSections->isEmpty()) {
+            return true;
+        }
+
+        $existingSection = $scheduledSections->first();
+        if (! $existingSection) {
+            return false;
+        }
+
+        if (! $this->isSectionRoomPairCompatible($section, $existingSection)) {
+            return false;
+        }
+
+        $combinedHours = $this->getSectionWeeklyHours($section) + $this->getSectionWeeklyHours($existingSection);
+
+        return $combinedHours <= (int) config('scheduling.room_combined_hours_limit', 38);
+    }
+
+    protected function getSectionWeeklyHours(Section $section): int
+    {
+        return max(1, (int) ($section->courseOffering->course->credits ?? $section->courseOffering->course->hours_per_week ?? 3));
+    }
+
+    protected function getSectionDepartmentId(Section $section): ?int
+    {
+        return $section->courseOffering?->course?->department_id ? (int) $section->courseOffering->course->department_id : null;
+    }
+
+    protected function getSectionBatchKey(Section $section): string
+    {
+        return (string) ($section->courseOffering?->semester_id ?? '');
+    }
+
+    protected function isAdjacentBatch($batchA, $batchB): bool
+    {
+        if (! is_numeric($batchA) || ! is_numeric($batchB)) {
+            return false;
+        }
+
+        return abs((int) $batchA - (int) $batchB) === 1;
+    }
+
+    protected function isSectionRoomPairCompatible(Section $sectionA, Section $sectionB): bool
+    {
+        $deptA = $this->getSectionDepartmentId($sectionA);
+        $deptB = $this->getSectionDepartmentId($sectionB);
+        $batchA = $this->getSectionBatchKey($sectionA);
+        $batchB = $this->getSectionBatchKey($sectionB);
+
+        if ($deptA === $deptB && $batchA === $batchB) {
+            return true;
+        }
+
+        if ($deptA === $deptB && $this->isAdjacentBatch($batchA, $batchB)) {
+            return true;
+        }
+
+        if ($deptA !== $deptB && $batchA === $batchB) {
+            return true;
+        }
+
+        return false;
     }
 }

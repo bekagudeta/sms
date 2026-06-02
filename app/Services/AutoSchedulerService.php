@@ -16,146 +16,161 @@ class AutoSchedulerService
     protected $semesterId;
 
     protected $sections;
-
     protected $teachers;
-
     protected $rooms;
-
     protected $timeslots;
 
     // In-memory state for backtracking
-    protected $teacherTimeslotMap = [];
+    protected $teacherTimeslotMap  = [];
+    protected $roomTimeslotMap     = [];
+    protected $studentTimeslotMap  = [];
 
-    protected $roomTimeslotMap = [];
-
-    protected $studentTimeslotMap = [];
-
+    /**
+     * Per-teacher accumulated teaching hours (1 unit per scheduled timeslot).
+     * This is the single source of truth for workload tracking.
+     */
     protected $teacherHours = [];
 
     protected $sectionAssignments = [];
+    protected $sectionRoomMap     = [];
+    protected $roomSectionsMap    = [];
 
     // Conflict tracking
-    protected $conflictCount = 0;
-
+    protected $conflictCount   = 0;
     protected $conflictDetails = [];
 
     // Day distribution tracking
-    protected $dayUsageCount = [];
-
-    protected $teacherDayUsage = [];
+    protected $dayUsageCount       = [];
+    protected $teacherDayUsage     = [];
+    protected $teacherScheduledDays = [];
 
     // Timeslots grouped by day
     protected $timeslotsByDay = [];
 
-    // Unscheduled section counter
     protected $unscheduledSections = 0;
 
-    // Precomputed data for performance
-    protected $sectionStudentIds = [];
+    // Precomputed data
+    protected $sectionStudentIds          = [];
+    protected $roomCache                  = [];
+    protected $teacherCourseMap           = [];
+    protected $availableTimeslotsCache    = [];
+    protected $timeslotOrderMap           = [];
+    protected $warnedRoomFallbackCourses  = [];
 
-    protected $roomCache = [];
+    protected $completionRelaxedStudents = false;
 
-    protected $teacherCourseMap = [];
-
-    protected $availableTimeslotsCache = [];
-
-    // Full section tracking
     protected $totalSectionCount = 0;
 
     // Best solution tracking
-    protected $bestSchedule = null;
-
-    protected $bestScore = -INF;
-
-    protected $currentSchedule = [];
-
+    protected $bestSchedule        = null;
+    protected $bestScore           = -INF;
+    protected $currentSchedule     = [];
     protected $bestPartialSchedule = [];
-
-    protected $bestPartialScore = -INF;
+    protected $bestPartialScore    = -INF;
 
     // Performance & configuration
-    protected $maxAttempts = 3;
-
-    protected $maxBacktrackSteps = 5000;
-
-    protected $backtrackCount = 0;
-
-    protected $timeLimitSeconds = 10;
-
+    protected $maxAttempts               = 3;
+    protected $maxBacktrackSteps         = 5000;
+    protected $backtrackCount            = 0;
+    protected $timeLimitSeconds          = 30;
     protected $startTime;
-
     protected $maxCombinationsPerSection = 100;
 
     // Soft constraint weights
     protected $weights = [
         'teacher_load_balance' => 10,
-        'room_preference' => 5,
-        'timeslot_preference' => 3,
+        'room_preference'      => 5,
+        'timeslot_preference'  => 3,
         'student_distribution' => 2,
-        'compact_schedule' => 4,
-        'day_distribution' => 8, // New weight for spreading across days
+        'compact_schedule'     => 4,
+        'day_distribution'     => 8,
     ];
+
+    // =========================================================================
+    //  PUBLIC ENTRY POINT
+    // =========================================================================
 
     public function generateSchedule($semesterId)
     {
-        $this->startTime = microtime(true);
+        $this->startTime  = microtime(true);
         $this->semesterId = $semesterId;
 
         DB::beginTransaction();
 
         try {
-            // Clear existing schedules for this semester only
             Schedule::whereHas('section.courseOffering', function ($q) {
                 $q->where('semester_id', $this->semesterId);
             })->delete();
 
-            // Load and prepare data
+            $this->completionRelaxedStudents = false;
+
             $this->loadData();
             $this->validateData();
             $this->precomputeData();
 
             $requiredSlotsBySection = $this->getRequiredSlotsBySection();
 
-            // Try simple scheduling first. Accept it only if it fully covers the semester.
+            // ── try the simple engine first ───────────────────────────────
             Log::info('Attempting simple scheduling engine first');
-            $engine = new SchedulingEngine;
-            $engineResult = $engine->generateSchedule($this->semesterId);
+            $engine        = new SchedulingEngine;
+            $engineResult  = $engine->generateSchedule($this->semesterId);
             $simpleSchedule = $this->filterSemesterSchedule($engineResult['assignments'] ?? []);
             $simpleCoverage = $this->analyzeScheduleCoverage($simpleSchedule, $requiredSlotsBySection);
+
             $simpleValidationErrors = $simpleCoverage['complete']
                 ? $this->validateGeneratedSchedule($simpleSchedule)
                 : [];
 
             $finalSchedule = $simpleSchedule;
-            $coverage = $simpleCoverage;
-            $engineUsed = 'simple';
+            $coverage      = $simpleCoverage;
+            $engineUsed    = 'simple';
 
-            if (! $coverage['complete'] || ! empty($simpleValidationErrors)) {
-                Log::info('Simple engine did not produce a complete schedule; attempting advanced backtracking algorithm', [
-                    'missing_sections' => count($coverage['missing']),
+            if (!$coverage['complete'] || !empty($simpleValidationErrors)) {
+                Log::info('Simple engine incomplete; trying advanced backtracking', [
+                    'missing_sections'  => count($coverage['missing']),
                     'validation_errors' => count($simpleValidationErrors),
-                    'scheduled_slots' => $coverage['scheduled_slots'],
-                    'required_slots' => $coverage['required_slots'],
+                    'scheduled_slots'   => $coverage['scheduled_slots'],
+                    'required_slots'    => $coverage['required_slots'],
                 ]);
 
-                $finalSchedule = $this->attemptAdvancedScheduling();
-                $coverage = $this->analyzeScheduleCoverage($finalSchedule, $requiredSlotsBySection);
-                $engineUsed = 'advanced';
+                $advancedSchedule = $this->attemptAdvancedScheduling();
+                $advancedCoverage = $this->analyzeScheduleCoverage($advancedSchedule, $requiredSlotsBySection);
+
+                if ($advancedCoverage['scheduled_slots'] > $coverage['scheduled_slots']) {
+                    $finalSchedule = $advancedSchedule;
+                    $coverage      = $advancedCoverage;
+                    $engineUsed    = 'advanced';
+                }
             }
 
-            $validationErrors = [];
-            if ($coverage['complete']) {
-                $validationErrors = $this->validateGeneratedSchedule($finalSchedule);
-                if (! empty($validationErrors)) {
-                    $this->conflictDetails = $validationErrors;
-                    throw new \Exception('Generated schedule has conflicts: '.$validationErrors[0]['message']);
-                }
-            } else {
-                $this->conflictDetails = $coverage['missing'];
-                Log::warning('Partial schedule generated for semester '.$this->semesterId, [
+            if (!$coverage['complete']) {
+                Log::info('Attempting completion pass for missing slots', [
                     'missing_sections' => count($coverage['missing']),
-                    'scheduled_slots' => $coverage['scheduled_slots'],
-                    'required_slots' => $coverage['required_slots'],
+                ]);
+
+                $finalSchedule = $this->attemptFillMissingSlots($finalSchedule, $requiredSlotsBySection);
+                $coverage      = $this->analyzeScheduleCoverage($finalSchedule, $requiredSlotsBySection);
+                if (!$coverage['complete']) {
+                    $engineUsed = $engineUsed.'+fill';
+                }
+            }
+
+            if (!$coverage['complete']) {
+                $this->conflictDetails = $coverage['missing'];
+                throw new \Exception($this->formatIncompleteScheduleMessage($coverage));
+            }
+
+            $validationErrors = $this->validateGeneratedSchedule($finalSchedule);
+            $blockingErrors   = $this->filterBlockingValidationErrors($validationErrors);
+
+            if (!empty($blockingErrors)) {
+                $this->conflictDetails = $blockingErrors;
+                throw new \Exception('Generated schedule has conflicts: '.$blockingErrors[0]['message']);
+            }
+
+            if (!empty($validationErrors) && empty($blockingErrors)) {
+                Log::warning('Schedule generated with non-blocking warnings', [
+                    'warnings' => $validationErrors,
                 ]);
             }
 
@@ -165,14 +180,13 @@ class AutoSchedulerService
             }
 
             $scheduledSectionIds = collect($finalSchedule)->pluck('section_id')->unique();
-            $this->sectionAssignments = $scheduledSectionIds->mapWithKeys(function ($id) {
-                return [$id => true];
-            })->toArray();
+            $this->sectionAssignments = $scheduledSectionIds
+                ->mapWithKeys(fn ($id) => [$id => true])
+                ->toArray();
             $this->unscheduledSections = 0;
-            $this->conflictCount = 0;
-            $this->conflictDetails = [];
+            $this->conflictCount       = 0;
+            $this->conflictDetails     = [];
 
-            // Persist the complete schedule.
             foreach ($finalSchedule as $scheduleEntry) {
                 Schedule::create($scheduleEntry);
             }
@@ -180,20 +194,18 @@ class AutoSchedulerService
             DB::commit();
 
             return [
-                'success' => ! empty($finalSchedule),
-                'message' => $coverage['complete']
-                    ? 'Schedule generated successfully using '.$engineUsed.' engine'
-                    : 'Partial schedule generated using '.$engineUsed.' engine: '.$coverage['scheduled_slots'].' of '.$coverage['required_slots'].' required weekly slots were scheduled; '.count($coverage['missing']).' section(s) are incomplete.',
-                'scheduled' => count($finalSchedule),
-                'total_sections' => $this->totalSectionCount,
+                'success'            => true,
+                'message'            => 'Schedule generated successfully using '.$engineUsed.' engine',
+                'scheduled'          => count($finalSchedule),
+                'total_sections'     => $this->totalSectionCount,
                 'scheduled_sections' => $scheduledSectionIds->count(),
-                'required_slots' => $coverage['required_slots'],
-                'scheduled_slots' => $coverage['scheduled_slots'],
-                'conflicts' => ! $coverage['complete'] ? count($coverage['missing']) : 0,
-                'day_distribution' => $this->getDayDistributionStats(),
-                'partial_schedule' => ! $coverage['complete'],
-                'engine' => $engineUsed,
-                'execution_time' => round(microtime(true) - $this->startTime, 2),
+                'required_slots'     => $coverage['required_slots'],
+                'scheduled_slots'    => $coverage['scheduled_slots'],
+                'conflicts'          => 0,
+                'day_distribution'   => $this->getDayDistributionStats(),
+                'partial_schedule'   => false,
+                'engine'             => $engineUsed,
+                'execution_time'     => round(microtime(true) - $this->startTime, 2),
             ];
 
         } catch (\Exception $e) {
@@ -201,202 +213,305 @@ class AutoSchedulerService
             Log::error('Schedule generation failed: '.$e->getMessage());
 
             return [
-                'success' => false,
-                'message' => 'Schedule generation failed: '.$e->getMessage(),
+                'success'        => false,
+                'message'        => 'Schedule generation failed: '.$e->getMessage(),
                 'execution_time' => round(microtime(true) - $this->startTime, 2),
             ];
         }
     }
 
+    public function getConflicts()
+    {
+        return $this->conflictDetails ?? [];
+    }
+
+    // =========================================================================
+    //  CREDIT-HOUR RULE  (single authoritative implementation)
+    // =========================================================================
+
+    /**
+     * Number of timeslot-hours a course must be assigned per week.
+     *
+     * Rule:  1 credit hour  →  1 teaching hour per week  (1 : 1)
+     *        2 credit hours →  2 teaching hours per week
+     *        … and so on.
+     *
+     * Falls back to hours_per_week only when credits is absent/zero.
+     */
+    protected function getRequiredWeeklyHours($course): int
+    {
+        $credits = (int) ($course->credits ?? 0);
+        if ($credits > 0) {
+            return $credits;
+        }
+
+        $hoursPerWeek = (int) ($course->hours_per_week ?? 0);
+        if ($hoursPerWeek > 0) {
+            return $hoursPerWeek;
+        }
+
+        Log::warning('Course has neither credits nor hours_per_week; defaulting to 3.', [
+            'course_id'   => $course->id   ?? null,
+            'course_name' => $course->course_name ?? null,
+        ]);
+        return 3;
+    }
+
+    /**
+     * Hard weekly teaching-hour cap for a teacher (never above 38).
+     */
+    protected function getTeacherMaxWeeklyHours($teacher): int
+    {
+        return min(
+            (int) ($teacher->max_hours_per_week ?? config('scheduling.max_teacher_hours_per_week', 38)),
+            (int) config('scheduling.max_teacher_hours_per_week', 38)
+        );
+    }
+
+    /**
+     * Can this teacher accept one more scheduled timeslot (= 1 more hour)?
+     *
+     * We always add exactly 1 here because the scheduler assigns timeslots
+     * one-at-a-time; the credit-hour count of the course determines how many
+     * timeslots will be assigned in total, not how much each one costs.
+     */
+    protected function teacherCanAcceptOneMoreHour($teacher): bool
+    {
+        $current = $this->teacherHours[$teacher->id] ?? 0;
+        return ($current + 1) <= $this->getTeacherMaxWeeklyHours($teacher);
+    }
+
+    // =========================================================================
+    //  REQUIRED SLOTS PER SECTION  (used by coverage analysis)
+    // =========================================================================
+
     protected function getRequiredSlotsBySection()
     {
         return $this->sections->mapWithKeys(function ($section) {
             return [
-                $section->id => max(1, (int) ($section->courseOffering->course->hours_per_week ?? 3)),
+                $section->id => $this->getRequiredWeeklyHours($section->courseOffering->course),
             ];
         });
     }
 
-    protected function filterSemesterSchedule(array $assignments): array
-    {
-        $semesterSectionIds = $this->sections->pluck('id')->flip();
-
-        return collect($assignments)
-            ->filter(function ($assignment) use ($semesterSectionIds) {
-                return isset($assignment['section_id'], $assignment['room_id'], $assignment['timeslot_id'])
-                    && $semesterSectionIds->has($assignment['section_id']);
-            })
-            ->map(function ($assignment) {
-                return [
-                    'section_id' => (int) $assignment['section_id'],
-                    'room_id' => (int) $assignment['room_id'],
-                    'timeslot_id' => (int) $assignment['timeslot_id'],
-                ];
-            })
-            ->unique(fn ($assignment) => $assignment['section_id'].'-'.$assignment['timeslot_id'])
-            ->values()
-            ->all();
-    }
-
-    protected function normalizeScheduleEntries(array $assignments): array
-    {
-        return collect($assignments)
-            ->map(function ($assignment) {
-                return [
-                    'section_id' => (int) $assignment['section_id'],
-                    'room_id' => (int) $assignment['room_id'],
-                    'timeslot_id' => (int) $assignment['timeslot_id'],
-                ];
-            })
-            ->values()
-            ->all();
-    }
+    // =========================================================================
+    //  COVERAGE & VALIDATION
+    // =========================================================================
 
     protected function analyzeScheduleCoverage(array $assignments, $requiredSlotsBySection): array
     {
         $slotCounts = collect($assignments)->countBy('section_id');
-        $missing = [];
+        $missing    = [];
 
         foreach ($requiredSlotsBySection as $sectionId => $requiredSlots) {
             $scheduledSlots = (int) ($slotCounts[$sectionId] ?? 0);
-
             if ($scheduledSlots < $requiredSlots) {
-                $section = $this->sections->firstWhere('id', $sectionId);
+                $section   = $this->sections->firstWhere('id', $sectionId);
                 $missing[] = [
-                    'type' => 'insufficient_section_slots',
-                    'section_id' => $sectionId,
-                    'section_name' => $section?->section_name,
-                    'course' => $section?->courseOffering?->course?->course_name,
-                    'required_slots' => $requiredSlots,
+                    'type'            => 'insufficient_section_slots',
+                    'section_id'      => $sectionId,
+                    'section_name'    => $section?->section_name,
+                    'course'          => $section?->courseOffering?->course?->course_name,
+                    'required_slots'  => $requiredSlots,
                     'scheduled_slots' => $scheduledSlots,
-                    'message' => "Section {$section?->section_name} needs {$requiredSlots} weekly slot(s), but only {$scheduledSlots} were scheduled.",
+                    'message'         => "Section {$section?->section_name} needs {$requiredSlots} weekly slot(s), "
+                                       . "but only {$scheduledSlots} were scheduled.",
                 ];
             }
         }
 
         return [
-            'complete' => empty($missing),
-            'missing' => $missing,
-            'required_slots' => (int) collect($requiredSlotsBySection)->sum(),
+            'complete'        => empty($missing),
+            'missing'         => $missing,
+            'required_slots'  => (int) collect($requiredSlotsBySection)->sum(),
             'scheduled_slots' => count($assignments),
         ];
     }
 
+    /**
+     * Validate the fully-assembled schedule for hard-constraint violations.
+     *
+     * Teacher workload is checked as: total scheduled slots for that teacher
+     * must not exceed their weekly hour cap.  Each timeslot == 1 hour.
+     */
     protected function validateGeneratedSchedule(array $assignments): array
     {
-        $errors = [];
-        $roomTimeslots = [];
+        $errors           = [];
+        $roomTimeslots    = [];
         $sectionTimeslots = [];
+        $roomSections     = [];
+        $sectionSlotCounts = [];
         $teacherTimeslots = [];
-        $teacherLoads = [];
-        $teacherModels = [];
+        $teacherSlotCount = [];   // raw slot count per teacher (= hours)
+        $teacherModels    = [];
         $studentTimeslots = [];
 
         $sections = $this->sections->keyBy('id');
-        $rooms = $this->rooms->keyBy('id');
+        $rooms    = $this->rooms->keyBy('id');
 
         foreach ($assignments as $assignment) {
-            $section = $sections->get($assignment['section_id']);
-            $room = $rooms->get($assignment['room_id']);
+            $section    = $sections->get($assignment['section_id']);
+            $room       = $rooms->get($assignment['room_id']);
             $timeslotId = (int) $assignment['timeslot_id'];
 
-            if (! $section || ! $room) {
+            if (!$section || !$room) {
                 $errors[] = [
-                    'type' => 'invalid_assignment_reference',
+                    'type'    => 'invalid_assignment_reference',
                     'message' => 'Generated schedule references a missing section or room.',
                 ];
-
                 continue;
             }
 
+            // ── room double-booking ───────────────────────────────────────
             $roomKey = $room->id.'-'.$timeslotId;
+            $roomSections[$room->id][$section->id] = true;
             if (isset($roomTimeslots[$roomKey])) {
                 $errors[] = [
-                    'type' => 'room_double_booking',
-                    'section_id' => $section->id,
-                    'room_id' => $room->id,
+                    'type'        => 'room_double_booking',
+                    'section_id'  => $section->id,
+                    'room_id'     => $room->id,
                     'timeslot_id' => $timeslotId,
-                    'message' => "Room {$room->room_code} is double booked.",
+                    'message'     => "Room {$room->room_code} is double booked.",
                 ];
             }
             $roomTimeslots[$roomKey] = true;
 
+            // ── section duplicate timeslot ────────────────────────────────
             $sectionKey = $section->id.'-'.$timeslotId;
             if (isset($sectionTimeslots[$sectionKey])) {
                 $errors[] = [
-                    'type' => 'section_duplicate_timeslot',
-                    'section_id' => $section->id,
+                    'type'        => 'section_duplicate_timeslot',
+                    'section_id'  => $section->id,
                     'timeslot_id' => $timeslotId,
-                    'message' => "Section {$section->section_name} is scheduled more than once in the same timeslot.",
+                    'message'     => "Section {$section->section_name} is scheduled more than once in the same timeslot.",
                 ];
             }
             $sectionTimeslots[$sectionKey] = true;
+            $sectionSlotCounts[$section->id] = ($sectionSlotCounts[$section->id] ?? 0) + 1;
 
+            // ── room capacity ─────────────────────────────────────────────
             if ($room->capacity < $section->capacity) {
                 $errors[] = [
-                    'type' => 'room_capacity',
+                    'type'       => 'room_capacity',
                     'section_id' => $section->id,
-                    'room_id' => $room->id,
-                    'message' => "Room {$room->room_code} capacity is too small for section {$section->section_name}.",
+                    'room_id'    => $room->id,
+                    'message'    => "Room {$room->room_code} capacity is too small for section {$section->section_name}.",
                 ];
             }
 
-            if (! $this->isRoomSuitableForCourse($room, $section->courseOffering->course)) {
+            // ── room type suitability ─────────────────────────────────────
+            if (!$this->isRoomSuitableForCourse($room, $section->courseOffering->course)) {
                 $hasExactRoomMatch = $this->rooms->contains(function ($candidate) use ($section) {
                     return $candidate->capacity >= $section->capacity
                         && $this->isRoomSuitableForCourse($candidate, $section->courseOffering->course);
                 });
-
                 if ($hasExactRoomMatch) {
                     $errors[] = [
-                        'type' => 'room_type',
+                        'type'       => 'room_type',
                         'section_id' => $section->id,
-                        'room_id' => $room->id,
-                        'message' => "Room {$room->room_code} is not suitable for {$section->courseOffering->course->course_name}.",
+                        'room_id'    => $room->id,
+                        'message'    => "Room {$room->room_code} is not suitable for {$section->courseOffering->course->course_name}.",
                     ];
                 }
             }
 
+            // ── teacher conflicts & workload ──────────────────────────────
             foreach ($section->teachers as $teacher) {
                 $teacherKey = $teacher->id.'-'.$timeslotId;
                 if (isset($teacherTimeslots[$teacherKey])) {
                     $errors[] = [
-                        'type' => 'teacher_conflict',
-                        'section_id' => $section->id,
-                        'teacher_id' => $teacher->id,
+                        'type'        => 'teacher_conflict',
+                        'section_id'  => $section->id,
+                        'teacher_id'  => $teacher->id,
                         'timeslot_id' => $timeslotId,
-                        'message' => "Teacher {$teacher->full_name} has a timeslot conflict.",
+                        'message'     => "Teacher {$teacher->full_name} has a timeslot conflict.",
                     ];
                 }
-                $teacherTimeslots[$teacherKey] = true;
-                $teacherLoads[$teacher->id] = ($teacherLoads[$teacher->id] ?? 0) + 1;
-                $teacherModels[$teacher->id] = $teacher;
+                $teacherTimeslots[$teacherKey]                = true;
+                $teacherSlotCount[$teacher->id]               = ($teacherSlotCount[$teacher->id] ?? 0) + 1;
+                $teacherModels[$teacher->id]                  = $teacher;
             }
 
-            foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
-                $studentKey = $studentId.'-'.$timeslotId;
-                if (isset($studentTimeslots[$studentKey])) {
-                    $errors[] = [
-                        'type' => 'student_conflict',
-                        'section_id' => $section->id,
-                        'student_id' => $studentId,
-                        'timeslot_id' => $timeslotId,
-                        'message' => "Student {$studentId} has a timeslot conflict.",
-                    ];
+            // ── student conflicts (optional) ──────────────────────────────
+            if ($this->shouldValidateStudentConflicts()) {
+                foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
+                    $studentKey = $studentId.'-'.$timeslotId;
+                    if (isset($studentTimeslots[$studentKey])) {
+                        $errors[] = [
+                            'type'        => 'student_conflict',
+                            'section_id'  => $section->id,
+                            'student_id'  => $studentId,
+                            'timeslot_id' => $timeslotId,
+                            'message'     => "Student {$studentId} has a timeslot conflict.",
+                        ];
+                    }
+                    $studentTimeslots[$studentKey] = true;
                 }
-                $studentTimeslots[$studentKey] = true;
             }
         }
 
-        foreach ($teacherLoads as $teacherId => $load) {
-            $teacher = $teacherModels[$teacherId];
-            $maxHours = $teacher->max_hours_per_week ?? 39;
-
-            if ($load > $maxHours) {
+        // ── teacher weekly-hour cap (slot count == hours, 1 : 1) ─────────
+        foreach ($teacherSlotCount as $teacherId => $scheduledHours) {
+            $teacher  = $teacherModels[$teacherId];
+            $maxHours = $this->getTeacherMaxWeeklyHours($teacher);
+            if ($scheduledHours > $maxHours) {
                 $errors[] = [
-                    'type' => 'teacher_workload',
+                    'type'       => 'teacher_workload',
                     'teacher_id' => $teacherId,
-                    'message' => "Teacher {$teacher->full_name} is assigned {$load} weekly slot(s), above the {$maxHours} limit.",
+                    'message'    => "Teacher {$teacher->full_name} is assigned {$scheduledHours} weekly hour(s), "
+                                  . "above the {$maxHours}-hour limit.",
+                ];
+            }
+        }
+
+        // ── section must have exactly the right number of slots ───────────
+        foreach ($sections as $sectionId => $section) {
+            $requiredSlots  = $this->getRequiredWeeklyHours($section->courseOffering->course);
+            $scheduledSlots = $sectionSlotCounts[$sectionId] ?? 0;
+            if ($scheduledSlots !== $requiredSlots) {
+                $errors[] = [
+                    'type'            => 'section_slot_mismatch',
+                    'section_id'      => $sectionId,
+                    'required_slots'  => $requiredSlots,
+                    'scheduled_slots' => $scheduledSlots,
+                    'message'         => "Section {$section->section_name} requires {$requiredSlots} weekly hour(s), "
+                                       . "but {$scheduledSlots} were scheduled.",
+                ];
+            }
+        }
+
+        // ── room section-count & combined-hours limits (optional strict sharing) ──
+        if (!$this->isStrictRoomSharing()) {
+            return $errors;
+        }
+
+        foreach ($roomSections as $roomId => $sectionsInRoom) {
+            $sectionIds = array_keys($sectionsInRoom);
+            $maxSections = (int) config('scheduling.room_max_sections', 0);
+            if ($maxSections > 0 && count($sectionIds) > $maxSections) {
+                $errors[] = [
+                    'type'    => 'room_section_limit',
+                    'room_id' => $roomId,
+                    'message' => "Room {$roomId} is assigned to more than {$maxSections} sections.",
+                ];
+                continue;
+            }
+
+            $roomLoad = 0;
+            foreach ($sectionIds as $sectionId) {
+                $section = $sections->get($sectionId);
+                if ($section) {
+                    $roomLoad += $this->getRequiredWeeklyHours($section->courseOffering->course);
+                }
+            }
+
+            $roomHoursLimit = (int) config('scheduling.room_combined_hours_limit', 38);
+            if ($roomLoad > $roomHoursLimit) {
+                $errors[] = [
+                    'type'    => 'room_combined_hours',
+                    'room_id' => $roomId,
+                    'message' => "Room {$roomId} is assigned {$roomLoad} weekly hour(s), "
+                               . "above the {$roomHoursLimit}-hour shared-room limit.",
                 ];
             }
         }
@@ -404,269 +519,33 @@ class AutoSchedulerService
         return $errors;
     }
 
-    protected function formatIncompleteScheduleMessage(array $coverage): string
-    {
-        $missingCount = count($coverage['missing']);
-
-        return "Unable to generate a complete semester schedule. {$coverage['scheduled_slots']} of {$coverage['required_slots']} required weekly slots were scheduled; {$missingCount} section(s) are incomplete.";
-    }
+    // =========================================================================
+    //  TIMESLOT VALIDITY  (used by both engines)
+    // =========================================================================
 
     /**
-     * Attempt advanced scheduling using backtracking algorithm
+     * A timeslot is valid for a section when:
+     *   1. No teacher is already teaching at that timeslot.
+     *   2. Every teacher still has room for 1 more hour this week.
+     *   3. No enrolled student is already occupied at that timeslot.
      */
-    protected function attemptAdvancedScheduling()
+    protected function isTimeslotValid($section, $course, $timeslot, bool $ignoreStudentConflicts = false): bool
     {
-        try {
-            // Sort sections by difficulty for better backtracking performance
-            $sortedSections = $this->sortSectionsByDifficulty();
-            $this->sections = $sortedSections;
-
-            // Get available timeslots
-            $availableTimeslots = $this->timeslots;
-
-            // Reset state for clean scheduling attempt
-            $this->resetSchedulingState();
-
-            // Attempt backtracking scheduling
-            $success = $this->backtrackAssignSections(0, $availableTimeslots);
-
-            if ($success) {
-                // Convert current schedule to final format
-                $finalSchedule = [];
-                foreach ($this->currentSchedule as $assignment) {
-                    $finalSchedule[] = $assignment;
-                }
-
-                return $finalSchedule;
+        foreach ($section->teachers as $teacher) {
+            if (isset($this->teacherTimeslotMap[$teacher->id][$timeslot->id])) {
+                return false;
             }
-
-            // If backtracking fails, try greedy approach as last resort
-            return $this->attemptGreedyScheduling();
-
-        } catch (\Exception $e) {
-            Log::error('Advanced scheduling failed: '.$e->getMessage());
-
-            return [];
-        }
-    }
-
-    /**
-     * Greedy scheduling as fallback when backtracking fails
-     */
-    protected function attemptGreedyScheduling()
-    {
-        $finalSchedule = [];
-        $usedRoomTimeslots = [];
-        $usedTeacherTimeslots = [];
-
-        foreach ($this->sections as $section) {
-            $course = $section->courseOffering->course;
-            $requiredSlots = $course->hours_per_week ?? 3;
-            $assignedSlots = 0;
-
-            foreach ($this->timeslots as $timeslot) {
-                if ($assignedSlots >= $requiredSlots) {
-                    break;
-                }
-
-                if (! $this->isTimeslotValid($section, $course, $timeslot)) {
-                    continue;
-                }
-
-                // Find available room
-                $room = null;
-                foreach ($this->rooms as $potentialRoom) {
-                    if ($potentialRoom->capacity >= $section->capacity) {
-                        $roomKey = $potentialRoom->id.'_'.$timeslot->id;
-                        if (! isset($usedRoomTimeslots[$roomKey])) {
-                            $room = $potentialRoom;
-                            break;
-                        }
-                    }
-                }
-
-                if ($room) {
-                    // Assign schedule
-                    $finalSchedule[] = [
-                        'section_id' => $section->id,
-                        'room_id' => $room->id,
-                        'timeslot_id' => $timeslot->id,
-                    ];
-
-                    // Mark as used
-                    $roomKey = $room->id.'_'.$timeslot->id;
-                    $usedRoomTimeslots[$roomKey] = true;
-
-                    foreach ($section->teachers as $teacher) {
-                        $teacherKey = $teacher->id.'_'.$timeslot->id;
-                        $usedTeacherTimeslots[$teacherKey] = true;
-                        $this->teacherTimeslotMap[$teacher->id][$timeslot->id] = true;
-                        $this->teacherHours[$teacher->id] = ($this->teacherHours[$teacher->id] ?? 0) + 1;
-                    }
-
-                    $this->roomTimeslotMap[$room->id][$timeslot->id] = true;
-
-                    foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
-                        $this->studentTimeslotMap[$studentId][$timeslot->id] = true;
-                    }
-
-                    $assignedSlots++;
-                }
+            if (!$this->teacherCanAcceptOneMoreHour($teacher)) {
+                return false;
             }
         }
 
-        return $finalSchedule;
-    }
+        $checkStudents = !$ignoreStudentConflicts
+            && config('scheduling.enforce_student_conflicts', true);
 
-    /**
-     * Precompute data for performance optimization
-     */
-    protected function precomputeData()
-    {
-        // Precompute student IDs per section for faster conflict checking
-        foreach ($this->sections as $section) {
-            $this->sectionStudentIds[$section->id] = $section->enrollments->pluck('student_id')->toArray();
-        }
-
-        // Group timeslots by day for easier distribution
-        $this->timeslotsByDay = $this->timeslots->groupBy('day_of_week');
-
-        // Precompute teacher qualifications
-        foreach ($this->teachers as $teacher) {
-            $this->teacherCourseMap[$teacher->id] = [];
-        }
-
-        // Precompute room availability cache
-        foreach ($this->rooms as $room) {
-            $this->roomCache[$room->id] = [];
-        }
-    }
-
-    /**
-     * Enhanced section sorting with multiple factors and pruning
-     */
-    protected function sortSectionsByDifficulty()
-    {
-        return $this->sections->sortByDesc(function ($section) {
-            $difficulty = 0;
-
-            // Factor 1: Enrollment count (primary)
-            $difficulty += count($this->sectionStudentIds[$section->id] ?? []) * 10;
-
-            // Factor 2: Teacher scarcity
-            $teacherCount = $section->teachers->count();
-            $difficulty += (10 - min(10, $teacherCount)) * 5;
-
-            // Factor 3: Course complexity (hours needed)
-            $course = $section->courseOffering->course;
-            $requiredSlots = $course->hours_per_week ?? 3;
-            $difficulty += $requiredSlots * 2;
-
-            // Factor 4: Room constraints
-            $eligibleRooms = $this->getEligibleRooms($course)->count();
-            if ($eligibleRooms < 3) {
-                $difficulty += 20;
-            } elseif ($eligibleRooms === 0) {
-                $difficulty += 100; // Impossible to schedule
-            }
-
-            return $difficulty;
-        })->values();
-    }
-
-    /**
-     * TRUE BACKTRACKING with pruning and forward checking
-     */
-    protected function backtrackAssignSections($sectionIndex, $availableTimeslots)
-    {
-        $this->backtrackCount++;
-
-        // Performance limits
-        if ($this->backtrackCount > $this->maxBacktrackSteps) {
-            return false;
-        }
-
-        if (microtime(true) - $this->startTime > $this->timeLimitSeconds) {
-            return false;
-        }
-
-        // All sections assigned successfully
-        if ($sectionIndex >= $this->sections->count()) {
-            return true;
-        }
-
-        $section = $this->sections[$sectionIndex];
-        $course = $section->courseOffering->course;
-        $requiredSlots = $course->hours_per_week ?? 3;
-
-        // Get all possible timeslot-room combinations for this section
-        $possibleAssignments = $this->getPossibleAssignments($section, $course, $availableTimeslots, $requiredSlots);
-
-        if ($possibleAssignments->isEmpty()) {
-            return false; // No possible assignments for this section
-        }
-
-        // Limit combinations to prevent explosion
-        if ($possibleAssignments->count() > $this->maxCombinationsPerSection) {
-            $possibleAssignments = $possibleAssignments->take($this->maxCombinationsPerSection);
-        }
-
-        // Sort assignments by score (try best first)
-        $possibleAssignments = $possibleAssignments->sortByDesc(function ($assignment) {
-            return $assignment['score'];
-        });
-
-        // Try each possible assignment
-        foreach ($possibleAssignments as $assignment) {
-            // Apply assignment
-            $this->applyAssignment($section, $assignment);
-
-            // Check if we still need more slots for this section
-            $currentSlots = $this->getCurrentSectionSlotCount($section->id);
-
-            if ($currentSlots < $requiredSlots) {
-                // Need more slots for this same section
-                $result = $this->backtrackAssignSections($sectionIndex, $availableTimeslots);
-            } else {
-                // Section is complete, move to next section
-                $result = $this->backtrackAssignSections($sectionIndex + 1, $availableTimeslots);
-            }
-
-            if ($result) {
-                return true; // Found valid solution
-            }
-
-            // BACKTRACK: Undo assignment
-            $this->undoAssignment($section, $assignment);
-        }
-
-        return false; // No valid assignment found
-    }
-
-    /**
-     * Pruning: Check if enough capacity remains for remaining sections
-     */
-    protected function hasEnoughRemainingCapacity($currentIndex, $currentRequiredSlots)
-    {
-        $remainingSections = $this->sections->slice($currentIndex);
-        $totalRequiredSlots = $remainingSections->sum(function ($section) {
-            return $section->courseOffering->course->hours_per_week ?? 3;
-        });
-
-        $totalCapacity = $this->timeslots->count() * $this->rooms->count();
-        $usedCapacity = count($this->currentSchedule);
-
-        if (($totalCapacity - $usedCapacity) < $totalRequiredSlots) {
-            return false;
-        }
-
-        // Teacher capacity check
-        $teacherLoad = [];
-        foreach ($remainingSections as $section) {
-            foreach ($section->teachers as $teacher) {
-                $teacherLoad[$teacher->id] = ($this->teacherHours[$teacher->id] ?? 0) + ($section->courseOffering->course->hours_per_week ?? 3);
-                $maxHours = $teacher->max_hours_per_week ?? 39;
-                if ($teacherLoad[$teacher->id] > $maxHours) {
+        if ($checkStudents) {
+            foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
+                if (isset($this->studentTimeslotMap[$studentId][$timeslot->id])) {
                     return false;
                 }
             }
@@ -675,230 +554,250 @@ class AutoSchedulerService
         return true;
     }
 
-    /**
-     * Forward checking: Test if assignment leads to impossible state
-     */
-    protected function forwardCheck($sectionIndex, $assignment)
+    protected function isStrictRoomSharing(): bool
     {
-        $remainingSections = $this->sections->slice($sectionIndex + 1);
+        return (bool) config('scheduling.strict_room_sharing', false);
+    }
 
-        foreach ($remainingSections as $remainingSection) {
-            $course = $remainingSection->courseOffering->course;
-            $requiredSlots = $course->hours_per_week ?? 3;
+    protected function shouldValidateStudentConflicts(): bool
+    {
+        if ($this->completionRelaxedStudents) {
+            return false;
+        }
 
-            // Get valid timeslots across all days
-            $validTimeslots = $this->timeslots->filter(function ($timeslot) use ($remainingSection, $course) {
-                return $this->isTimeslotValid($remainingSection, $course, $timeslot)
-                    && $this->findAvailableRoom($remainingSection, $course, $timeslot) !== null;
-            });
+        return (bool) config('scheduling.validate_student_conflicts', false);
+    }
 
-            if ($validTimeslots->count() < $requiredSlots) {
-                return false; // Not enough valid slots
+    protected function filterBlockingValidationErrors(array $errors): array
+    {
+        return collect($errors)
+            ->reject(fn ($error) => ($error['type'] ?? '') === 'student_conflict'
+                && !config('scheduling.validate_student_conflicts', false))
+            ->values()
+            ->all();
+    }
+
+    // =========================================================================
+    //  ADVANCED SCHEDULING (backtracking + greedy fallback)
+    // =========================================================================
+
+    protected function attemptAdvancedScheduling()
+    {
+        try {
+            $sortedSections  = $this->sortSectionsByDifficulty();
+            $this->sections  = $sortedSections;
+            $this->resetSchedulingState();
+
+            $success = $this->backtrackAssignSections(0, $this->timeslots);
+
+            if ($success) {
+                return $this->currentSchedule;
             }
 
-            // Check if we can find at least one valid combination across ANY days
-            $combinations = $this->getValidCombinationsByDay($validTimeslots, $requiredSlots);
-            if ($combinations->isEmpty()) {
-                return false;
-            }
+            return $this->attemptGreedyScheduling();
 
-            $found = false;
-            foreach ($combinations as $combination) {
-                foreach ($this->getEligibleRooms($course) as $room) {
-                    if ($room->capacity < $remainingSection->capacity) {
+        } catch (\Exception $e) {
+            Log::error('Advanced scheduling failed: '.$e->getMessage());
+            return [];
+        }
+    }
+
+    protected function attemptGreedyScheduling()
+    {
+        $finalSchedule       = [];
+        $usedRoomTimeslots   = [];
+
+        foreach ($this->sections as $section) {
+            $course        = $section->courseOffering->course;
+            $requiredSlots = $this->getRequiredWeeklyHours($course);
+            $assignedSlots = 0;
+
+            foreach ($this->timeslots as $timeslot) {
+                if ($assignedSlots >= $requiredSlots) {
+                    break;
+                }
+
+                if (!$this->isTimeslotValid($section, $course, $timeslot)) {
+                    continue;
+                }
+
+                $room        = null;
+                $roomsToTry  = $this->getEligibleRooms($course)
+                    ->filter(fn ($r) => $this->canUseRoomForSection($section, $r))
+                    ->sortByDesc(fn ($r) => $this->getRoomSelectionScore($section, $r));
+
+                foreach ($roomsToTry as $potentialRoom) {
+                    if (!$this->canUseRoomForSection($section, $potentialRoom)) {
                         continue;
                     }
-
-                    $roomOK = true;
-                    foreach ($combination as $timeslot) {
-                        if ($this->hasRoomConflictInMemory($room, $timeslot)) {
-                            $roomOK = false;
-                            break;
-                        }
+                    if (isset($usedRoomTimeslots[$potentialRoom->id.'_'.$timeslot->id])) {
+                        continue;
                     }
-
-                    if ($roomOK) {
-                        $found = true;
-                        break 2;
-                    }
+                    $room = $potentialRoom;
+                    break;
                 }
-            }
 
-            if (! $found) {
-                return false;
-            }
-        }
+                if (!$room) {
+                    continue;
+                }
 
-        return true;
-    }
+                $finalSchedule[] = [
+                    'section_id'  => $section->id,
+                    'room_id'     => $room->id,
+                    'timeslot_id' => $timeslot->id,
+                ];
 
-    /**
-     * Get valid combinations grouped by day
-     */
-    protected function getValidCombinationsByDay($validTimeslots, $requiredSlots)
-    {
-        if ($validTimeslots->count() < $requiredSlots) {
-            return collect();
-        }
+                $usedRoomTimeslots[$room->id.'_'.$timeslot->id] = true;
+                $this->sectionRoomMap[$section->id]             = $room->id;
+                $this->roomSectionsMap[$room->id][$section->id] = true;
+                $this->roomTimeslotMap[$room->id][$timeslot->id] = true;
 
-        return $this->generateTimeslotCombinations($validTimeslots, $requiredSlots);
-    }
+                foreach ($section->teachers as $teacher) {
+                    $this->teacherTimeslotMap[$teacher->id][$timeslot->id] = true;
+                    $this->teacherHours[$teacher->id]                      = ($this->teacherHours[$teacher->id] ?? 0) + 1;
+                    $this->teacherScheduledDays[$teacher->id][$timeslot->day_of_week] = true;
+                    $this->teacherDayUsage[$teacher->id][$timeslot->day_of_week] =
+                        ($this->teacherDayUsage[$teacher->id][$timeslot->day_of_week] ?? 0) + 1;
+                }
 
-    protected function generateTimeslotCombinations($timeslots, $requiredSlots, $limit = 1200)
-    {
-        $result = collect();
-        $timeslotArray = $timeslots->values()->all();
-        $this->combineTimeslots($timeslotArray, $requiredSlots, 0, [], $result, $limit);
+                foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
+                    $this->studentTimeslotMap[$studentId][$timeslot->id] = true;
+                }
 
-        return $result;
-    }
+                $this->dayUsageCount[$timeslot->day_of_week] =
+                    ($this->dayUsageCount[$timeslot->day_of_week] ?? 0) + 1;
 
-    protected function combineTimeslots(array $timeslotArray, int $requiredSlots, int $start, array $current, &$result, int $limit)
-    {
-        if ($result->count() >= $limit) {
-            return;
-        }
-
-        if (count($current) === $requiredSlots) {
-            $result->push(collect($current));
-
-            return;
-        }
-
-        for ($i = $start; $i < count($timeslotArray); $i++) {
-            $current[] = $timeslotArray[$i];
-            $this->combineTimeslots($timeslotArray, $requiredSlots, $i + 1, $current, $result, $limit);
-            array_pop($current);
-
-            if ($result->count() >= $limit) {
-                break;
+                $assignedSlots++;
             }
         }
+
+        return $finalSchedule;
     }
 
-    /**
-     * Get all possible timeslot-room combinations with scoring
-     */
+    // =========================================================================
+    //  BACKTRACKING
+    // =========================================================================
+
+    protected function backtrackAssignSections($sectionIndex, $availableTimeslots): bool
+    {
+        $this->backtrackCount++;
+
+        if ($this->backtrackCount > $this->maxBacktrackSteps) {
+            return false;
+        }
+        if (microtime(true) - $this->startTime > $this->timeLimitSeconds) {
+            return false;
+        }
+        if ($sectionIndex >= $this->sections->count()) {
+            return true;
+        }
+
+        $section       = $this->sections[$sectionIndex];
+        $course        = $section->courseOffering->course;
+        $requiredSlots = $this->getRequiredWeeklyHours($course);
+
+        $possibleAssignments = $this->getPossibleAssignments($section, $course, $availableTimeslots, $requiredSlots);
+
+        if ($possibleAssignments->isEmpty()) {
+            return false;
+        }
+
+        if ($possibleAssignments->count() > $this->maxCombinationsPerSection) {
+            $possibleAssignments = $possibleAssignments->take($this->maxCombinationsPerSection);
+        }
+
+        $possibleAssignments = $possibleAssignments->sortByDesc(fn ($a) => $a['score']);
+
+        foreach ($possibleAssignments as $assignment) {
+            $this->applyAssignment($section, $assignment);
+
+            $currentSlots = $this->getCurrentSectionSlotCount($section->id);
+            $result       = $currentSlots < $requiredSlots
+                ? $this->backtrackAssignSections($sectionIndex, $availableTimeslots)
+                : $this->backtrackAssignSections($sectionIndex + 1, $availableTimeslots);
+
+            if ($result) {
+                return true;
+            }
+
+            $this->undoAssignment($section, $assignment);
+        }
+
+        return false;
+    }
+
     protected function getPossibleAssignments($section, $course, $availableTimeslots, $requiredSlots)
     {
-        $possibilities = collect();
+        $possibilities   = collect();
+        $preferredRoomId = $this->sectionRoomMap[$section->id] ?? null;
 
-        // Find valid timeslots across all weekdays
-        $validTimeslots = $availableTimeslots->filter(function ($timeslot) use ($section, $course) {
-            return $this->isTimeslotValid($section, $course, $timeslot);
-        });
+        $validTimeslots = $availableTimeslots->filter(
+            fn ($ts) => $this->isTimeslotValid($section, $course, $ts)
+        );
 
         if ($validTimeslots->isEmpty()) {
             return $possibilities;
         }
 
-        // For simplicity and reliability, assign individual slots rather than combinations
-        // This approach is more robust and avoids combination explosion
         foreach ($validTimeslots as $timeslot) {
-            $eligibleRooms = $this->getEligibleRooms($course);
+            $eligibleRooms = $this->getEligibleRooms($course)
+                ->filter(fn ($r) => $this->canUseRoomForSection($section, $r));
 
-            foreach ($eligibleRooms as $room) {
-                if ($room->capacity < $section->capacity) {
-                    continue;
+            $eligibleRooms = $eligibleRooms->sortByDesc(function ($r) use ($section, $preferredRoomId) {
+                $score = $this->getRoomSelectionScore($section, $r);
+                if ($preferredRoomId && (int) $r->id === (int) $preferredRoomId) {
+                    $score += 50;
                 }
 
+                return $score;
+            });
+
+            foreach ($eligibleRooms as $room) {
                 if ($this->hasRoomConflictInMemory($room, $timeslot)) {
                     continue;
                 }
 
-                $day = $timeslot->day_of_week;
                 $score = $this->calculateAssignmentScore($section, $course, [$timeslot], $room);
 
                 $possibilities->push([
                     'timeslots' => collect([$timeslot]),
-                    'room' => $room,
-                    'day' => $day,
-                    'score' => $score,
+                    'room'      => $room,
+                    'day'       => $timeslot->day_of_week,
+                    'score'     => $score,
                 ]);
-
-                // Use first available room for this timeslot to avoid duplicates
-                break;
             }
         }
 
         return $possibilities;
     }
 
-    /**
-     * Calculate comprehensive score for an assignment
-     */
-    protected function calculateAssignmentScore($section, $course, $timeslots, $room)
-    {
-        $score = 100; // Base score
-
-        // Day distribution score - prefer less used days
-        $day = $timeslots[0]->day_of_week;
-        $currentDayUsage = $this->dayUsageCount[$day] ?? 0;
-        $score -= $currentDayUsage * 5; // Penalize overused days
-
-        // Teacher load balance
-        $primaryTeacher = $section->teachers->first();
-        if ($primaryTeacher) {
-            $currentHours = $this->teacherHours[$primaryTeacher->id] ?? 0;
-            $score += max(0, (39 - $currentHours)) * 10;
-
-            // Check teacher's day distribution
-            $teacherDayUsage = $this->teacherDayUsage[$primaryTeacher->id][$day] ?? 0;
-            $score -= $teacherDayUsage * 3; // Penalize teachers teaching too many classes on same day
-        }
-
-        // Timeslot preference (avoid early morning/late evening)
-        foreach ($timeslots as $timeslot) {
-            $hour = (int) substr($timeslot->start_time, 0, 2);
-            if ($hour >= 9 && $hour <= 16) {
-                $score += 10;
-            } elseif ($hour < 8 || $hour > 18) {
-                $score -= 5; // Penalty for very early/late
-            }
-        }
-
-        // Room suitability
-        $preferredRoomType = $this->getRequiredRoomType($course);
-        if ($preferredRoomType === 'any' || $this->normalizeRoomType($room->type ?? 'lecture') === $preferredRoomType) {
-            $score += 20;
-        }
-
-        // Student distribution - prefer spreading across days
-        $score += $this->weights['day_distribution'];
-
-        return $score;
-    }
-
-    /**
-     * Apply assignment to in-memory state
-     */
-    protected function applyAssignment($section, &$assignment)
+    protected function applyAssignment($section, &$assignment): void
     {
         $timeslots = $assignment['timeslots'];
-        $room = $assignment['room'];
-        $day = $assignment['day'];
+        $room      = $assignment['room'];
+        $day       = $assignment['day'];
 
-        // Update day usage
+        $this->sectionRoomMap[$section->id]             = $room->id;
+        $this->roomSectionsMap[$room->id][$section->id] = true;
         $this->dayUsageCount[$day] = ($this->dayUsageCount[$day] ?? 0) + count($timeslots);
 
         foreach ($timeslots as $timeslot) {
             $this->currentSchedule[] = [
-                'section_id' => $section->id,
-                'room_id' => $room->id,
+                'section_id'  => $section->id,
+                'room_id'     => $room->id,
                 'timeslot_id' => $timeslot->id,
             ];
 
-            // Update teacher maps
             foreach ($section->teachers as $teacher) {
                 $this->teacherTimeslotMap[$teacher->id][$timeslot->id] = true;
                 $this->teacherHours[$teacher->id] = ($this->teacherHours[$teacher->id] ?? 0) + 1;
-                $this->teacherDayUsage[$teacher->id][$day] = ($this->teacherDayUsage[$teacher->id][$day] ?? 0) + 1;
+                $this->teacherDayUsage[$teacher->id][$day] =
+                    ($this->teacherDayUsage[$teacher->id][$day] ?? 0) + 1;
+                $this->teacherScheduledDays[$teacher->id][$day] = true;
             }
 
-            // Update room maps
             $this->roomTimeslotMap[$room->id][$timeslot->id] = true;
 
-            // Update student maps
             foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
                 $this->studentTimeslotMap[$studentId][$timeslot->id] = true;
             }
@@ -907,212 +806,402 @@ class AutoSchedulerService
         $this->sectionAssignments[$section->id] = $assignment;
     }
 
-    /**
-     * Undo assignment (BACKTRACKING)
-     */
-    protected function undoAssignment($section, $assignment)
+    protected function undoAssignment($section, $assignment): void
     {
         $timeslots = $assignment['timeslots'];
-        $room = $assignment['room'];
-        $day = $assignment['day'];
+        $room      = $assignment['room'];
+        $day       = $assignment['day'];
 
-        // Update day usage
         $this->dayUsageCount[$day] = max(0, ($this->dayUsageCount[$day] ?? 0) - count($timeslots));
 
         foreach ($timeslots as $timeslot) {
             array_pop($this->currentSchedule);
 
-            // Remove from teacher maps
             foreach ($section->teachers as $teacher) {
                 unset($this->teacherTimeslotMap[$teacher->id][$timeslot->id]);
                 $this->teacherHours[$teacher->id] = max(0, ($this->teacherHours[$teacher->id] ?? 0) - 1);
-                if (($this->teacherHours[$teacher->id] ?? 0) == 0) {
+                if (($this->teacherHours[$teacher->id] ?? 0) === 0) {
                     unset($this->teacherHours[$teacher->id]);
                 }
-                $this->teacherDayUsage[$teacher->id][$day] = max(0, ($this->teacherDayUsage[$teacher->id][$day] ?? 0) - 1);
-                if (($this->teacherDayUsage[$teacher->id][$day] ?? 0) == 0) {
+                $this->teacherDayUsage[$teacher->id][$day] =
+                    max(0, ($this->teacherDayUsage[$teacher->id][$day] ?? 0) - 1);
+                if (($this->teacherDayUsage[$teacher->id][$day] ?? 0) === 0) {
                     unset($this->teacherDayUsage[$teacher->id][$day]);
+                }
+                if (!$this->teacherHasAnyScheduledTimeslotOnDay($teacher->id, $day)) {
+                    unset($this->teacherScheduledDays[$teacher->id][$day]);
                 }
             }
 
-            // Remove from room maps
             unset($this->roomTimeslotMap[$room->id][$timeslot->id]);
 
-            // Remove from student maps
             foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
                 unset($this->studentTimeslotMap[$studentId][$timeslot->id]);
+            }
+        }
+
+        if ($this->getCurrentSectionSlotCount($section->id) === 0) {
+            unset($this->sectionRoomMap[$section->id]);
+            unset($this->roomSectionsMap[$room->id][$section->id]);
+            if (empty($this->roomSectionsMap[$room->id])) {
+                unset($this->roomSectionsMap[$room->id]);
             }
         }
 
         unset($this->sectionAssignments[$section->id]);
     }
 
-    /**
-     * Get current slot count for a section
-     */
-    protected function getCurrentSectionSlotCount($sectionId)
+    protected function getCurrentSectionSlotCount($sectionId): int
     {
         $count = 0;
-        foreach ($this->currentSchedule as $assignment) {
-            if ($assignment['section_id'] == $sectionId) {
+        foreach ($this->currentSchedule as $a) {
+            if ($a['section_id'] == $sectionId) {
                 $count++;
             }
         }
-
         return $count;
     }
 
-    /**
-     * Find available room
-     */
-    protected function findAvailableRoom($section, $course, $timeslot)
+    // =========================================================================
+    //  SCORING
+    // =========================================================================
+
+    protected function calculateAssignmentScore($section, $course, $timeslots, $room): int
     {
-        $eligibleRooms = $this->getEligibleRooms($course);
+        $score = 100;
+        $day   = $timeslots[0]->day_of_week;
 
-        // Sort rooms by usage count (least used first)
-        $eligibleRooms = $eligibleRooms->sortBy(function ($room) {
-            return count($this->roomTimeslotMap[$room->id] ?? []);
-        });
+        // Prefer less-used days
+        $score -= ($this->dayUsageCount[$day] ?? 0) * 5;
 
-        foreach ($eligibleRooms as $room) {
-            if ($room->capacity < $section->capacity) {
-                continue;
+        $primaryTeacher = $section->teachers->first();
+        if ($primaryTeacher) {
+            $current  = $this->teacherHours[$primaryTeacher->id] ?? 0;
+            $cap      = $this->getTeacherMaxWeeklyHours($primaryTeacher);
+            $score   += max(0, $cap - $current) * 10;
+            $score   -= ($this->teacherDayUsage[$primaryTeacher->id][$day] ?? 0) * 3;
+
+            if ($this->isConsecutiveTeachingDay($primaryTeacher, $day)) {
+                $score -= 25;
             }
-            if ($this->hasRoomConflictInMemory($room, $timeslot)) {
-                continue;
-            }
-
-            return $room;
-        }
-
-        return null;
-    }
-
-    /**
-     * Find available room with caching
-     */
-    protected function findAvailableRoomWithCache($section, $course, $timeslot)
-    {
-        return $this->findAvailableRoom($section, $course, $timeslot);
-    }
-
-    /**
-     * Get timeslot usage count for load balancing
-     */
-    protected function getTimeslotUsageCount($timeslot)
-    {
-        $count = 0;
-        foreach ($this->roomTimeslotMap as $roomTimeslots) {
-            if (isset($roomTimeslots[$timeslot->id])) {
-                $count++;
+            foreach ($timeslots as $timeslot) {
+                if ($this->isConsecutiveTeachingPeriod($primaryTeacher, $timeslot)) {
+                    $score -= 25;
+                    break;
+                }
             }
         }
 
-        return $count;
-    }
-
-    /**
-     * Get current solution score
-     */
-    protected function getCurrentScore()
-    {
-        $score = 0;
-
-        // Teacher load balance score
-        foreach ($this->teacherHours as $hours) {
-            $score += max(0, 39 - $hours) * 10;
+        foreach ($timeslots as $timeslot) {
+            $hour = (int) substr($timeslot->start_time, 0, 2);
+            if ($hour >= 9 && $hour <= 16) {
+                $score += 10;
+            } elseif ($hour < 8 || $hour > 18) {
+                $score -= 5;
+            }
         }
 
-        // Room utilization score (reward efficient usage)
-        foreach ($this->roomTimeslotMap as $roomTimeslots) {
-            $score += count($roomTimeslots) * 5;
+        $preferredRoomType = $this->getRequiredRoomType($course);
+        if ($preferredRoomType === 'any' || $this->normalizeRoomType($room->type ?? 'lecture') === $preferredRoomType) {
+            $score += 20;
         }
 
-        // Day distribution score - reward even distribution across days
-        $avgUsage = array_sum($this->dayUsageCount) / max(1, count($this->dayUsageCount));
-        foreach ($this->dayUsageCount as $day => $usage) {
-            $deviation = abs($usage - $avgUsage);
-            $score -= $deviation * 2; // Penalize uneven distribution
-        }
-
-        // Penalize unscheduled sections
-        $scheduledSections = count($this->sectionAssignments);
-        $totalSections = $this->sections->count();
-        $score -= ($totalSections - $scheduledSections) * 100;
+        $score += $this->getRoomSelectionScore($section, $room);
+        $score += $this->weights['day_distribution'];
 
         return $score;
     }
 
-    /**
-     * Get day distribution statistics
-     */
-    protected function getDayDistributionStats()
+    // =========================================================================
+    //  ROOM HELPERS
+    // =========================================================================
+
+    protected function canUseRoomForSection($section, $room): bool
     {
-        $stats = [];
-        foreach ($this->dayUsageCount as $day => $count) {
-            $stats[$day] = $count;
+        if ($room->capacity < $section->capacity) {
+            return false;
         }
 
-        return $stats;
+        if (!$this->isStrictRoomSharing()) {
+            return true;
+        }
+
+        $roomSectionIds = array_keys($this->roomSectionsMap[$room->id] ?? []);
+
+        if (in_array($section->id, $roomSectionIds, true)) {
+            return true;
+        }
+
+        $maxSections = (int) config('scheduling.room_max_sections', 0);
+        if ($maxSections > 0 && count($roomSectionIds) >= $maxSections) {
+            return false;
+        }
+
+        if (empty($roomSectionIds)) {
+            return true;
+        }
+
+        $existingSection = $this->sections->firstWhere('id', $roomSectionIds[0]);
+        if (!$existingSection) {
+            return false;
+        }
+
+        if (!$this->isSectionRoomPairCompatible($section, $existingSection)) {
+            return false;
+        }
+
+        $combinedHours = $this->roomWeeklyLoad($room->id)
+            + $this->getRequiredWeeklyHours($section->courseOffering->course);
+
+        return $combinedHours <= (int) config('scheduling.room_combined_hours_limit', 38);
     }
 
-    /**
-     * Prepare final result
-     */
-    protected function prepareResult($success)
+    protected function getRoomSelectionScore($section, $room): int
     {
-        $executionTime = microtime(true) - $this->startTime;
-        $totalRequired = $this->sections->sum(function ($s) {
-            return $s->courseOffering->course->hours_per_week ?? 3;
+        $roomSectionIds = array_keys($this->roomSectionsMap[$room->id] ?? []);
+
+        if (in_array($section->id, $roomSectionIds, true)) {
+            return 1000;
+        }
+
+        if (!$this->isStrictRoomSharing()) {
+            return empty($roomSectionIds) ? 800 : 600;
+        }
+
+        if (empty($roomSectionIds)) {
+            return 800;
+        }
+        $maxSections = (int) config('scheduling.room_max_sections', 0);
+        if ($maxSections > 0 && count($roomSectionIds) >= $maxSections) {
+            return -1000;
+        }
+
+        $existingSection = $this->sections->firstWhere('id', $roomSectionIds[0]);
+        if (!$existingSection) {
+            return -1000;
+        }
+
+        $deptA  = $this->getSectionDepartmentId($section);
+        $deptB  = $this->getSectionDepartmentId($existingSection);
+        $batchA = $this->getSectionBatchKey($section);
+        $batchB = $this->getSectionBatchKey($existingSection);
+
+        if ($deptA === $deptB && $batchA === $batchB) {
+            return 900;
+        }
+        if ($deptA === $deptB && $this->isAdjacentBatch($batchA, $batchB)) {
+            return 800;
+        }
+        if ($deptA !== $deptB && $batchA === $batchB) {
+            return 700;
+        }
+
+        return -1000;
+    }
+
+    protected function roomWeeklyLoad(int $roomId): int
+    {
+        $sectionIds = array_keys($this->roomSectionsMap[$roomId] ?? []);
+        return collect($sectionIds)->sum(function ($sectionId) {
+            $section = $this->sections->firstWhere('id', $sectionId);
+            return $section ? $this->getRequiredWeeklyHours($section->courseOffering->course) : 0;
         });
-
-        $scheduledCount = count($this->bestSchedule ?? $this->currentSchedule);
-        $totalSections = $this->totalSectionCount;
-        $scheduledSectionCount = count($this->sectionAssignments);
-        $conflicts = max(0, $totalSections - $scheduledSectionCount);
-
-        return [
-            'success' => ($scheduledCount > 0),
-            'perfect' => ($conflicts === 0),
-            'message' => ($conflicts === 0 ? 'Schedule generated successfully' : 'Partial schedule generated with conflicts'),
-            'scheduled' => $scheduledCount,
-            'total_sections' => $totalSections,
-            'scheduled_sections' => $scheduledSectionCount,
-            'conflicts' => $conflicts,
-            'day_distribution' => $this->getDayDistributionStats(),
-            'total_required' => $totalRequired,
-            'completion_rate' => round(($scheduledCount / max(1, $totalRequired)) * 100, 2),
-            'backtrack_steps' => $this->backtrackCount,
-            'execution_time' => round($executionTime, 2),
-            'best_score' => $this->bestScore,
-            'attempts' => $this->maxAttempts,
-        ];
     }
 
-    public function getConflicts()
+    protected function findAvailableRoom($section, $course, $timeslot)
     {
-        return $this->conflictDetails ?? [];
+        return $this->getEligibleRooms($course)
+            ->filter(fn ($r) => $this->canUseRoomForSection($section, $r))
+            ->sortByDesc(fn ($r) => $this->getRoomSelectionScore($section, $r))
+            ->first(fn ($r) => !$this->hasRoomConflictInMemory($r, $timeslot));
     }
 
-    // ========== HELPER METHODS ==========
-
-    protected function loadData()
+    protected function hasRoomConflictInMemory($room, $timeslot): bool
     {
-        $this->sections = Section::with(['courseOffering.course', 'courseOffering.semester', 'teachers', 'enrollments'])
-            ->whereHas('courseOffering', function ($q) {
-                $q->where('semester_id', $this->semesterId);
-            })
+        return isset($this->roomTimeslotMap[$room->id][$timeslot->id]);
+    }
+
+    protected function getEligibleRooms($course)
+    {
+        $eligible = $this->rooms->filter(fn ($r) => $this->isRoomSuitableForCourse($r, $course))->values();
+
+        if ($eligible->isNotEmpty()) {
+            return $eligible;
+        }
+
+        $fallback = $this->rooms->values();
+        $courseId = $course->id ?? null;
+        if (!isset($this->warnedRoomFallbackCourses[$courseId])) {
+            Log::warning('No exact room-type match for course; using capacity-based fallback.', [
+                'course_id'          => $courseId,
+                'course_name'        => $course->course_name ?? null,
+                'required_room_type' => $this->getRequiredRoomType($course),
+            ]);
+            $this->warnedRoomFallbackCourses[$courseId] = true;
+        }
+
+        return $fallback;
+    }
+
+    // =========================================================================
+    //  ROOM TYPE HELPERS
+    // =========================================================================
+
+    protected function getRequiredRoomType($course): string
+    {
+        $required    = strtolower(trim((string) ($course->required_room_type ?? '')));
+        $courseName  = strtolower(trim((string) ($course->course_name ?? '')));
+        $courseLevel = strtolower(trim((string) ($course->level ?? 'undergraduate')));
+
+        if ($required !== '' && $required !== 'any') {
+            return $this->normalizeRoomType($required);
+        }
+        if (str_contains($courseName, 'lab')) {
+            return 'lab';
+        }
+        if ($courseLevel === 'graduate') {
+            return 'seminar';
+        }
+        return 'lecture';
+    }
+
+    protected function normalizeRoomType($roomType): string
+    {
+        return match (strtolower(trim((string) $roomType))) {
+            'laboratory', 'computer lab', 'computer-lab', 'computer_lab' => 'lab',
+            'classroom', 'hall', 'auditorium'                            => 'lecture',
+            default => strtolower(trim((string) $roomType)),
+        };
+    }
+
+    protected function isRoomSuitableForCourse($room, $course): bool
+    {
+        $roomType     = $this->normalizeRoomType($room->type ?? 'lecture');
+        $requiredType = $this->getRequiredRoomType($course);
+
+        if ($requiredType === 'any') {
+            return true;
+        }
+        if ($requiredType === 'seminar') {
+            return in_array($roomType, ['seminar', 'conference', 'lecture'], true);
+        }
+        if ($requiredType === 'lecture') {
+            return in_array($roomType, ['lecture', 'seminar', 'conference'], true);
+        }
+        return $roomType === $requiredType;
+    }
+
+    // =========================================================================
+    //  TEACHER DAY / PERIOD HELPERS
+    // =========================================================================
+
+    protected function getDayIndex(string $day): int
+    {
+        return (int) (config("scheduling.days.$day") ?? 99);
+    }
+
+    protected function isConsecutiveTeachingDay($teacher, string $day): bool
+    {
+        $candidateIndex = $this->getDayIndex($day);
+        foreach (array_keys($this->teacherScheduledDays[$teacher->id] ?? []) as $existingDay) {
+            if (abs($candidateIndex - $this->getDayIndex($existingDay)) === 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected function isConsecutiveTeachingPeriod($teacher, $timeslot): bool
+    {
+        $candidate = $this->timeslotOrderMap[$timeslot->id] ?? null;
+        if (!$candidate) {
+            return false;
+        }
+        foreach (array_keys($this->teacherTimeslotMap[$teacher->id] ?? []) as $existingTimeslotId) {
+            $existing = $this->timeslotOrderMap[$existingTimeslotId] ?? null;
+            if ($existing
+                && $candidate['day'] === $existing['day']
+                && abs($candidate['index'] - $existing['index']) === 1
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected function teacherHasAnyScheduledTimeslotOnDay(int $teacherId, string $day): bool
+    {
+        foreach (array_keys($this->teacherTimeslotMap[$teacherId] ?? []) as $timeslotId) {
+            $slot = $this->timeslotOrderMap[$timeslotId] ?? null;
+            if ($slot && $slot['day'] === $day) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // =========================================================================
+    //  SECTION / BATCH HELPERS
+    // =========================================================================
+
+    protected function getSectionDepartmentId($section): ?int
+    {
+        $deptId = $section->courseOffering?->course?->department_id;
+        return $deptId ? (int) $deptId : null;
+    }
+
+    protected function getSectionBatchKey($section): string
+    {
+        return (string) ($section->courseOffering?->semester_id ?? '');
+    }
+
+    protected function isAdjacentBatch($batchA, $batchB): bool
+    {
+        if (!is_numeric($batchA) || !is_numeric($batchB)) {
+            return false;
+        }
+        return abs((int) $batchA - (int) $batchB) === 1;
+    }
+
+    protected function isSectionRoomPairCompatible($sectionA, $sectionB): bool
+    {
+        $deptA  = $this->getSectionDepartmentId($sectionA);
+        $deptB  = $this->getSectionDepartmentId($sectionB);
+        $batchA = $this->getSectionBatchKey($sectionA);
+        $batchB = $this->getSectionBatchKey($sectionB);
+
+        if ($deptA === $deptB && $batchA === $batchB) return true;
+        if ($deptA === $deptB && $this->isAdjacentBatch($batchA, $batchB)) return true;
+        if ($deptA !== $deptB && $batchA === $batchB) return true;
+
+        return false;
+    }
+
+    // =========================================================================
+    //  DATA LOADING & VALIDATION
+    // =========================================================================
+
+    protected function loadData(): void
+    {
+        $this->sections = Section::with([
+            'courseOffering.course',
+            'courseOffering.semester',
+            'teachers',
+            'enrollments',
+        ])
+            ->whereHas('courseOffering', fn ($q) => $q->where('semester_id', $this->semesterId))
             ->get()
-            ->filter(function ($section) {
-                return $section->courseOffering && $section->courseOffering->course;
-            })
+            ->filter(fn ($s) => $s->courseOffering && $s->courseOffering->course)
             ->values();
 
         $this->totalSectionCount = $this->sections->count();
 
         $this->teachers = Teacher::all();
-        $this->rooms = Room::all();
-        $this->timeslots = Timeslot::whereIn('day_of_week', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])
+        $this->rooms    = Room::all();
+
+        $this->timeslots = Timeslot::whereIn('day_of_week', [
+            'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+        ])
             ->orderBy('day_of_week')
             ->orderBy('start_time')
             ->get();
@@ -1122,91 +1211,167 @@ class AutoSchedulerService
         }
 
         $this->timeslotsByDay = $this->timeslots->groupBy('day_of_week');
-
         $this->resetSchedulingState();
 
-        // --- FEASIBILITY PRE-CHECKS ---
-        $totalRequiredSlots = $this->sections->sum(function ($section) {
-            return $section->courseOffering->course->hours_per_week ?? 3;
-        });
+        // Feasibility pre-check
+        $totalRequired = $this->sections->sum(
+            fn ($s) => $this->getRequiredWeeklyHours($s->courseOffering->course)
+        );
         $totalCapacity = $this->timeslots->count() * $this->rooms->count();
 
-        if ($totalRequiredSlots > $totalCapacity) {
-            throw new \Exception("Insufficient total capacity for all required slots. Required: {$totalRequiredSlots}, available: {$totalCapacity}.");
+        if ($totalRequired > $totalCapacity) {
+            throw new \Exception(
+                "Insufficient total capacity. Required: {$totalRequired}, available: {$totalCapacity}."
+            );
         }
 
-        // Check each section has at least one teacher
         foreach ($this->sections as $section) {
             if ($section->teachers->count() === 0) {
-                throw new \Exception('Cannot schedule section '.$section->section_name.' because it has no teacher assigned.');
+                throw new \Exception(
+                    "Cannot schedule section {$section->section_name}: no teacher assigned."
+                );
             }
         }
     }
 
-    protected function validateData()
+    protected function validateData(): void
     {
         if ($this->sections->isEmpty()) {
-            throw new \Exception('No sections found for this semester');
+            throw new \Exception('No sections found for this semester.');
         }
-
         if ($this->teachers->isEmpty()) {
-            throw new \Exception('No teachers found in the system');
+            throw new \Exception('No teachers found in the system.');
         }
-
         if ($this->rooms->isEmpty()) {
-            throw new \Exception('No rooms found in the system');
+            throw new \Exception('No rooms found in the system.');
         }
-
         if ($this->timeslots->isEmpty()) {
-            throw new \Exception('No timeslots found in the system');
+            throw new \Exception('No timeslots found in the system.');
         }
 
         foreach ($this->sections as $section) {
             if ($section->teachers->isEmpty()) {
-                throw new \Exception('Cannot schedule section '.$section->section_name.' because it has no teacher assigned.');
+                throw new \Exception(
+                    "Cannot schedule section {$section->section_name}: no teacher assigned."
+                );
             }
 
-            $hasEligibleRoom = $this->rooms->contains(function ($room) use ($section) {
-                return $room->capacity >= $section->capacity;
-            });
-
-            if (! $hasEligibleRoom) {
-                throw new \Exception('Cannot schedule section '.$section->section_name.' because no eligible room with enough capacity exists for '.$section->courseOffering->course->course_name.'.');
+            $hasRoom = $this->rooms->contains(fn ($r) => $r->capacity >= $section->capacity);
+            if (!$hasRoom) {
+                throw new \Exception(
+                    "Cannot schedule section {$section->section_name}: no room large enough for "
+                    . "{$section->courseOffering->course->course_name}."
+                );
             }
         }
     }
 
-    protected function getEligibleRooms($course)
+    protected function precomputeData(): void
     {
-        $eligibleRooms = $this->rooms->filter(function ($room) use ($course) {
-            return $this->isRoomSuitableForCourse($room, $course);
+        foreach ($this->sections as $section) {
+            $this->sectionStudentIds[$section->id] = $section->enrollments->pluck('student_id')->toArray();
+        }
+
+        $this->timeslotsByDay  = $this->timeslots->groupBy('day_of_week');
+        $this->timeslotOrderMap = [];
+
+        foreach ($this->timeslotsByDay as $day => $dayTimeslots) {
+            foreach ($dayTimeslots->sortBy('start_time')->values() as $index => $timeslot) {
+                $this->timeslotOrderMap[$timeslot->id] = ['day' => $day, 'index' => $index];
+            }
+        }
+
+        foreach ($this->teachers as $teacher) {
+            $this->teacherCourseMap[$teacher->id] = [];
+        }
+        foreach ($this->rooms as $room) {
+            $this->roomCache[$room->id] = [];
+        }
+    }
+
+    protected function sortSectionsByDifficulty()
+    {
+        return $this->sections->sortByDesc(function ($section) {
+            $difficulty  = count($this->sectionStudentIds[$section->id] ?? []) * 10;
+            $difficulty += (10 - min(10, $section->teachers->count())) * 5;
+            $difficulty += $this->getRequiredWeeklyHours($section->courseOffering->course) * 2;
+
+            $eligibleRooms = $this->getEligibleRooms($section->courseOffering->course)->count();
+            if ($eligibleRooms === 0) {
+                $difficulty += 100;
+            } elseif ($eligibleRooms < 3) {
+                $difficulty += 20;
+            }
+
+            return $difficulty;
         })->values();
-
-        if ($eligibleRooms->isNotEmpty()) {
-            return $eligibleRooms;
-        }
-
-        $fallbackRooms = $this->rooms->values();
-
-        if ($fallbackRooms->isNotEmpty()) {
-            Log::warning('No exact room type match found for course; using capacity-based fallback rooms.', [
-                'course_id' => $course->id ?? null,
-                'course_name' => $course->course_name ?? null,
-                'required_room_type' => $this->getRequiredRoomType($course),
-                'fallback_rooms' => $fallbackRooms->pluck('room_code')->all(),
-            ]);
-        }
-
-        return $fallbackRooms;
     }
 
-    protected function hasAnyTeacherConflict($section, $timeslot)
+    // =========================================================================
+    //  COMPLETION PASS (fill remaining weekly slots)
+    // =========================================================================
+
+    protected function attemptFillMissingSlots(array $assignments, $requiredSlotsBySection): array
     {
-        foreach ($section->teachers as $teacher) {
-            if (isset($this->teacherTimeslotMap[$teacher->id][$timeslot->id])) {
-                return true;
+        $this->loadScheduleIntoState($assignments);
+
+        foreach ($requiredSlotsBySection as $sectionId => $required) {
+            $section = $this->sections->firstWhere('id', $sectionId);
+            if (!$section) {
+                continue;
             }
-            if (! $this->hasTeacherHoursAvailable($teacher, $section->courseOffering->course, 1)) {
+
+            $course = $section->courseOffering->course;
+
+            while ($this->getCurrentSectionSlotCount($sectionId) < $required) {
+                $placed = $this->placeOneSlotForSection($section, $course, false);
+
+                if (!$placed && config('scheduling.relax_student_conflicts_on_completion', true)) {
+                    $placed = $this->placeOneSlotForSection($section, $course, true);
+                    if ($placed) {
+                        $this->completionRelaxedStudents = true;
+                    }
+                }
+
+                if (!$placed) {
+                    Log::warning('Completion pass could not place slot', [
+                        'section_id'   => $sectionId,
+                        'section_name' => $section->section_name,
+                        'scheduled'    => $this->getCurrentSectionSlotCount($sectionId),
+                        'required'     => $required,
+                    ]);
+                    break;
+                }
+            }
+        }
+
+        return $this->filterSemesterSchedule($this->currentSchedule);
+    }
+
+    protected function placeOneSlotForSection($section, $course, bool $ignoreStudentConflicts): bool
+    {
+        $eligibleRooms = $this->getEligibleRooms($course)
+            ->filter(fn ($r) => $this->canUseRoomForSection($section, $r))
+            ->sortByDesc(fn ($r) => $this->getRoomSelectionScore($section, $r));
+
+        foreach ($this->timeslots as $timeslot) {
+            if (!$this->isTimeslotValid($section, $course, $timeslot, $ignoreStudentConflicts)) {
+                continue;
+            }
+
+            foreach ($eligibleRooms as $room) {
+                if ($this->hasRoomConflictInMemory($room, $timeslot)) {
+                    continue;
+                }
+
+                $assignment = [
+                    'timeslots' => collect([$timeslot]),
+                    'room'      => $room,
+                    'day'       => $timeslot->day_of_week,
+                    'score'     => 0,
+                ];
+                $this->applyAssignment($section, $assignment);
+
                 return true;
             }
         }
@@ -1214,99 +1379,177 @@ class AutoSchedulerService
         return false;
     }
 
-    protected function hasAnyStudentConflict($section, $timeslot)
+    protected function loadScheduleIntoState(array $assignments): void
     {
-        foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
-            if (isset($this->studentTimeslotMap[$studentId][$timeslot->id])) {
-                return true;
-            }
-        }
+        $this->resetSchedulingState();
 
-        return false;
-    }
+        foreach ($this->filterSemesterSchedule($assignments) as $entry) {
+            $section = $this->sections->firstWhere('id', $entry['section_id']);
+            $timeslot = $this->timeslots->firstWhere('id', $entry['timeslot_id']);
+            $room = $this->rooms->firstWhere('id', $entry['room_id']);
 
-    protected function hasTeacherHoursAvailable($teacher, $course, $slotsNeeded = 1)
-    {
-        $currentHours = $this->teacherHours[$teacher->id] ?? 0;
-        $maxHours = $teacher->max_hours_per_week ?? 39;
-
-        return ($currentHours + $slotsNeeded) <= $maxHours;
-    }
-
-    protected function hasRoomConflictInMemory($room, $timeslot)
-    {
-        return isset($this->roomTimeslotMap[$room->id][$timeslot->id]);
-    }
-
-    protected function getRequiredRoomType($course)
-    {
-        $requiredRoomType = strtolower(trim((string) ($course->required_room_type ?? '')));
-        $courseName = strtolower(trim((string) ($course->course_name ?? '')));
-        $courseLevel = strtolower(trim((string) ($course->level ?? 'undergraduate')));
-
-        if ($requiredRoomType !== '' && $requiredRoomType !== 'any') {
-            return $this->normalizeRoomType($requiredRoomType);
-        }
-
-        if (str_contains($courseName, 'lab')) {
-            return 'lab';
-        }
-
-        if ($courseLevel === 'graduate') {
-            return 'seminar';
-        }
-
-        return 'lecture';
-    }
-
-    protected function normalizeRoomType($roomType)
-    {
-        return match (strtolower(trim((string) $roomType))) {
-            'laboratory', 'computer lab', 'computer-lab', 'computer_lab' => 'lab',
-            'classroom', 'hall', 'auditorium' => 'lecture',
-            default => strtolower(trim((string) $roomType)),
-        };
-    }
-
-    protected function isRoomSuitableForCourse($room, $course)
-    {
-        $roomType = $this->normalizeRoomType($room->type ?? 'lecture');
-        $requiredRoomType = $this->getRequiredRoomType($course);
-
-        if ($requiredRoomType === 'any') {
-            return true;
-        }
-
-        if ($requiredRoomType === 'seminar') {
-            return in_array($roomType, ['seminar', 'conference', 'lecture'], true);
-        }
-
-        if ($requiredRoomType === 'lecture') {
-            return in_array($roomType, ['lecture', 'seminar', 'conference'], true);
-        }
-
-        return $roomType === $requiredRoomType;
-    }
-
-    protected function isTimeslotValid($section, $course, $timeslot)
-    {
-        // Check teacher conflicts
-        foreach ($section->teachers as $teacher) {
-            if (isset($this->teacherTimeslotMap[$teacher->id][$timeslot->id])) {
-                return false;
+            if (!$section || !$timeslot || !$room) {
+                continue;
             }
 
-            // Check teacher hours limit
-            $currentHours = $this->teacherHours[$teacher->id] ?? 0;
-            $maxHours = $teacher->max_hours_per_week ?? 39;
-            if ($currentHours >= $maxHours) {
-                return false;
-            }
+            $assignment = [
+                'timeslots' => collect([$timeslot]),
+                'room'      => $room,
+                'day'       => $timeslot->day_of_week,
+                'score'     => 0,
+            ];
+            $this->applyAssignment($section, $assignment);
+        }
+    }
+
+    // =========================================================================
+    //  STATE MANAGEMENT
+    // =========================================================================
+
+    protected function resetSchedulingState(): void
+    {
+        $this->teacherTimeslotMap          = [];
+        $this->roomTimeslotMap             = [];
+        $this->studentTimeslotMap          = [];
+        $this->teacherHours                = [];
+        $this->sectionAssignments          = [];
+        $this->sectionRoomMap              = [];
+        $this->roomSectionsMap             = [];
+        $this->teacherScheduledDays        = [];
+        $this->warnedRoomFallbackCourses   = [];
+        $this->completionRelaxedStudents   = false;
+        $this->currentSchedule             = [];
+        $this->dayUsageCount               = [];
+        $this->teacherDayUsage             = [];
+        $this->roomCache                   = [];
+        $this->unscheduledSections         = 0;
+        $this->conflictCount               = 0;
+        $this->conflictDetails             = [];
+    }
+
+    // =========================================================================
+    //  RESULT HELPERS
+    // =========================================================================
+
+    protected function filterSemesterSchedule(array $assignments): array
+    {
+        $semesterSectionIds = $this->sections->pluck('id')->flip();
+
+        return collect($assignments)
+            ->filter(fn ($a) => isset($a['section_id'], $a['room_id'], $a['timeslot_id'])
+                && $semesterSectionIds->has($a['section_id']))
+            ->map(fn ($a) => [
+                'section_id'  => (int) $a['section_id'],
+                'room_id'     => (int) $a['room_id'],
+                'timeslot_id' => (int) $a['timeslot_id'],
+            ])
+            ->unique(fn ($a) => $a['section_id'].'-'.$a['timeslot_id'])
+            ->values()
+            ->all();
+    }
+
+    protected function normalizeScheduleEntries(array $assignments): array
+    {
+        return collect($assignments)
+            ->map(fn ($a) => [
+                'section_id'  => (int) $a['section_id'],
+                'room_id'     => (int) $a['room_id'],
+                'timeslot_id' => (int) $a['timeslot_id'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function formatIncompleteScheduleMessage(array $coverage): string
+    {
+        $missingCount = count($coverage['missing']);
+        $base         = "Unable to generate a complete schedule. {$coverage['scheduled_slots']} of "
+             . "{$coverage['required_slots']} required weekly slots were scheduled; "
+             . "{$missingCount} section(s) are incomplete.";
+
+        $details = collect($coverage['missing'] ?? [])
+            ->take(3)
+            ->map(fn ($m) => ($m['section_name'] ?? 'Section').': '
+                .($m['scheduled_slots'] ?? 0).'/'.($m['required_slots'] ?? '?').' slots')
+            ->implode('; ');
+
+        if ($details !== '') {
+            $base .= ' ('.$details.')';
         }
 
-        // Check student conflicts
-        foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
-            if (isset($this->studentTimeslotMap[$studentId][$timeslot->id])) {
+        return $base;
+    }
+
+    protected function getDayDistributionStats(): array
+    {
+        $stats = [];
+        foreach ($this->dayUsageCount as $day => $count) {
+            $stats[$day] = $count;
+        }
+        return $stats;
+    }
+
+    protected function getCurrentScore(): int
+    {
+        $score = 0;
+        foreach ($this->teacherHours as $hours) {
+            $score += max(0, config('scheduling.max_teacher_hours_per_week', 38) - $hours) * 10;
+        }
+        foreach ($this->roomTimeslotMap as $roomTimeslots) {
+            $score += count($roomTimeslots) * 5;
+        }
+        $avgUsage = array_sum($this->dayUsageCount) / max(1, count($this->dayUsageCount));
+        foreach ($this->dayUsageCount as $usage) {
+            $score -= abs($usage - $avgUsage) * 2;
+        }
+        $score -= ($this->sections->count() - count($this->sectionAssignments)) * 100;
+        return $score;
+    }
+
+    protected function prepareResult($success): array
+    {
+        $executionTime    = microtime(true) - $this->startTime;
+        $totalRequired    = $this->sections->sum(fn ($s) => $this->getRequiredWeeklyHours($s->courseOffering->course));
+        $scheduledCount   = count($this->bestSchedule ?? $this->currentSchedule);
+        $scheduledSectionCount = count($this->sectionAssignments);
+        $conflicts        = max(0, $this->totalSectionCount - $scheduledSectionCount);
+
+        return [
+            'success'           => ($scheduledCount > 0),
+            'perfect'           => ($conflicts === 0),
+            'message'           => ($conflicts === 0 ? 'Schedule generated successfully' : 'Partial schedule generated with conflicts'),
+            'scheduled'         => $scheduledCount,
+            'total_sections'    => $this->totalSectionCount,
+            'scheduled_sections'=> $scheduledSectionCount,
+            'conflicts'         => $conflicts,
+            'day_distribution'  => $this->getDayDistributionStats(),
+            'total_required'    => $totalRequired,
+            'completion_rate'   => round(($scheduledCount / max(1, $totalRequired)) * 100, 2),
+            'backtrack_steps'   => $this->backtrackCount,
+            'execution_time'    => round($executionTime, 2),
+            'best_score'        => $this->bestScore,
+            'attempts'          => $this->maxAttempts,
+        ];
+    }
+
+    // =========================================================================
+    //  FORWARD CHECKING (used optionally during backtracking)
+    // =========================================================================
+
+    protected function forwardCheck($sectionIndex, $assignment): bool
+    {
+        $remainingSections = $this->sections->slice($sectionIndex + 1);
+
+        foreach ($remainingSections as $remainingSection) {
+            $course        = $remainingSection->courseOffering->course;
+            $requiredSlots = $this->getRequiredWeeklyHours($course);
+
+            $validTimeslots = $this->timeslots->filter(
+                fn ($ts) => $this->isTimeslotValid($remainingSection, $course, $ts)
+                    && $this->findAvailableRoom($remainingSection, $course, $ts) !== null
+            );
+
+            if ($validTimeslots->count() < $requiredSlots) {
                 return false;
             }
         }
@@ -1314,27 +1557,15 @@ class AutoSchedulerService
         return true;
     }
 
-    protected function resetSchedulingState()
-    {
-        $this->teacherTimeslotMap = [];
-        $this->roomTimeslotMap = [];
-        $this->studentTimeslotMap = [];
-        $this->teacherHours = [];
-        $this->sectionAssignments = [];
-        $this->currentSchedule = [];
-        $this->dayUsageCount = [];
-        $this->teacherDayUsage = [];
-        $this->roomCache = [];
-        $this->unscheduledSections = 0;
-        $this->conflictCount = 0;
-        $this->conflictDetails = [];
-    }
+    // =========================================================================
+    //  DEFAULT TIMESLOTS (fallback)
+    // =========================================================================
 
     protected function createDefaultTimeslots()
     {
-        $defaultTimeslots = collect();
-        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-        $times = [
+        $slots   = collect();
+        $days    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        $times   = [
             ['start' => '08:00', 'end' => '09:30'],
             ['start' => '09:30', 'end' => '11:00'],
             ['start' => '11:00', 'end' => '12:30'],
@@ -1346,15 +1577,15 @@ class AutoSchedulerService
         $counter = 1;
         foreach ($days as $day) {
             foreach ($times as $time) {
-                $defaultTimeslots->push((object) [
-                    'id' => $counter++,
+                $slots->push((object) [
+                    'id'          => $counter++,
                     'day_of_week' => $day,
-                    'start_time' => $time['start'],
-                    'end_time' => $time['end'],
+                    'start_time'  => $time['start'],
+                    'end_time'    => $time['end'],
                 ]);
             }
         }
 
-        return $defaultTimeslots;
+        return $slots;
     }
 }

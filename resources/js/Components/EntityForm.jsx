@@ -208,7 +208,7 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                         { value: 'Other', label: 'Other' }
                     ]
                 },
-                max_hours_per_week: { type: 'number', min: 1, max: 40, label: 'Max Hours per Week' },
+                max_hours_per_week: { type: 'number', min: 1, max: 38, label: 'Max Hours per Week' },
                 status: { 
                     type: 'select', 
                     options: [
@@ -220,8 +220,8 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
             courses: {
                 course_code: { label: 'Course Code' },
                 course_name: { label: 'Course Name' },
-                credits: { type: 'number', min: 1, max: 10, label: 'Credits' },
-                hours_per_week: { type: 'number', min: 1, max: 39, label: 'Hours per Week' },
+                credits: { type: 'number', min: 1, max: 38, label: 'Credits' },
+                hours_per_week: { type: 'number', min: 1, max: 38, label: 'Hours per Week' },
                 department_id: {
                     type: 'select',
                     label: 'Department',

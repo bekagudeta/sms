@@ -379,7 +379,7 @@ class DashboardController extends Controller
             'department_id' => 'required_if:role,student,teacher|nullable|exists:departments,id',
             'level' => 'required_if:role,student|nullable|string',
             'academic_section' => 'required_if:role,student|nullable|string|max:50',
-            'max_hours_per_week' => 'required_if:role,teacher|nullable|integer|min:1|max:40',
+            'max_hours_per_week' => 'required_if:role,teacher|nullable|integer|min:1|max:38',
         ]);
 
         DB::transaction(function () use ($validated) {

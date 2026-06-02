@@ -10,7 +10,7 @@ export default function Form({
     submitText = 'Submit' 
 }) {
     const renderField = (field) => {
-        const { name, label, type = 'text', options = [], required = false, placeholder = '' } = field;
+        const { name, label, type = 'text', options = [], required = false, placeholder = '', min, max, step } = field;
         const value = data[name] || '';
 
         switch (type) {
@@ -61,6 +61,9 @@ export default function Form({
                         id={name}
                         value={value}
                         onChange={e => setData(name, e.target.value)}
+                        min={min}
+                        max={max}
+                        step={step}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                         placeholder={placeholder}
                     />

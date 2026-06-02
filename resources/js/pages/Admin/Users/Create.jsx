@@ -95,7 +95,7 @@ export default function CreateUser({ roles, departments }) {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Max Hours Per Week</label>
-                                        <input type="number" value={data.max_hours_per_week} onChange={e => setData('max_hours_per_week', e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                                        <input type="number" min="1" max="38" value={data.max_hours_per_week} onChange={e => setData('max_hours_per_week', e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
                                         {errors.max_hours_per_week && <p className="text-red-500 text-sm mt-1">{errors.max_hours_per_week}</p>}
                                     </div>
                                 </>

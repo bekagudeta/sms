@@ -46,7 +46,7 @@ class TeacherRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:20'],
             'department_id' => ['required', 'exists:departments,id'],
             'qualification' => ['nullable', 'string', 'max:255'],
-            'max_hours_per_week' => ['required', 'integer', 'min:1', 'max:40'],
+            'max_hours_per_week' => ['required', 'integer', 'min:1', 'max:38'],
         ];
     }
 }

@@ -46,16 +46,16 @@ class CourseController extends Controller
             'course_code'     => 'required|string|max:50|unique:courses,course_code',
             'course_name'     => 'required|string|max:255',
             'description'     => 'nullable|string',
-            'credits'         => 'required|integer|min:1|max:15',
-            'hours_per_week'  => 'required|integer|min:1|max:39',
+            'credits'         => 'required|integer|min:1|max:38',
+            'hours_per_week'  => 'required|integer|min:1|max:38',
             'department_id'   => 'required|exists:departments,id',
             'level'           => 'required|in:undergraduate,graduate,diploma',
         ]);
 
         // Optional logical constraint (stronger data integrity)
-        if ($validated['hours_per_week'] < $validated['credits']) {
+        if ($validated['hours_per_week'] !== $validated['credits']) {
             return back()->withErrors([
-                'hours_per_week' => 'Hours per week should be greater than or equal to credits.'
+                'hours_per_week' => 'Hours per week must exactly match credits.'
             ])->withInput();
         }
 
@@ -83,16 +83,16 @@ class CourseController extends Controller
             'course_code'     => 'required|string|max:50|unique:courses,course_code,' . $course->id,
             'course_name'     => 'required|string|max:255',
             'description'     => 'nullable|string',
-            'credits'         => 'required|integer|min:1|max:15',
-            'hours_per_week'  => 'required|integer|min:1|max:39',
+            'credits'         => 'required|integer|min:1|max:38',
+            'hours_per_week'  => 'required|integer|min:1|max:38',
             'department_id'   => 'required|exists:departments,id',
             'level'           => 'required|in:undergraduate,graduate,diploma',
         ]);
 
         // Optional logical constraint
-        if ($validated['hours_per_week'] < $validated['credits']) {
+        if ($validated['hours_per_week'] !== $validated['credits']) {
             return back()->withErrors([
-                'hours_per_week' => 'Hours per week should be greater than or equal to credits.'
+                'hours_per_week' => 'Hours per week must exactly match credits.'
             ])->withInput();
         }
 

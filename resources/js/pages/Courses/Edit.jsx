@@ -23,8 +23,8 @@ export default function Edit({ course, teachers, departments, semesters }) {
         { name: 'course_code', label: 'Course Code', type: 'text', required: true },
         { name: 'course_name', label: 'Course Name', type: 'text', required: true },
         { name: 'description', label: 'Description', type: 'textarea' },
-        { name: 'credits', label: 'Credits', type: 'number', required: true },
-        { name: 'hours_per_week', label: 'Hours Per Week', type: 'number', required: true },
+        { name: 'credits', label: 'Credits', type: 'number', required: true, min: 1, max: 38 },
+        { name: 'hours_per_week', label: 'Hours Per Week', type: 'number', required: true, min: 1, max: 38 },
         { 
             name: 'department_id', 
             label: 'Department', 

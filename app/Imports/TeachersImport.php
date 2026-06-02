@@ -77,7 +77,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
                     'phone' => $row['phone'] ?? null,
                     'department_id' => $department->id,
                     'qualification' => $row['qualification'] ?? null,
-                    'max_hours_per_week' => $row['max_hours_per_week'] ?? 20,
+                    'max_hours_per_week' => $row['max_hours_per_week'] ?? 38,
                 ]
             );
             $this->rowCount++;
@@ -96,7 +96,7 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
             '*.department_name' => 'nullable|string|exists:departments,name',
             '*.phone' => 'nullable|string',
             '*.qualification' => 'nullable|string',
-            '*.max_hours_per_week' => 'nullable|integer|min:1|max:40',
+            '*.max_hours_per_week' => 'nullable|integer|min:1|max:38',
         ];
     }
 

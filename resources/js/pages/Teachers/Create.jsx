@@ -12,7 +12,7 @@ export default function Create({ departments }) {
         phone: '',
         department_id: '',
         qualification: '',
-        max_hours_per_week: 20
+        max_hours_per_week: 38
     });
 
     const handleSubmit = (e) => {
@@ -37,7 +37,7 @@ export default function Create({ departments }) {
             })) || []
         },
         { name: 'qualification', label: 'Qualification', type: 'text' },
-        { name: 'max_hours_per_week', label: 'Max Hours Per Week', type: 'number', required: true }
+        { name: 'max_hours_per_week', label: 'Max Hours Per Week', type: 'number', required: true, max: 38, min: 1 }
     ];
 
     return (

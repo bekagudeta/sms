@@ -11,7 +11,7 @@ export default function Edit({ teacher, departments }) {
         phone: teacher.phone || '',
         department_id: teacher.department_id || '',
         qualification: teacher.qualification || '',
-        max_hours_per_week: teacher.max_hours_per_week || 20
+        max_hours_per_week: teacher.max_hours_per_week || 38
     });
 
     const handleSubmit = (e) => {
@@ -35,7 +35,7 @@ export default function Edit({ teacher, departments }) {
             })) || []
         },
         { name: 'qualification', label: 'Qualification', type: 'text' },
-        { name: 'max_hours_per_week', label: 'Max Hours Per Week', type: 'number', required: true }
+        { name: 'max_hours_per_week', label: 'Max Hours Per Week', type: 'number', required: true, max: 38, min: 1 }
     ];
 
     return (

@@ -596,7 +596,10 @@ class ScheduleController extends Controller
             $q->where('teachers.id', $teacher->id);
         })->count();
 
-        $maxHours = $teacher->max_hours_per_week ?? 20;
+        $maxHours = min(
+            (int) ($teacher->max_hours_per_week ?? config('scheduling.max_teacher_hours_per_week', 38)),
+            (int) config('scheduling.max_teacher_hours_per_week', 38)
+        );
 
         if ($currentHours >= $maxHours) {
             return [

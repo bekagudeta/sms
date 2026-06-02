@@ -139,8 +139,8 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation, Ski
         return [
             '*.course_code' => 'required|string',
             '*.course_name' => 'required|string',
-            '*.credits' => 'required|integer|min:1|max:6',
-            '*.hours_per_week' => 'required|integer|min:1|max:6',
+            '*.credits' => 'required|integer|min:1|max:38',
+            '*.hours_per_week' => 'required|integer|min:1|max:38',
             '*.department_id' => 'required_without_all:*.department_code,*.department_name|integer|exists:departments,id',
             '*.department_code' => 'nullable|string|exists:departments,code',
             '*.department_name' => 'nullable|string|exists:departments,name',

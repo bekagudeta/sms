@@ -88,7 +88,7 @@ class UserSeeder extends Seeder
                 'department_id' => $department->id,
                 'phone' => '000-000-0000',
                 'qualification' => 'N/A',
-                'max_hours_per_week' => 20,
+                'max_hours_per_week' => 38,
             ]
         );
 
