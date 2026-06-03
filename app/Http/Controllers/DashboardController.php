@@ -9,6 +9,9 @@ use App\Models\Course;
 use App\Models\Schedule;
 use App\Models\Semester;
 use App\Models\Department;
+use App\Repositories\ScheduleRepository;
+use App\Services\TeacherStudentService;
+use App\Support\TeacherScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +21,23 @@ use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        protected ScheduleRepository $scheduleRepository,
+        protected TeacherStudentService $teacherStudentService
+    ) {}
+
+    protected function scheduleEagerLoads(): array
+    {
+        return [
+            'section.courseOffering.course.department',
+            'section.courseOffering.semester',
+            'section.teachers.user',
+            'section.enrollments.student',
+            'room',
+            'timeslot',
+        ];
+    }
+
     // Student schedule view (timetable)
     public function studentSchedule()
     {
@@ -26,7 +46,7 @@ class DashboardController extends Controller
 
         if (!$student) {
             // If no student profile is found, show generic schedule entries
-            $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
+            $schedules = Schedule::with($this->scheduleEagerLoads())
                 ->latest()
                 ->take(20)
                 ->get();
@@ -38,20 +58,18 @@ class DashboardController extends Controller
 
             // fallback to broader schedule when no exact matches are found
             if ($schedules->isEmpty()) {
-                $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
+                $schedules = Schedule::with($this->scheduleEagerLoads())
                     ->latest()
                     ->take(20)
                     ->get();
             }
         } catch (\Exception $e) {
-            // Log the error for debugging but don't expose it to the user
             \Log::error('Error in studentSchedule method: ' . $e->getMessage(), [
                 'student_id' => $student->id,
                 'user_id' => $user->id
             ]);
-            
-            // Fallback to basic schedule query
-            $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
+
+            $schedules = Schedule::with($this->scheduleEagerLoads())
                 ->latest()
                 ->take(20)
                 ->get();
@@ -68,11 +86,16 @@ class DashboardController extends Controller
         if (!$teacher) {
             abort(403, 'Teacher profile missing');
         }
-        $schedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
-            ->whereHas('section.teachers', function($query) use ($teacher) {
-                $query->where('teachers.id', $teacher->id);
+        $schedules = Schedule::with($this->scheduleEagerLoads())
+            ->whereHas('section.teachers', function ($query) use ($teacher) {
+                TeacherScope::wherePrimaryKey($query, $teacher->id);
             })
+            ->join('timeslots', 'schedules.timeslot_id', '=', 'timeslots.id')
+            ->orderBy('timeslots.day_of_week')
+            ->orderBy('timeslots.start_time')
+            ->select('schedules.*')
             ->get();
+
         return view('teacher.schedule', compact('schedules'));
     }
     public function index()
@@ -200,6 +223,39 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function teacherStudents(Request $request)
+    {
+        $teacher = Auth::user()?->teacher;
+        abort_unless($teacher, 403, 'Teacher profile missing.');
+
+        $semesters = Semester::orderByDesc('start_date')->get();
+        $semesterId = $request->integer('semester_id')
+            ?: Semester::where('is_active', true)->value('id');
+
+        $students = $this->teacherStudentService->studentsForTeacher(
+            $teacher,
+            $semesterId ?: null
+        );
+
+        $currentSemester = $semesters->firstWhere('id', $semesterId);
+
+        return Inertia::render('Teacher/Students', [
+            'students' => $students,
+            'semesters' => $semesters->map(fn ($semester) => [
+                'id' => $semester->id,
+                'name' => $semester->name,
+                'academic_year' => $semester->resolved_academic_year,
+                'is_active' => $semester->is_active,
+            ])->values(),
+            'currentSemesterId' => $semesterId,
+            'currentSemester' => $currentSemester ? [
+                'id' => $currentSemester->id,
+                'name' => $currentSemester->name,
+                'academic_year' => $currentSemester->resolved_academic_year,
+            ] : null,
+        ]);
+    }
+
     public function teacher()
     {
         $user = Auth::user();
@@ -207,20 +263,33 @@ class DashboardController extends Controller
 
         $teacher = $user->teacher;
         $recentSchedules = collect();
+        $myStudents = collect();
+        $activeSemester = Semester::where('is_active', true)->first();
+
         if ($teacher) {
-            $recentSchedules = Schedule::whereHas('section.teachers', function($query) use ($teacher) {
-                    $query->where('teachers.id', $teacher->id);
-                })
-                ->with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
-                ->latest()
-                ->take(5)
-                ->get();
+            $recentSchedules = $this->scheduleRepository
+                ->getByTeacher($teacher->id)
+                ->sortBy([
+                    fn ($s) => array_search($s->timeslot?->day_of_week, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], true) ?: 99,
+                    fn ($s) => $s->timeslot?->start_time,
+                ])
+                ->values();
+
+            $myStudents = $this->teacherStudentService->studentsForTeacher(
+                $teacher,
+                $activeSemester?->id
+            );
         }
 
-        $stats = []; // teacher dashboard does not display global stats
         return Inertia::render('Dashboard/Index', [
-            'stats' => $stats,
+            'stats' => [],
             'recentSchedules' => $recentSchedules,
+            'myStudents' => $myStudents,
+            'activeSemester' => $activeSemester ? [
+                'id' => $activeSemester->id,
+                'name' => $activeSemester->name,
+                'academic_year' => $activeSemester->resolved_academic_year,
+            ] : null,
             'role' => $role,
         ]);
     }
@@ -313,8 +382,8 @@ class DashboardController extends Controller
                 'email' => $user->email,
                 'first_name' => explode(' ', trim($user->name))[0] ?? null,
                 'last_name' => trim(str_replace(explode(' ', trim($user->name))[0] ?? '', '', $user->name)),
-                'semester' => 1,
                 'academic_section' => 'Unassigned',
+                'department_id' => Department::query()->value('id'),
                 'enrollment_date' => now(),
             ]);
         }
@@ -324,28 +393,13 @@ class DashboardController extends Controller
 
     private function buildStudentScheduleQuery(Student $student)
     {
-        $query = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot']);
+        $query = Schedule::with($this->scheduleEagerLoads());
 
-        // Primary filter: Department-based filtering
-        if ($student->department_id) {
-            $query->whereHas('section.courseOffering.course', function ($q) use ($student) {
-                $q->where('department_id', $student->department_id);
-                
-                // Only filter by level if it matches course levels (skip numeric vs text mismatch)
-                if (!empty($student->level) && !is_numeric($student->level)) {
-                    $q->where('level', $student->level);
-                }
+        $activeSemester = Semester::where('is_active', true)->first();
+        if ($activeSemester) {
+            $query->whereHas('section.courseOffering', function ($q) use ($activeSemester) {
+                $q->where('semester_id', $activeSemester->id);
             });
-        }
-
-        // Optional semester filtering
-        if (!empty($student->semester)) {
-            $semesterModel = Semester::where('name', $student->semester . ' Semester')->first();
-            if ($semesterModel) {
-                $query->whereHas('section.courseOffering', function ($q) use ($semesterModel) {
-                    $q->where('semester_id', $semesterModel->id);
-                });
-            }
         }
 
         $enrolledSectionIds = $student->enrollments()->pluck('section_id');
@@ -405,7 +459,6 @@ class DashboardController extends Controller
                     'last_name' => $lastName,
                     'email' => $validated['email'],
                     'department_id' => $validated['department_id'],
-                    'semester' => 1, // Default to first semester
                     'level' => $validated['level'],
                     'academic_section' => $validated['academic_section'],
                     'enrollment_date' => now()->toDateString(),

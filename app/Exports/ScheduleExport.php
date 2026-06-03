@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Schedule;
+use App\Support\ScheduleDisplay;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -20,7 +21,14 @@ class ScheduleExport implements FromCollection, WithHeadings, WithMapping, WithS
 
     public function collection()
     {
-        $query = Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot', 'section.courseOffering.semester']);
+        $query = Schedule::with([
+            'section.courseOffering.course.department',
+            'section.courseOffering.semester',
+            'section.teachers.user',
+            'section.enrollments.student',
+            'room',
+            'timeslot',
+        ]);
         
         if ($this->semesterId) {
             $query->whereHas('section.courseOffering', function($q) {
@@ -34,38 +42,40 @@ class ScheduleExport implements FromCollection, WithHeadings, WithMapping, WithS
     public function headings(): array
     {
         return [
+            'Academic Year',
+            'Department',
+            'Year Level',
+            'Semester',
             'Course Code',
             'Course Name',
-            'Teacher',
-            'Room',
+            'Instructor',
+            'Classroom',
             'Day',
             'Time',
-            'Semester',
             'Section',
             'Max Students',
-            'Status'
+            'Status',
         ];
     }
 
     public function map($schedule): array
     {
-        $course = $schedule->section?->courseOffering?->course;
-        $teacher = $schedule->section?->teachers?->first();
-        $semester = $schedule->section?->courseOffering?->semester;
-        
+        $display = ScheduleDisplay::for($schedule);
+
         return [
-            $course?->course_code ?? 'N/A',
-            $course?->course_name ?? 'N/A',
-            $teacher?->user?->name ?? 'Not assigned',
-            $schedule->room?->room_code ?? 'N/A',
-            $schedule->timeslot?->day_of_week ?? 'Not set',
-            $schedule->timeslot?->start_time && $schedule->timeslot?->end_time ? 
-                $schedule->timeslot->start_time . ' - ' . $schedule->timeslot->end_time : 
-                'Not set',
-            $semester?->name ?? 'N/A',
-            $schedule->section?->section_name ?? 'N/A',
+            $display['academic_year'] ?? 'N/A',
+            $display['department'] ?? 'N/A',
+            $display['year_level'] ?? 'N/A',
+            $display['semester'] ?? 'N/A',
+            $display['course_code'] ?? 'N/A',
+            $display['course_name'] ?? 'N/A',
+            $display['instructor'] ?? 'Not assigned',
+            $display['classroom'] ?? 'N/A',
+            $display['day'] ?? 'Not set',
+            $display['time'] ?? 'Not set',
+            $display['section'] ?? 'N/A',
             $schedule->section?->capacity ?? 'N/A',
-            'Scheduled'
+            'Scheduled',
         ];
     }
 

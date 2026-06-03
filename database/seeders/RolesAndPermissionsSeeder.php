@@ -26,6 +26,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'generate schedule',
             'import data',
             'export schedule',
+            'view own students',
+            'export own students',
             'manage sections', 'view sections', 'create sections', 'edit sections', 'delete sections', 'import sections',
             'manage course-offerings', 'view course-offerings', 'create course-offerings', 'edit course-offerings', 'delete course-offerings', 'import course-offerings',
         ];
@@ -47,6 +49,8 @@ class RolesAndPermissionsSeeder extends Seeder
                 'generate schedule',
                 'import data',
                 'export schedule',
+            'view own students',
+            'export own students',
                 'manage sections', 'view sections', 'create sections', 'edit sections', 'delete sections', 'import sections',
                 'manage course-offerings', 'view course-offerings', 'create course-offerings', 'edit course-offerings', 'delete course-offerings', 'import course-offerings',
             ],
@@ -58,6 +62,8 @@ class RolesAndPermissionsSeeder extends Seeder
             ],
             'teacher' => [
                 'view schedules',
+                'view own students',
+                'export own students',
             ],
             'student' => [
                 'view schedules',

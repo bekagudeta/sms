@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Imports\StudentPromotionsImport;
 use App\Imports\StudentsImport;
 use App\Imports\TeachersImport;
 use App\Imports\CoursesImport;
@@ -31,7 +32,7 @@ class ExcelImportService
             
             return [
                 'success' => true,
-                'message' => 'Students imported successfully',
+                'message' => 'Students imported successfully. Existing student_id values were updated in place (no duplicate records).',
                 'count' => $import->getRowCount(),
                 'credentials' => $import->credentials,
             ];
@@ -54,6 +55,28 @@ class ExcelImportService
             return [
                 'success' => false,
                 'message' => 'Import failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    public function importStudentPromotions($file)
+    {
+        try {
+            $import = new StudentPromotionsImport();
+            Excel::import($import, $file);
+
+            return [
+                'success' => true,
+                'message' => 'Student promotions applied. Use Enrollments import for the new term — student profiles were not re-created.',
+                'count' => $import->updatedCount,
+                'skipped' => $import->skippedCount,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Student promotion import failed: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Import failed: '.$e->getMessage(),
             ];
         }
     }

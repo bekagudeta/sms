@@ -1,36 +1,22 @@
 @extends('layouts.app')
 @section('content')
-    <h2>Student Timetable</h2>
+    <div class="mb-6">
+        <h2 class="text-2xl font-bold">Student Timetable</h2>
+        <p class="text-gray-600 mt-1">Your enrolled classes with full schedule details.</p>
+    </div>
     @if($schedules->isEmpty())
         <p>No schedules found.</p>
     @else
         @php
-            $grouped = $schedules->groupBy(function($item) {
-                return $item->timeslot->day;
-            });
+            $grouped = $schedules->groupBy(fn ($item) => $item->timeslot?->day_of_week ?? 'Unscheduled');
+            $dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Unscheduled'];
         @endphp
-        @foreach($grouped as $day => $items)
-            <h3>{{ $day }}</h3>
-            <table border="1" style="margin-bottom: 2em;">
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Course</th>
-                        <th>Teacher</th>
-                        <th>Room</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach($items->sortBy(fn($s) => $s->timeslot->start_time) as $schedule)
-                    <tr>
-                        <td>{{ $schedule->timeslot->start_time }} - {{ $schedule->timeslot->end_time }}</td>
-                        <td>{{ $schedule->course->course_name }}</td>
-                        <td>{{ $schedule->teacher->user->name ?? 'N/A' }}</td>
-                        <td>{{ $schedule->room->room_code }}</td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
+        @foreach($dayOrder as $day)
+            @if(!isset($grouped[$day]))
+                @continue
+            @endif
+            <h3 class="text-lg font-semibold mb-2">{{ $day }}</h3>
+            @include('partials.schedule-table', ['items' => $grouped[$day]])
         @endforeach
     @endif
 @endsection

@@ -40,7 +40,11 @@ export default function Show({ schedule }) {
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Department:</span>
-                                    <span className="ml-2 text-gray-600">{schedule.course?.department?.name || schedule.section?.course_offering?.course?.department?.name || 'N/A'}</span>
+                                    <span className="ml-2 text-gray-600">{schedule.department_name || schedule.course?.department?.name || 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span className="font-medium text-gray-700">Year Level:</span>
+                                    <span className="ml-2 text-gray-600">{schedule.year_level || schedule.display?.year_level || 'N/A'}</span>
                                 </div>
                             </div>
                         </div>
@@ -49,11 +53,15 @@ export default function Show({ schedule }) {
                             <h3 className="text-lg font-medium text-gray-900 mb-4">Schedule Details</h3>
                             <div className="space-y-3">
                                 <div>
-                                    <span className="font-medium text-gray-700">Teacher:</span>
+                                    <span className="font-medium text-gray-700">Academic Year:</span>
+                                    <span className="ml-2 text-gray-600">{schedule.academic_year || schedule.display?.academic_year || 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span className="font-medium text-gray-700">Instructor:</span>
                                     <span className="ml-2 text-gray-600">{schedule.teacher_name || 'Not assigned'}</span>
                                 </div>
                                 <div>
-                                    <span className="font-medium text-gray-700">Room:</span>
+                                    <span className="font-medium text-gray-700">Classroom:</span>
                                     <span className="ml-2 text-gray-600">{schedule.room?.room_code || 'Not assigned'}</span>
                                 </div>
                                 <div>
@@ -62,12 +70,7 @@ export default function Show({ schedule }) {
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Time:</span>
-                                    <span className="ml-2 text-gray-600">
-                                        {schedule.timeslot?.start_time && schedule.timeslot?.end_time ? 
-                                            `${schedule.timeslot.start_time} - ${schedule.timeslot.end_time}` : 
-                                            'Not set'
-                                        }
-                                    </span>
+                                    <span className="ml-2 text-gray-600">{schedule.time_range || 'Not set'}</span>
                                 </div>
                                 <div>
                                     <span className="font-medium text-gray-700">Semester:</span>

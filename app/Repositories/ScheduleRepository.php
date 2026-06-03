@@ -3,19 +3,20 @@
 namespace App\Repositories;
 
 use App\Models\Schedule;
+use App\Support\TeacherScope;
 use Illuminate\Support\Collection;
 
 class ScheduleRepository
 {
     public function getAll(): Collection
     {
-        return Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot', 'section.courseOffering.semester'])
+        return Schedule::with($this->scheduleRelations())
             ->get();
     }
 
     public function paginate(int $perPage = 10, ?int $semesterId = null)
     {
-        return Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot'])
+        return Schedule::with($this->scheduleRelations())
             ->when($semesterId, fn($query) => $query->whereHas('section.courseOffering', function ($q) use ($semesterId) {
                 $q->where('semester_id', $semesterId);
             }))
@@ -29,9 +30,9 @@ class ScheduleRepository
 
     public function paginateByTeacher(int $teacherId, int $perPage = 10)
     {
-        return Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot', 'section.courseOffering.semester'])
+        return Schedule::with($this->scheduleRelations())
             ->whereHas('section.teachers', function ($q) use ($teacherId) {
-                $q->where('teachers.id', $teacherId);
+                TeacherScope::wherePrimaryKey($q, $teacherId);
             })
             ->join('timeslots', 'schedules.timeslot_id', '=', 'timeslots.id')
             ->orderBy('timeslots.day_of_week')
@@ -43,7 +44,7 @@ class ScheduleRepository
 
     public function paginateBySemester(int $semesterId, int $perPage = 10)
     {
-        return Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot'])
+        return Schedule::with($this->scheduleRelations())
             ->whereHas('section.courseOffering', function ($q) use ($semesterId) {
                 $q->where('semester_id', $semesterId);
             })
@@ -57,7 +58,7 @@ class ScheduleRepository
 
     public function paginateByStudent(int $studentId, int $perPage = 10)
     {
-        return Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot'])
+        return Schedule::with($this->scheduleRelations())
             ->whereHas('section.enrollments', function ($q) use ($studentId) {
                 $q->where('student_id', $studentId);
             })
@@ -71,7 +72,7 @@ class ScheduleRepository
 
     public function findById($id): ?Schedule
     {
-        return Schedule::with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot'])
+        return Schedule::with($this->scheduleRelations())
             ->find($id);
     }
 
@@ -97,26 +98,38 @@ class ScheduleRepository
         return Schedule::whereHas('section.courseOffering', function ($q) use ($semesterId) {
             $q->where('semester_id', $semesterId);
         })
-            ->with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot'])
+            ->with($this->scheduleRelations())
             ->get();
     }
 
     public function getByTeacher($teacherId): Collection
     {
         return Schedule::whereHas('section.teachers', function ($q) use ($teacherId) {
-            $q->where('teacher_id', $teacherId);
+            TeacherScope::wherePrimaryKey($q, $teacherId);
         })
-            ->with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot'])
+            ->with($this->scheduleRelations())
             ->get();
     }
 
     public function getByRoom($roomId): Collection
     {
         return Schedule::where('room_id', $roomId)
-            ->with(['section.courseOffering.course', 'section.teachers', 'room', 'timeslot'])
+            ->with($this->scheduleRelations())
             ->get();
     }
-    
+
+    protected function scheduleRelations(): array
+    {
+        return [
+            'section.courseOffering.course.department',
+            'section.courseOffering.semester',
+            'section.teachers.user',
+            'section.enrollments.student',
+            'room',
+            'timeslot',
+        ];
+    }
+
     public function checkConflicts($roomId, $timeslotId, $semesterId, $excludeId = null): bool
     {
         $query = Schedule::where('room_id', $roomId)

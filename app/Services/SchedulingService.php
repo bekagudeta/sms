@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\Teacher;
 use App\Models\Room;
 use App\Models\Timeslot;
+use App\Support\TeacherScope;
 use Illuminate\Support\Facades\DB;
 
 class SchedulingService
@@ -118,7 +119,7 @@ class SchedulingService
     {
         foreach ($section->teachers as $teacher) {
             $conflict = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
-                $q->where('teacher_id', $teacher->id);
+                TeacherScope::wherePrimaryKey($q, $teacher->id);
             })
             ->where('timeslot_id', $timeslot->id)
             ->exists();
@@ -151,7 +152,7 @@ class SchedulingService
     {
         // Count schedules where teacher is assigned through section_teachers relationship
         $hours = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
-                $q->where('teacher_id', $teacher->id);
+                TeacherScope::wherePrimaryKey($q, $teacher->id);
             })
             ->whereHas('section.courseOffering', function($q) use ($semesterId) {
                 $q->where('semester_id', $semesterId);
@@ -170,7 +171,7 @@ class SchedulingService
     {
         // Count schedules where teacher is assigned through section_teachers on the same day
         $hours = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
-                $q->where('teacher_id', $teacher->id);
+                TeacherScope::wherePrimaryKey($q, $teacher->id);
             })
             ->whereHas('section.courseOffering', function($q) use ($semesterId) {
                 $q->where('semester_id', $semesterId);
@@ -281,8 +282,8 @@ class SchedulingService
         }
 
         // Check for time conflict
-        $conflict = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
-            $q->where('teacher_id', $teacher->id);
+        $conflict = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
+            TeacherScope::wherePrimaryKey($q, $teacher->id);
         })
         ->where('timeslot_id', $schedule->timeslot_id)
         ->exists();
@@ -346,7 +347,7 @@ class SchedulingService
         // Check teacher conflicts through section_teachers relationship
         foreach ($schedule->section->teachers as $teacher) {
             $conflict = Schedule::whereHas('section.teachers', function($q) use ($teacher) {
-                $q->where('teacher_id', $teacher->id);
+                TeacherScope::wherePrimaryKey($q, $teacher->id);
             })
             ->where('timeslot_id', $timeslot->id)
             ->where('id', '!=', $schedule->id)

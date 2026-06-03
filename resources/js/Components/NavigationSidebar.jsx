@@ -7,7 +7,8 @@ export default function NavigationSidebar({ currentRoute }) {
     const { props } = usePage();
     const user = props.auth?.user;
     const userRoles = user?.roles || [];
-    const userPermissions = user?.permissions || [];
+    const userPermissions = props.auth?.permissions || [];
+    const isTeacher = userRoles.some((role) => role.name === 'teacher');
 
     const toggleCategory = (category) => {
         const newExpanded = new Set(expandedCategories);
@@ -46,8 +47,11 @@ export default function NavigationSidebar({ currentRoute }) {
         if (userRoles.some(role => role.name === 'teacher')) {
             const teacherPermissions = [
                 'view schedules',
-                'view own schedule'
+                'view own schedule',
+                'view own students',
+                'export own students',
             ];
+
             return teacherPermissions.includes(permission) || userPermissions.includes(permission);
         }
         
@@ -160,6 +164,21 @@ export default function NavigationSidebar({ currentRoute }) {
                 {getIcon('Dashboard')}
                 <span className="ml-3">Dashboard</span>
             </Link>
+
+            {/* Teacher: My Students */}
+            {isTeacher && (
+                <Link
+                    href="/teacher/students"
+                    className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        isActive('/teacher/students')
+                            ? 'bg-success text-white shadow-sm'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                    {getIcon('Users')}
+                    <span className="ml-3">My Students</span>
+                </Link>
+            )}
 
             {/* Schedules */}
             {(hasPermission('view schedules') || hasPermission('generate schedule')) && (

@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Student;
+use App\Support\ScheduleDisplay;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -23,8 +24,10 @@ class StudentsExport implements FromCollection, WithHeadings, WithMapping
             'Email',
             'Phone',
             'Department',
-            'Semester',
-            'Enrollment Date'
+            'Year Level',
+            'Academic Section',
+            'Status',
+            'Enrollment Date',
         ];
     }
 
@@ -36,9 +39,13 @@ class StudentsExport implements FromCollection, WithHeadings, WithMapping
             $student->last_name,
             $student->email,
             $student->phone,
-            $student->department->name,
-            $student->semester,
-            $student->enrollment_date->format('Y-m-d')
+            $student->department?->name ?? '',
+            ScheduleDisplay::formatYearLevel($student->level)
+                ?? ScheduleDisplay::yearLevelFromAcademicSection($student->academic_section)
+                ?? '',
+            $student->academic_section ?? '',
+            $student->status ?? '',
+            $student->enrollment_date?->format('Y-m-d') ?? '',
         ];
     }
 }

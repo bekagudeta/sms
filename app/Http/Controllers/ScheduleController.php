@@ -12,6 +12,7 @@ use App\Models\Semester;
 use App\Models\Teacher;
 use App\Models\Timeslot;
 use App\Repositories\ScheduleRepository;
+use App\Support\TeacherScope;
 use App\Services\AutoSchedulerService;
 use App\Services\ScheduleAssignmentService;
 use App\Services\SchedulingService;
@@ -399,9 +400,10 @@ class ScheduleController extends Controller
         $this->authorize('view', $schedule);
 
         $schedule->load([
-            'section.courseOffering.course',
+            'section.courseOffering.course.department',
             'section.courseOffering.semester',
             'section.teachers.user',
+            'section.enrollments.student',
             'room',
             'timeslot',
         ]);
@@ -577,7 +579,7 @@ class ScheduleController extends Controller
     private function hasTeacherConflict($teacher, $timeslot, $excludeSectionId = null)
     {
         $query = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
-            $q->where('teachers.id', $teacher->id);
+            TeacherScope::wherePrimaryKey($q, $teacher->id);
         })->where('timeslot_id', $timeslot->id);
 
         if ($excludeSectionId) {
@@ -593,7 +595,7 @@ class ScheduleController extends Controller
     private function checkTeacherWorkload($teacher, $timeslot)
     {
         $currentHours = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
-            $q->where('teachers.id', $teacher->id);
+            TeacherScope::wherePrimaryKey($q, $teacher->id);
         })->count();
 
         $maxHours = min(

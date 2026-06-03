@@ -60,6 +60,12 @@ Route::middleware(['auth'])->group(function () {
         ->name('teacher.dashboard');
     Route::middleware(['role:teacher'])->get('/teacher/schedule', [DashboardController::class, 'teacherSchedule'])
         ->name('teacher.schedule');
+    Route::middleware(['role:teacher'])->group(function () {
+        Route::get('/teacher/students', [DashboardController::class, 'teacherStudents'])
+            ->name('teacher.students');
+        Route::get('/export/teacher-students', [ExportController::class, 'exportTeacherStudents'])
+            ->name('export.teacher-students');
+    });
 
     Route::middleware(['role:student'])->get('/student/dashboard', [DashboardController::class, 'student'])
         ->name('student.dashboard');

@@ -3,13 +3,14 @@
 namespace App\Imports;
 
 use App\Models\Semester;
-use Maatwebsite\Excel\Concerns\ToModel;
+use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
+use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use Carbon\Carbon;
 
-class SemestersImport implements ToModel, WithHeadingRow, WithValidation
+class SemestersImport implements ToCollection, WithHeadingRow, WithValidation
 {
     protected $rowCount = 0;
 
@@ -34,24 +35,36 @@ class SemestersImport implements ToModel, WithHeadingRow, WithValidation
         return Carbon::parse($value)->format('Y-m-d');
     }
 
-    public function model(array $row)
+    public function collection(Collection $rows)
     {
-        $this->rowCount++;
+        foreach ($rows as $row) {
+            $this->rowCount++;
 
-        return new Semester([
-            'name'       => $row['name'],
-            'code'       => $row['code'],
-            'start_date' => $this->parseDate($row['start_date']),
-            'end_date'   => $this->parseDate($row['end_date']),
-            'is_active'  => $row['is_active'] ?? false,
-        ]);
+            $startDate = $this->parseDate($row['start_date']);
+            $academicYear = trim((string) ($row['academic_year'] ?? ''));
+            if ($academicYear === '' && $startDate) {
+                $academicYear = substr($startDate, 0, 4);
+            }
+
+            Semester::updateOrCreate(
+                ['code' => $row['code']],
+                [
+                    'name' => $row['name'],
+                    'academic_year' => $academicYear ?: null,
+                    'start_date' => $startDate,
+                    'end_date' => $this->parseDate($row['end_date']),
+                    'is_active' => filter_var($row['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                ]
+            );
+        }
     }
 
     public function rules(): array
     {
         return [
             'name'       => 'required|string',
-            'code'       => 'required|string|unique:semesters,code',
+            'code'       => 'required|string',
+            'academic_year' => 'nullable|string',
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after:start_date',
         ];

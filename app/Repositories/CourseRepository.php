@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Course;
+use App\Support\TeacherScope;
 use Illuminate\Support\Collection;
 
 class CourseRepository
@@ -67,7 +68,7 @@ class CourseRepository
     public function getByTeacher($teacherId): Collection
     {
         return Course::whereHas('courseOfferings.sections.teachers', function ($q) use ($teacherId) {
-            $q->where('teacher_id', $teacherId);
+            TeacherScope::wherePrimaryKey($q, $teacherId);
         })
             ->with(['department', 'courseOfferings.sections.teachers.user'])
             ->get();

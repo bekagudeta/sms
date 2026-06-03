@@ -27,15 +27,15 @@ return [
             'dependencies' => [],
             'service_method' => 'importSemesters',
             'required_columns' => ['name', 'code', 'start_date', 'end_date'],
-            'optional_columns' => ['is_active'],
-            'template_headers' => ['name', 'code', 'start_date', 'end_date', 'is_active'],
+            'optional_columns' => ['academic_year', 'is_active'],
+            'template_headers' => ['name', 'code', 'academic_year', 'start_date', 'end_date', 'is_active'],
             'template_rows' => [
-                ['Fall 2024', 'F2024', '2024-09-01', '2024-12-15', '1'],
-                ['Spring 2025', 'S2025', '2025-01-15', '2025-05-31', '1'],
-                ['Summer 2025', 'SU2025', '2025-06-01', '2025-08-31', '0'],
+                ['Fall 2024', 'F2024', '2024', '2024-09-01', '2024-12-15', '1'],
+                ['Spring 2025', 'S2025', '2025', '2025-01-15', '2025-05-31', '1'],
+                ['Summer 2025', 'SU2025', '2025', '2025-06-01', '2025-08-31', '0'],
             ],
             'filename' => 'semesters_template.csv',
-            'note' => 'Schedule generation is semester-based. Date format: YYYY-MM-DD. is_active: 1 or 0 (1 = active, 0 = inactive).',
+            'note' => 'Schedule generation is semester-based. academic_year (e.g. 2024) appears on timetables and exports. Re-importing the same code updates the term. Date format: YYYY-MM-DD.',
         ],
 
         'courses' => [
@@ -188,7 +188,25 @@ return [
                 ['S003', 'Charlie', 'White', 'charlie.white@student.university.edu', 'SE', 'SE-3B', '555-2003'],
             ],
             'filename' => 'students_template.csv',
-            'note' => 'academic_section is the student cohort (e.g. SE-3A), not a course section. department_code must exist in Departments. One row per student.',
+            'note' => 'academic_section is the student cohort (e.g. SE-3A), not a course section. Re-importing the same student_id updates the existing record (no duplicate). For a new term after promotion, use Student Promotions then Enrollments only.',
+        ],
+
+        'student-promotions' => [
+            'label' => 'Student Promotions',
+            'category' => 'Student Demand',
+            'description' => 'Advance existing students to a new year level or cohort without re-importing profiles.',
+            'dependencies' => ['students'],
+            'service_method' => 'importStudentPromotions',
+            'required_columns' => ['student_id'],
+            'optional_columns' => ['level', 'academic_section', 'status'],
+            'template_headers' => ['student_id', 'level', 'academic_section', 'status'],
+            'template_rows' => [
+                ['S001', '4', 'SE-4A', 'active'],
+                ['S002', '4', 'SE-4A', 'active'],
+                ['S003', '4', 'SE-4B', 'active'],
+            ],
+            'filename' => 'student_promotions_template.csv',
+            'note' => 'student_id must already exist. Updates level and/or academic_section only. Then import Enrollments for the new semester — students are not created again.',
         ],
 
         'enrollments' => [

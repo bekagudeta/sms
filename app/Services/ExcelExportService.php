@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exports\ScheduleExport;
 use App\Exports\StudentsExport;
+use App\Exports\TeacherStudentsExport;
 use App\Exports\TeachersExport;
 use Illuminate\Support\Facades\Schema;
 use Maatwebsite\Excel\Facades\Excel;
@@ -19,6 +20,16 @@ class ExcelExportService
     public function exportStudents(): BinaryFileResponse
     {
         return Excel::download(new StudentsExport(), 'students.xlsx');
+    }
+
+    public function exportTeacherStudents(int $teacherId, ?int $semesterId = null): BinaryFileResponse
+    {
+        $suffix = $semesterId ? "_semester_{$semesterId}" : '';
+
+        return Excel::download(
+            new TeacherStudentsExport($teacherId, $semesterId),
+            'my_students'.$suffix.'.xlsx'
+        );
     }
 
     public function exportTeachers(): BinaryFileResponse

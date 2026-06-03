@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\Section;
 use App\Models\Teacher;
 use App\Models\Timeslot;
+use App\Support\TeacherScope;
 use Illuminate\Support\Facades\Log;
 
 class ScheduleAssignmentService
@@ -109,7 +110,7 @@ class ScheduleAssignmentService
     protected function hasTeacherConflict(Teacher $teacher, Timeslot $timeslot, ?int $ignoreSectionId = null): bool
     {
         $query = Schedule::whereHas('section.teachers', function ($q) use ($teacher) {
-            $q->where('teacher_id', $teacher->id);
+            TeacherScope::wherePrimaryKey($q, $teacher->id);
         })->where('timeslot_id', $timeslot->id);
 
         if ($ignoreSectionId) {

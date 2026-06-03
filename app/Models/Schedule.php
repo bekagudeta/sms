@@ -20,7 +20,12 @@ class Schedule extends Model
         'course',
         'teacher',
         'teacher_name',
-        'semester'
+        'semester',
+        'academic_year',
+        'department_name',
+        'year_level',
+        'time_range',
+        'display',
     ];
 
     protected $casts = [
@@ -63,6 +68,36 @@ class Schedule extends Model
     public function getSemesterAttribute()
     {
         return $this->section?->courseOffering?->semester;
+    }
+
+    public function getAcademicYearAttribute(): ?string
+    {
+        return \App\Support\AcademicYear::forSemester($this->semester);
+    }
+
+    public function getDepartmentNameAttribute(): ?string
+    {
+        $course = $this->course;
+
+        return $course?->department?->name ?? $course?->department?->code;
+    }
+
+    public function getYearLevelAttribute(): ?string
+    {
+        return \App\Support\ScheduleDisplay::yearLevelForSection($this->section);
+    }
+
+    public function getTimeRangeAttribute(): ?string
+    {
+        return \App\Support\ScheduleDisplay::formatTimeRange(
+            $this->timeslot?->start_time,
+            $this->timeslot?->end_time
+        );
+    }
+
+    public function getDisplayAttribute(): array
+    {
+        return \App\Support\ScheduleDisplay::for($this);
     }
 
     public function getTeachersAttribute()

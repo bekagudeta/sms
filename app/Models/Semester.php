@@ -12,10 +12,13 @@ class Semester extends Model
     protected $fillable = [
         'name',
         'code',
+        'academic_year',
         'start_date',
         'end_date',
-        'is_active'
+        'is_active',
     ];
+
+    protected $appends = ['resolved_academic_year'];
 
     protected $casts = [
         'start_date' => 'date',
@@ -26,5 +29,10 @@ class Semester extends Model
     public function courseOfferings()
     {
         return $this->hasMany(CourseOffering::class);
+    }
+
+    public function getResolvedAcademicYearAttribute(): ?string
+    {
+        return \App\Support\AcademicYear::forSemester($this);
     }
 }
