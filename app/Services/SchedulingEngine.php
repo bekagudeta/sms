@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\TimeslotDuration;
 use App\Models\Room;
 use App\Models\Schedule;
 use App\Models\Section;
@@ -23,11 +24,15 @@ class SchedulingEngine
     private array $studentTimeslotMap = [];
 
     /**
-     * Per-teacher total scheduled hours (sum of credit-hours, NOT slot count).
-     * Incremented by 1 for every timeslot assigned to that teacher, which is
-     * correct because each timeslot represents exactly 1 teaching hour.
+     * Per-teacher total scheduled hours (sum of timeslot durations).
      */
     private array $teacherHours = [];
+
+    /** Scheduled teaching hours per course section. */
+    private array $sectionScheduledHours = [];
+
+    /** Home classroom per course section (all weekly hours use the same room). */
+    private array $sectionHomeRoom = [];
 
     public function __construct()
     {
@@ -84,27 +89,24 @@ class SchedulingEngine
 
         foreach ($sortedSections as $section) {
             $course        = $section->courseOffering->course;
-            $requiredSlots = $this->getRequiredWeeklyHours($course);
-            $assignedSlots = 0;
+            $requiredHours   = $this->getRequiredWeeklyHours($course);
+            $scheduledHours  = 0.0;
 
-            // Walk every timeslot.  We do NOT remove timeslots from a shared
-            // pool because different sections can legitimately share a timeslot
-            // (they use different rooms).
             foreach ($timeslots as $timeslot) {
-                if ($assignedSlots >= $requiredSlots) {
+                if ($scheduledHours + 0.001 >= $requiredHours) {
                     break;
                 }
+
+                $slotHours = TimeslotDuration::teachingHours($timeslot);
 
                 // ── teacher availability ──────────────────────────────────
                 $teacherBlocked = false;
                 foreach ($section->teachers as $teacher) {
-                    // Already teaching at this timeslot?
                     if ($this->isTeacherOccupied($teacher->id, $timeslot->id)) {
                         $teacherBlocked = true;
                         break;
                     }
-                    // Would adding 1 more hour exceed the weekly cap?
-                    if (!$this->teacherCanAcceptOneMoreHour($teacher)) {
+                    if (!$this->teacherCanAcceptTimeslot($teacher, $timeslot)) {
                         $teacherBlocked = true;
                         break;
                     }
@@ -125,11 +127,21 @@ class SchedulingEngine
                     continue;
                 }
 
-                // ── find a free room ──────────────────────────────────────
-                $room = $eligibleRooms = $this->getEligibleRooms($section, $rooms)
-                    ->first(fn ($candidate) => !$this->isRoomOccupied($candidate->id, $timeslot->id));
+                // ── find a free room (same room for every slot of this section) ──
+                $roomCandidates = $this->getEligibleRooms($section, $rooms)
+                    ->filter(fn ($candidate) => $candidate->capacity >= $section->capacity);
+
+                if (isset($this->sectionHomeRoom[$section->id])) {
+                    $roomCandidates = $roomCandidates->where('id', $this->sectionHomeRoom[$section->id]);
+                }
+
+                $room = $roomCandidates->first(fn ($candidate) => !$this->isRoomOccupied($candidate->id, $timeslot->id));
                 if (!$room) {
                     continue;
+                }
+
+                if (!isset($this->sectionHomeRoom[$section->id])) {
+                    $this->sectionHomeRoom[$section->id] = $room->id;
                 }
 
                 // ── record the assignment ─────────────────────────────────
@@ -143,22 +155,22 @@ class SchedulingEngine
 
                 foreach ($section->teachers as $teacher) {
                     $this->teacherTimeslotMap[$teacher->id][$timeslot->id] = true;
-                    // Each assigned timeslot counts as 1 teaching hour.
-                    $this->teacherHours[$teacher->id] = ($this->teacherHours[$teacher->id] ?? 0) + 1;
+                    $this->teacherHours[$teacher->id] = ($this->teacherHours[$teacher->id] ?? 0) + $slotHours;
                 }
 
                 foreach ($section->enrollments as $enrollment) {
                     $this->studentTimeslotMap[$enrollment->student_id][$timeslot->id] = true;
                 }
 
-                $assignedSlots++;
+                $scheduledHours += $slotHours;
+                $this->sectionScheduledHours[$section->id] = $scheduledHours;
             }
 
-            if ($assignedSlots < $requiredSlots) {
+            if ($scheduledHours + 0.001 < $requiredHours) {
                 $this->conflicts[] = [
                     'type'       => 'insufficient_slots',
                     'section_id' => $section->id,
-                    'message'    => "Only found {$assignedSlots} of {$requiredSlots} required slot(s) for section {$section->section_name}",
+                    'message'    => "Only scheduled {$scheduledHours} of {$requiredHours} required teaching hour(s) for section {$section->section_name}",
                 ];
             }
         }
@@ -241,11 +253,13 @@ class SchedulingEngine
      * We do NOT add the full course-credit count here because we schedule
      * one timeslot at a time; each call to this method represents one hour.
      */
-    private function teacherCanAcceptOneMoreHour(Teacher $teacher): bool
+    private function teacherCanAcceptTimeslot(Teacher $teacher, $timeslot): bool
     {
-        $current = $this->teacherHours[$teacher->id] ?? 0;
+        $current = (float) ($this->teacherHours[$teacher->id] ?? 0);
+        $add     = TimeslotDuration::teachingHours($timeslot);
         $cap     = min((int) ($teacher->max_hours_per_week ?? 38), 38);
-        return ($current + 1) <= $cap;
+
+        return ($current + $add) <= $cap;
     }
 
     // =========================================================================
@@ -434,6 +448,8 @@ class SchedulingEngine
         $this->roomTimeslotMap   = [];
         $this->teacherTimeslotMap = [];
         $this->studentTimeslotMap = [];
-        $this->teacherHours      = [];
+        $this->teacherHours           = [];
+        $this->sectionScheduledHours  = [];
+        $this->sectionHomeRoom        = [];
     }
 }

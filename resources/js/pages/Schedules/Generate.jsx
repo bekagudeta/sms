@@ -87,19 +87,19 @@ export default function Generate({ semesters = [], courseOfferings = [], teacher
             label: 'Rooms loaded',
             ok: rooms.length > 0,
             blocking: true,
-            detail: 'Room capacity and type are enforced during scheduling.'
+            detail: 'At most two student academic sections (cohorts) may share one room. All courses for the same academic section use one home classroom.'
         },
         {
             label: 'Timeslots loaded',
             ok: timeslots.length > 0,
             blocking: true,
-            detail: 'Real timeslots should exist before generating schedules.'
+            detail: 'Teaching hours come from each timeslot length (end − start). Example: 08:00–09:00 = 1 hour; 08:00–09:50 ≈ 1.83 hours (not 2).'
         },
         {
             label: 'Enrollments loaded',
             ok: totalSemesterEnrollments > 0,
             blocking: false,
-            detail: 'Recommended for student conflict detection.'
+            detail: 'Enrollments link students (academic section, e.g. SE-3A) to course sections for scheduling and conflict checks.'
         }
     ];
 

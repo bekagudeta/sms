@@ -198,8 +198,8 @@ class SchedulingService
             return true;
         }
 
-        $maxSections = (int) config('scheduling.room_max_sections', 0);
-        if ($maxSections > 0 && $scheduledSections->count() >= $maxSections) {
+        $maxSections = (int) config('scheduling.room_max_sections', 2);
+        if ($scheduledSections->count() >= $maxSections) {
             return false;
         }
 
@@ -207,16 +207,16 @@ class SchedulingService
             return true;
         }
 
-        $existingSection = $scheduledSections->first();
-        if (! $existingSection) {
-            return false;
+        foreach ($scheduledSections as $existingSection) {
+            if (! $this->isSectionRoomPairCompatible($section, $existingSection)) {
+                return false;
+            }
         }
 
-        if (! $this->isSectionRoomPairCompatible($section, $existingSection)) {
-            return false;
+        $combinedHours = $this->getSectionWeeklyHours($section);
+        foreach ($scheduledSections as $existingSection) {
+            $combinedHours += $this->getSectionWeeklyHours($existingSection);
         }
-
-        $combinedHours = $this->getSectionWeeklyHours($section) + $this->getSectionWeeklyHours($existingSection);
 
         return $combinedHours <= (int) config('scheduling.room_combined_hours_limit', 38);
     }

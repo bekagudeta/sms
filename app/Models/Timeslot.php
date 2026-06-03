@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Support\TimeslotDuration;
+
 class Timeslot extends Model
 {
     use HasFactory;
@@ -19,6 +21,16 @@ class Timeslot extends Model
     public function schedules()
     {
         return $this->hasMany(Schedule::class);
+    }
+
+    public function getDurationMinutesAttribute(): int
+    {
+        return TimeslotDuration::minutes($this);
+    }
+
+    public function getTeachingHoursAttribute(): float
+    {
+        return TimeslotDuration::teachingHours($this);
     }
 
     public function getFormattedTimeAttribute()
