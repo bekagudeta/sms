@@ -179,9 +179,9 @@ export const ENTITY_CONFIG = {
     columns: [
       { key: "id", label: "ID", sortable: true },
       { key: "section_name", label: "Section", sortable: true, searchable: true },
-      { key: "courseOffering.course.course_code", label: "Course Code", sortable: true, searchable: true },
+      { key: "course_offering.course.course_code", label: "Course Code", sortable: true, searchable: true },
       { key: "course_name", label: "Course", sortable: true, searchable: true },
-      { key: "courseOffering.semester.name", label: "Semester", sortable: true, searchable: true },
+      { key: "course_offering.semester.name", label: "Semester", sortable: true, searchable: true },
       { key: "capacity", label: "Capacity", sortable: true },
       { key: "enrolled_count", label: "Enrolled", sortable: true },
       { key: "created_at", label: "Created", sortable: true }
@@ -260,8 +260,8 @@ export const ENTITY_CONFIG = {
       { key: "student.full_name", label: "Student", sortable: true, searchable: true },
       { key: "student_code_value", label: "Student Code", sortable: true, searchable: true },
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
-      { key: "section.courseOffering.course.course_code", label: "Course", sortable: true },
-      { key: "section.courseOffering.semester.name", label: "Semester", sortable: true },
+      { key: "section.course_offering.course.course_code", label: "Course", sortable: true },
+      { key: "section.course_offering.semester.name", label: "Semester", sortable: true },
       { key: "enrolled_at", label: "Enrolled Date", sortable: true }
     ],
     requiredColumns: ["student_id", "course_code", "semester_code", "section_name"],
@@ -284,8 +284,8 @@ export const ENTITY_CONFIG = {
     columns: [
       { key: "id", label: "ID", sortable: true },
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
-      { key: "section.courseOffering.course.course_code", label: "Course", sortable: true },
-      { key: "section.courseOffering.semester.name", label: "Semester", sortable: true },
+      { key: "section.course_offering.course.course_code", label: "Course", sortable: true },
+      { key: "section.course_offering.semester.name", label: "Semester", sortable: true },
       { key: "teacher.full_name", label: "Teacher", sortable: true, searchable: true },
       { key: "teacher.teacher_id", label: "Teacher ID", sortable: true, searchable: true }
     ],

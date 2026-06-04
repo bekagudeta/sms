@@ -74,12 +74,14 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
         }
 
         if ((value === null || value === undefined || value === '') && column.key.includes('.')) {
-            // fallback for computed relations (e.g. student.name, teacher.full_name)
-            const [relation, field] = column.key.split('.');
-            const relObject = getNestedValue(item, relation);
+            // fallback for computed relations - try different field names
+            const parts = column.key.split('.');
+            const fieldName = parts[parts.length - 1];
+            const relationPath = parts.slice(0, -1).join('.');
+            const relObject = getNestedValue(item, relationPath);
 
             if (relObject) {
-                const fallback = relObject[field] || relObject[`${field}_name`] || relObject.name || relObject.full_name;
+                const fallback = relObject[fieldName] || relObject[`${fieldName}_name`] || relObject.name || relObject.full_name;
                 if (fallback) return String(fallback);
             }
         }
