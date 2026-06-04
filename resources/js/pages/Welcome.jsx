@@ -2,255 +2,590 @@ import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import logoSrc from '../images/logo.png';
 
+const FEATURES = [
+  {
+    icon: (
+      <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+      </svg>
+    ),
+    title: 'Bulk Excel Import',
+    desc: 'Import 11 academic entity types—from departments and semesters to enrollments—with guided templates and validation.',
+  },
+  {
+    icon: (
+      <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+      </svg>
+    ),
+    title: 'Automated Timetables',
+    desc: 'Generate course schedules that assign teachers, rooms, and timeslots while respecting capacity and availability.',
+  },
+  {
+    icon: (
+      <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+      </svg>
+    ),
+    title: 'Role-Based Access',
+    desc: 'Separate experiences for admins, schedulers, teachers, and students—each sees only what their role allows.',
+  },
+  {
+    icon: (
+      <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+      </svg>
+    ),
+    title: 'Exports & Insights',
+    desc: 'Export schedules and credentials to Excel, and monitor students, courses, and assignments from one dashboard.',
+  },
+];
+
+const STEPS = [
+  {
+    num: '1',
+    title: 'Import your data',
+    details: 'Upload Excel files for departments, courses, teachers, rooms, students, and more using built-in templates.',
+  },
+  {
+    num: '2',
+    title: 'Configure resources',
+    details: 'Set semesters, sections, timeslots, and teacher assignments so the scheduler has everything it needs.',
+  },
+  {
+    num: '3',
+    title: 'Generate schedules',
+    details: 'Run schedule generation, review assignments, and export timetables for your institution.',
+  },
+];
+
+const TESTIMONIALS = [
+  {
+    quote: 'We replaced spreadsheet chaos with one place for students, teachers, and rooms. Importing our roster took an afternoon, not a week.',
+    name: 'Maria Santos',
+    role: 'Registrar, Metro Community College',
+    initials: 'MS',
+  },
+  {
+    quote: 'The guided import order and validation caught bad department codes before they broke our timetable. That alone saved us days of cleanup.',
+    name: 'James Okonkwo',
+    role: 'Scheduling Coordinator, Lakeside Academy',
+    initials: 'JO',
+  },
+  {
+    quote: 'Teachers log in and see their own sections; admins keep full control. Exactly the split we needed without extra IT overhead.',
+    name: 'Elena Ruiz',
+    role: 'Academic Dean, North Valley Institute',
+    initials: 'ER',
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: 'What can I import into SMS?',
+    a: 'Eleven entity types: departments, semesters, courses, course offerings, sections, teachers, section teachers, rooms, timeslots, students, and enrollments—each with documented Excel columns.',
+  },
+  {
+    q: 'Who can use the platform?',
+    a: 'Admins manage all data and users. Schedulers generate timetables. Teachers view schedules and their students. Students view their own schedules.',
+  },
+  {
+    q: 'Do I need a credit card to start?',
+    a: 'No. Create a free account, sign in, and explore the dashboard. Your institution can add data through imports when ready.',
+  },
+];
+
+function DashboardPreview() {
+  const rows = [
+    { course: 'CS101', teacher: 'Dr. Chen', room: 'Lab A', day: 'Mon', time: '09:00–10:30' },
+    { course: 'MATH201', teacher: 'Prof. Ali', room: 'R-204', day: 'Tue', time: '11:00–12:30' },
+    { course: 'ENG110', teacher: 'Ms. Park', room: 'R-101', day: 'Wed', time: '14:00–15:30' },
+  ];
+
+  return (
+    <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-white/25 bg-white shadow-2xl shadow-black/30">
+      <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-4 py-3">
+        <span className="h-3 w-3 rounded-full bg-red-400" />
+        <span className="h-3 w-3 rounded-full bg-amber-400" />
+        <span className="h-3 w-3 rounded-full bg-emerald-400" />
+        <span className="ml-3 text-xs font-medium text-gray-500">SMS Dashboard — Schedule overview</span>
+      </div>
+      <div className="grid gap-3 bg-white p-4 sm:grid-cols-4 sm:p-5">
+        {[
+          { label: 'Students', value: '1,248', color: 'from-primary to-primary-dark' },
+          { label: 'Teachers', value: '86', color: 'from-success to-success-dark' },
+          { label: 'Courses', value: '142', color: 'from-primary-accent to-primary' },
+          { label: 'Schedules', value: '318', color: 'from-primary-dark to-primary' },
+        ].map((stat) => (
+          <div key={stat.label} className={`rounded-xl bg-gradient-to-br ${stat.color} p-3 text-white`}>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-white/80">{stat.label}</p>
+            <p className="text-xl font-bold">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-gray-100 px-4 pb-4 sm:px-5">
+        <table className="w-full text-left text-xs text-gray-600">
+          <thead>
+            <tr className="border-b border-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+              <th className="py-2 pr-2">Course</th>
+              <th className="py-2 pr-2">Teacher</th>
+              <th className="py-2 pr-2">Room</th>
+              <th className="hidden py-2 pr-2 sm:table-cell">Day</th>
+              <th className="py-2">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.course} className="border-b border-gray-50 last:border-0">
+                <td className="py-2.5 pr-2 font-semibold text-primary">{row.course}</td>
+                <td className="py-2.5 pr-2">{row.teacher}</td>
+                <td className="py-2.5 pr-2">{row.room}</td>
+                <td className="hidden py-2.5 pr-2 sm:table-cell">{row.day}</td>
+                <td className="py-2.5 text-gray-500">{row.time}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function Welcome({ auth }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState(0);
+
+  const primaryCta = auth?.user ? (
+    <Link href="/dashboard" className="app-primary-btn rounded-full px-8 py-3 text-base shadow-lg shadow-primary/30">
+      Go to Dashboard
+    </Link>
+  ) : (
+    <Link
+      href="/register"
+      className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-success to-primary px-8 py-3 text-base font-bold text-white shadow-lg shadow-success/25 transition hover:-translate-y-0.5 hover:brightness-105"
+    >
+      Start for free
+    </Link>
+  );
+
+  const secondaryCta = auth?.user ? (
+    <Link href="/schedules" className="rounded-full border-2 border-white/60 bg-white/10 px-8 py-3 text-base font-semibold text-white backdrop-blur transition hover:bg-white/20">
+      View schedules
+    </Link>
+  ) : (
+    <Link href="/login" className="rounded-full border-2 border-white/60 bg-white/10 px-8 py-3 text-base font-semibold text-white backdrop-blur transition hover:bg-white/20">
+      Sign in
+    </Link>
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#001722] via-[#084A48] to-[#6BCFCB] text-white">
-      <header className="sticky top-0 z-50 border-b border-[#084A48] bg-[#001722]/75 backdrop-blur-lg">
+    <div className="min-h-screen bg-gray-50 text-primary">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-primary/10 bg-white/90 backdrop-blur-lg">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <img src={logoSrc} alt="SMS logo" className="h-10 w-10 rounded-full border border-slate-300" />
+          <Link href="/" className="flex items-center gap-3">
+            <img src={logoSrc} alt="SMS logo" className="h-10 w-10 rounded-full border border-primary/20 shadow-sm" />
             <div>
-              <div className="text-xl font-extrabold text-slate-900">Scheduling <span className="text-cyan-500">Management</span> System</div>
-              <div className="text-xs font-semibold tracking-wider text-slate-500">SMS</div>
+              <p className="text-lg font-bold leading-tight text-primary">School Management System</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-success">SMS</p>
             </div>
-          </div>
+          </Link>
 
           <button
-            aria-label="Menu"
+            type="button"
+            aria-label="Toggle menu"
             onClick={() => setMobileOpen((open) => !open)}
-            className="md:hidden rounded-lg border border-cyan-500/40 bg-[#001722]/70 px-3 py-2 text-xl text-cyan-200 hover:bg-[#001722]/90"
+            className="rounded-lg border border-primary/20 px-3 py-2 text-primary md:hidden"
           >
             {mobileOpen ? '✕' : '☰'}
           </button>
 
-          <nav className="hidden items-center gap-8 text-base font-medium text-slate-700 md:flex">
-            <Link href="#dashboard" className="hover:text-cyan-600">Home</Link>
-            <Link href="#features" className="hover:text-cyan-600">Features</Link>
-            <Link href="#about" className="hover:text-cyan-600">About</Link>
-            <Link href="#contact" className="hover:text-cyan-600">Contact</Link>
+          <nav className="hidden items-center gap-8 text-sm font-medium text-primary/80 md:flex">
+            <a href="#features" className="transition hover:text-primary">Features</a>
+            <a href="#how-it-works" className="transition hover:text-primary">How it works</a>
+            <a href="#testimonials" className="transition hover:text-primary">Testimonials</a>
+            <a href="#faq" className="transition hover:text-primary">FAQ</a>
           </nav>
 
-          <div>
+          <div className="hidden md:block">
             {auth?.user ? (
-              <Link href="/dashboard" className="rounded-full border-2 border-cyan-600 bg-white px-6 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-50">
+              <Link href="/dashboard" className="app-primary-btn rounded-full px-6 py-2">
                 Dashboard
               </Link>
             ) : (
-              <Link href="/login" className="rounded-full border-2 border-cyan-600 bg-white px-6 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-50">
+              <Link href="/login" className="app-secondary-btn rounded-full px-6 py-2">
                 Login
               </Link>
             )}
           </div>
         </div>
+
+        {mobileOpen && (
+          <div className="border-t border-primary/10 bg-white px-6 py-4 md:hidden">
+            <div className="space-y-1">
+              {['#features', '#how-it-works', '#testimonials', '#faq'].map((href) => (
+                <a
+                  key={href}
+                  href={href}
+                  className="block rounded-lg px-3 py-2 font-medium text-primary hover:bg-gray-50"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {href.replace('#', '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                </a>
+              ))}
+              <Link
+                href={auth?.user ? '/dashboard' : '/login'}
+                className="mt-2 block rounded-lg bg-primary px-3 py-2 text-center font-semibold text-white"
+                onClick={() => setMobileOpen(false)}
+              >
+                {auth?.user ? 'Dashboard' : 'Login'}
+              </Link>
+            </div>
+          </div>
+        )}
       </header>
 
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-x-0 top-16 z-40 bg-[#001722]/95 border-b border-cyan-500/30 backdrop-blur-md">
-          <div className="space-y-2 px-6 py-4">
-            <Link href="#dashboard" className="block rounded-lg px-3 py-2 text-base font-semibold text-cyan-200 hover:bg-[#001722]/80" onClick={() => setMobileOpen(false)}>Dashboard</Link>
-            <Link href="#features" className="block rounded-lg px-3 py-2 text-base font-semibold text-cyan-200 hover:bg-[#001722]/80" onClick={() => setMobileOpen(false)}>Features</Link>
-            <Link href="#about" className="block rounded-lg px-3 py-2 text-base font-semibold text-cyan-200 hover:bg-[#001722]/80" onClick={() => setMobileOpen(false)}>About</Link>
-            <Link href="#contact" className="block rounded-lg px-3 py-2 text-base font-semibold text-cyan-200 hover:bg-[#001722]/80" onClick={() => setMobileOpen(false)}>Contact</Link>
+      {/* Hero */}
+      <section id="hero" className="relative min-h-[85vh] overflow-hidden text-white">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage:
+              "url('https://images.unsplash.com/photo-1696197018935-fe03c621838f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920')",
+          }}
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/90 via-primary-dark/85 to-primary-bright/75" aria-hidden="true" />
+        <div
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 20% 80%, #82d3ee 0%, transparent 50%), radial-gradient(circle at 80% 20%, #20ae4d 0%, transparent 40%)',
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center gap-10 px-6 py-16 lg:flex-row lg:items-center lg:py-24">
+          <div className="flex-1 text-center lg:text-left">
+            <p className="inline-flex rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-light-bg">
+              Academic scheduling & administration
+            </p>
+            <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+              Run your school schedules with less chaos.
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-white/90 sm:text-lg">
+              SMS helps registrars and scheduling teams manage students, teachers, courses, rooms, and timetables in one
+              place—from bulk Excel imports to automated schedule generation.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-4 lg:justify-start">
+              {primaryCta}
+              {secondaryCta}
+            </div>
+            <p className="mt-4 text-sm text-white/70">Free to get started · No credit card required</p>
+          </div>
+          <div className="flex w-full flex-1 justify-center lg:justify-end">
+            <DashboardPreview />
           </div>
         </div>
-      )}
+      </section>
 
-      <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 md:gap-3 rounded-full bg-[#001722]/95 px-3 py-2 md:px-5 md:py-3 text-xs md:text-sm text-white shadow-xl shadow-[#001722]/50 backdrop-blur-md">
-        <span className="font-semibold text-cyan-300 hidden sm:inline">Need help fast?</span>
-        <Link href="#help" className="rounded-full border border-cyan-500/40 bg-cyan-500/20 px-2 py-1 md:px-3 text-cyan-100 text-xs md:text-sm transition hover:bg-cyan-500/40">Visit Help Center</Link>
-        {auth?.user ? (
-          <Link href="/dashboard" className="rounded-full border border-[#FE580B] bg-[#FE580B]/20 px-2 py-1 md:px-3 font-semibold text-[#FE580B] text-xs md:text-sm transition hover:bg-[#FE580B]/30">Dashboard</Link>
-        ) : (
-          <Link href="/login" className="rounded-full border border-[#FE580B] bg-[#FE580B]/20 px-2 py-1 md:px-3 font-semibold text-[#FE580B] text-xs md:text-sm transition hover:bg-[#FE580B]/30">Sign in</Link>
-        )}
-      </div>
+      {/* Social proof */}
+      <section className="border-b border-primary/10 bg-white py-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-6 sm:flex-row">
+          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-center sm:justify-start">
+            <div>
+              <p className="text-2xl font-bold text-primary">11</p>
+              <p className="text-xs font-medium text-primary/60">Import entity types</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-primary">4</p>
+              <p className="text-xs font-medium text-primary/60">User roles</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-primary">1</p>
+              <p className="text-xs font-medium text-primary/60">Unified dashboard</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-center sm:text-right">
+            <div className="flex text-amber-400" aria-hidden="true">
+              {'★★★★★'.split('').map((star, i) => (
+                <span key={i} className="text-lg">
+                  {star}
+                </span>
+              ))}
+            </div>
+            <p className="max-w-xs text-sm text-primary/70">
+              <span className="font-semibold text-primary">Built for schools and colleges</span> that need reliable
+              timetables without juggling dozens of spreadsheets.
+            </p>
+          </div>
+        </div>
+      </section>
 
-      <section id="dashboard" className="relative overflow-hidden min-h-[85vh] pt-20 md:pt-24">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1696197018935-fe03c621838f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920')] bg-cover bg-center" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#001722]/80 via-[#084A48]/60 to-[#6BCFCB]/30" />
-        <div className="relative mx-auto flex w-full max-w-7xl flex-col items-center gap-8 px-6 py-20 text-center sm:py-24 xl:py-28">
-          <p className="rounded-full border border-cyan-300/80 bg-cyan-600/20 px-4 py-2 text-sm font-semibold uppercase tracking-wider text-cyan-200">
-            Smart Academic Scheduling Platform
-          </p>
-          <h1 className="text-5xl font-bold leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl">
-            Streamline Your <span className="text-cyan-300">Academic Scheduling</span> with Ease
-          </h1>
-          <p className="max-w-3xl text-base text-slate-200 sm:text-lg lg:text-xl">
-            Manage students, teachers, courses, sections, and enrollments all in one powerful platform. Import data seamlessly and create optimized schedules in minutes.
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link href="/register" className="rounded-full bg-gradient-to-r from-[#6BCFCB] to-[#FE580B] px-8 py-3 text-base font-extrabold text-[#001722] shadow-lg shadow-[#6BCFCB]/30 transition hover:-translate-y-0.5 hover:scale-105">
-              Get Started Free
-            </Link>
-            <Link href="/demo" className="rounded-full border border-[#6BCFCB]/80 bg-white/15 px-8 py-3 text-base font-bold text-white hover:border-[#6BCFCB] hover:bg-white/30">
-              Watch Demo
+      {/* Problem → Solution */}
+      <section className="mx-auto max-w-7xl px-6 py-16">
+        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+          <div>
+            <h2 className="text-3xl font-bold text-primary sm:text-4xl">Sound familiar?</h2>
+            <ul className="mt-6 space-y-4">
+              {[
+                'Student and course data scattered across spreadsheets that never stay in sync.',
+                'Manual timetabling that takes weeks and still produces room or teacher conflicts.',
+                'No clear way for teachers and students to see schedules after they are published.',
+              ].map((pain) => (
+                <li key={pain} className="flex gap-3 text-primary/80">
+                  <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-sm text-red-600">
+                    ✕
+                  </span>
+                  <span>{pain}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-primary/10 bg-gradient-to-br from-white to-light-bg/30 p-8 shadow-lg">
+            <p className="text-sm font-semibold uppercase tracking-wide text-success">That is why we built SMS</p>
+            <h3 className="mt-2 text-2xl font-bold text-primary">One platform for your academic operations</h3>
+            <p className="mt-4 leading-relaxed text-primary/75">
+              Import your institutional data in the right order, assign teachers and rooms, generate conflict-aware
+              schedules, and give every role a tailored view—from admin dashboards to teacher and student portals.
+            </p>
+            <Link href={auth?.user ? '/import' : '/register'} className="app-primary-btn mt-6 inline-flex">
+              {auth?.user ? 'Open import center' : 'Set up your institution'}
             </Link>
           </div>
         </div>
       </section>
 
-      <section id="features" className="mx-auto max-w-7xl px-6 py-16 bg-white/95 backdrop-blur rounded-3xl shadow-2xl my-10 border border-[#6BCFCB]/30">
-        <div className="text-center">
-          <h2 className="text-4xl font-bold tracking-tight text-[#001722] sm:text-5xl">Everything You Need</h2>
-          <h3 className="mt-2 text-4xl font-bold tracking-tight text-[#084A48] sm:text-5xl">
-            in <span className="text-[#6BCFCB]">One</span> <span className="text-[#FE580B]">Platform</span>
-          </h3>
-          <p className="mx-auto mt-4 max-w-3xl text-base text-slate-500 sm:text-lg">Powerful features designed to simplify academic scheduling</p>
-        </div>
-
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { title: 'Bulk Import', desc: 'Import 9 entity types from Excel with drag & drop simplicity.', icon: '⬆️' },
-            { title: 'Smart Editor', desc: 'Edit students, teachers, and courses with an intuitive interface.', icon: '✏️' },
-            { title: 'Auto-Scheduling', desc: 'AI-powered schedule optimization that saves hours of work.', icon: '🗓️' },
-            { title: 'People Management', desc: 'Manage all users centrally with role-based permissions.', icon: '👥' },
-            { title: 'Resource Allocation', desc: 'Smart room and timeslot management for optimal utilization.', icon: '🏫' },
-            { title: 'Analytics Dashboard', desc: 'Real-time insights into enrollment, capacity, and performance.', icon: '📊' },
-          ].map((item, index) => {
-            const colorClasses = [
-              'from-[#FE580B] to-[#6BCFCB] border-[#FE580B]/40 text-[#001722] bg-gradient-to-br',
-              'from-[#6BCFCB] to-[#084A48] border-[#6BCFCB]/40 text-[#001722] bg-gradient-to-br',
-              'from-[#084A48] to-[#001722] border-[#084A48]/40 text-white bg-gradient-to-br',
-              'from-[#001722] to-[#FE580B] border-[#001722]/40 text-white bg-gradient-to-br',
-            ];
-            const style = colorClasses[index % colorClasses.length];
-
-            return (
-              <div key={item.title} className={`group rounded-2xl border p-7 shadow-lg transition transform duration-300 hover:-translate-y-1 hover:shadow-[0_25px_50px_-12px_rgba(15,23,42,0.3)] ${style}`}>
-                <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-md text-white transition duration-300 group-hover:scale-110">
+      {/* Features */}
+      <section id="features" className="bg-white py-16">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-primary sm:text-4xl">Everything you need to schedule smarter</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-primary/65">
+              Purpose-built tools for registrars, schedulers, and academic administrators—not generic project management.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {FEATURES.map((item) => (
+              <div
+                key={item.title}
+                className="group rounded-2xl border border-primary/10 bg-gray-50 p-6 transition hover:border-primary/25 hover:bg-white hover:shadow-lg"
+              >
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-white">
                   {item.icon}
                 </div>
-                <h3 className="text-2xl font-bold">{item.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed">{item.desc}</p>
-                <span className="mt-5 inline-flex items-center text-sm font-semibold underline decoration-white/60 transition-colors duration-300 group-hover:text-white">
-                  Learn more <span className="ml-1">→</span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section id="how-it-works" className="mx-auto max-w-7xl px-6 py-12">
-        <h2 className="text-center text-4xl font-bold text-white">How it Works</h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-slate-300">Three simple steps to perfect schedules</p>
-
-        <div className="mt-10 grid gap-6 sm:grid-cols-3">
-          {[
-            { num: '01', title: 'Upload', details: 'Drag & drop your files, or connect SIS automatically.' },
-            { num: '02', title: 'Validate & Map', details: 'Auto-detect conflicts, set priorities, and update rules.' },
-            { num: '03', title: 'Generate', details: 'Deliver fully optimized, conflict-free schedules fast.' },
-          ].map((item) => (
-            <div key={item.num} className="rounded-2xl border border-cyan-500/40 bg-[#072f3f] p-8 text-center">
-              <div className="text-7xl font-black text-cyan-400/80">{item.num}</div>
-              <h3 className="mt-4 text-2xl font-bold text-white">{item.title}</h3>
-              <p className="mt-2 text-sm text-slate-300">{item.details}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section id="testimonials" className="mx-auto max-w-7xl px-6 py-12">
-        <h2 className="text-center text-4xl font-bold text-white">Loved by Educators</h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-slate-300">See what academic leaders are saying</p>
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-3">
-          {[
-            { quote: 'ScheduleMaster Pro transformed our scheduling process. What used to take weeks now takes just hours.', author: 'District Principal' },
-            { quote: 'The bulk import feature saved us 15,000 records in minutes. Outstanding speed and accuracy.', author: 'Operations Director' },
-            { quote: 'Resource allocation works flawlessly and keeps classrooms at optimal capacity.', author: 'Academic Coordinator' },
-          ].map((item, idx) => (
-            <div key={idx} className="rounded-2xl border border-cyan-600/40 bg-[#072d3b] p-6">
-              <div className="mb-3 flex gap-1 text-amber-400">★★★★★</div>
-              <p className="text-sm text-slate-200">“{item.quote}”</p>
-              <p className="mt-4 text-xs font-semibold text-cyan-200">- {item.author}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section id="security" className="mx-auto max-w-7xl px-6 py-12 mb-12 sm:mb-16 rounded-3xl border border-[#6BCFCB]/30 bg-gradient-to-r from-[#001722]/90 via-[#084A48]/85 to-[#6BCFCB]/30">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="text-center text-4xl font-bold text-[#6BCFCB]">Enterprise-Grade Security</h2>
-          <p className="mx-auto mt-3 max-w-3xl text-center text-[#C8F9FF]">Role-based permissions, audit logs, and encrypted data ensure your institution stays compliant and secure, with military-grade AES-256 encryption and granular access controls.</p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { title: 'Access Control', desc: 'RBAC and SSO with multi-factor authentication', icon: '🔐' },
-              { title: 'Data Encryption', desc: 'AES-256 at rest and TLS in transit', icon: '🛡️' },
-              { title: 'Audit Logs', desc: 'Immutable audit trails for compliance', icon: '📜' },
-            ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-cyan-300/30 bg-[#04272f]/80 p-5">
-                <div className="text-3xl">{item.icon}</div>
-                <h3 className="mt-2 text-lg font-bold text-[#6BCFCB]">{item.title}</h3>
-                <p className="mt-1 text-sm text-[#D5FCFF]">{item.desc}</p>
+                <h3 className="text-lg font-bold text-primary">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-primary/70">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="roadmap" className="mx-auto max-w-7xl px-6 py-12 rounded-3xl border border-[#6BCFCB]/25 bg-[#082530]/90">
-        <h2 className="text-center text-4xl font-bold text-[#6BCFCB]">Product Roadmap</h2>
-        <p className="mx-auto mt-3 max-w-3xl text-center text-[#C8F9FF]">Next priority: advanced timetable conflict resolution, bulk schedule publish, and custom role workflows to expand the platform without feature speculation.</p>
+      {/* How it works */}
+      <section id="how-it-works" className="border-y border-primary/10 bg-gradient-to-b from-gray-50 to-white py-16">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-primary sm:text-4xl">How it works</h2>
+            <p className="mt-2 text-primary/65">Three straightforward steps—no complex setup wizard</p>
+          </div>
+          <div className="mt-12 grid gap-8 md:grid-cols-3">
+            {STEPS.map((item) => (
+              <div key={item.num} className="relative rounded-2xl border border-primary/10 bg-white p-8 text-center shadow-sm">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-success text-2xl font-black text-white">
+                  {item.num}
+                </div>
+                <h3 className="mt-5 text-xl font-bold text-primary">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-primary/70">{item.details}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
-      <section id="faq" className="mx-auto max-w-7xl px-6 py-12 rounded-3xl border border-[#6BCFCB]/25 bg-[#082530]/90 mt-8">
-        <h2 className="text-center text-4xl font-bold text-[#6BCFCB]">FAQ</h2>
-        <p className="mx-auto mt-3 max-w-3xl text-center text-[#C8F9FF]">Common questions about importing entities, generating schedules, and role-based access are answered here, with library links for deep dive.</p>
+      {/* Testimonials */}
+      <section id="testimonials" className="py-16">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-primary sm:text-4xl">Trusted by scheduling teams</h2>
+            <p className="mt-2 text-primary/65">What academic leaders say about streamlining their workflows</p>
+          </div>
+          <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            {TESTIMONIALS.map((item) => (
+              <blockquote
+                key={item.name}
+                className="flex flex-col rounded-2xl border border-primary/10 bg-white p-6 shadow-sm"
+              >
+                <div className="mb-3 flex gap-0.5 text-amber-400" aria-label="5 out of 5 stars">
+                  {'★★★★★'.split('').map((s, i) => (
+                    <span key={i}>{s}</span>
+                  ))}
+                </div>
+                <p className="flex-1 text-sm leading-relaxed text-primary/80">&ldquo;{item.quote}&rdquo;</p>
+                <footer className="mt-5 flex items-center gap-3 border-t border-gray-100 pt-5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                    {item.initials}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-primary">{item.name}</p>
+                    <p className="text-xs text-primary/60">{item.role}</p>
+                  </div>
+                </footer>
+              </blockquote>
+            ))}
+          </div>
+        </div>
       </section>
 
-      <section id="help" className="mx-auto max-w-7xl px-6 py-12 rounded-3xl border border-[#6BCFCB]/25 bg-[#082530]/90 mt-8">
-        <h2 className="text-center text-4xl font-bold text-[#6BCFCB]">Help Center</h2>
-        <p className="mx-auto mt-3 max-w-3xl text-center text-[#C8F9FF]">Documentation, how-to resources, and support escalation for administrators and scheduling teams are available when you need them.</p>
+      {/* Security (honest) */}
+      <section className="mx-auto max-w-7xl px-6 pb-16">
+        <div className="rounded-2xl bg-gradient-to-r from-primary to-primary-dark p-8 text-white sm:p-10">
+          <div className="max-w-3xl">
+            <h2 className="text-2xl font-bold sm:text-3xl">Secure access for your institution</h2>
+            <p className="mt-3 text-white/85">
+              SMS uses Laravel authentication with role-based permissions so admins, schedulers, teachers, and students
+              each access only the data and actions appropriate to their role.
+            </p>
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {[
+              { title: 'Role-based permissions', desc: 'Admin, scheduler, teacher, and student roles with granular capabilities.' },
+              { title: 'Authenticated sessions', desc: 'Secure login, registration, and password reset flows built in.' },
+              { title: 'Audit-friendly workflows', desc: 'Structured imports and exports keep data changes traceable.' },
+            ].map((item) => (
+              <div key={item.title} className="rounded-xl border border-white/20 bg-white/10 p-5 backdrop-blur">
+                <h3 className="font-semibold">{item.title}</h3>
+                <p className="mt-1 text-sm text-white/80">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
-      <section id="status" className="mx-auto max-w-7xl px-6 py-12 rounded-3xl border border-[#6BCFCB]/25 bg-[#082530]/90 mt-8 mb-16">
-        <h2 className="text-center text-4xl font-bold text-[#6BCFCB]">System Status</h2>
-        <p className="mx-auto mt-3 max-w-3xl text-center text-[#C8F9FF]">Live status data display for imports, schedules, and system health is available from the dashboard backend in real deployments.</p>
+      {/* Pricing teaser */}
+      <section className="border-t border-primary/10 bg-light-bg/20 py-12">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <h2 className="text-2xl font-bold text-primary">Free to get started</h2>
+          <p className="mt-3 text-primary/70">
+            Register your account, explore the dashboard, and import your first datasets. No credit card required—scale
+            when your institution is ready.
+          </p>
+          {!auth?.user && (
+            <Link href="/register" className="app-primary-btn mt-6 inline-flex rounded-full px-8">
+              Create your free account
+            </Link>
+          )}
+        </div>
       </section>
 
-      <footer className="bg-[#001722] text-slate-300 mt-12 sm:mt-16 lg:mt-20">
-        <div className="mx-auto max-w-7xl px-6 py-16 sm:py-18 lg:py-20">
-          <div className="grid gap-8 md:grid-cols-3">
-            <div>
-              <p className="text-2xl font-bold text-white">Scheduling Management System (SMS)</p>
-              <p className="mt-2 text-sm text-slate-300">The most powerful academic scheduling platform trusted by leading institutions worldwide.</p>
+      {/* FAQ */}
+      <section id="faq" className="py-16">
+        <div className="mx-auto max-w-3xl px-6">
+          <h2 className="text-center text-3xl font-bold text-primary">Frequently asked questions</h2>
+          <div className="mt-8 space-y-3">
+            {FAQ_ITEMS.map((item, index) => (
+              <div key={item.q} className="overflow-hidden rounded-xl border border-primary/10 bg-white">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-5 py-4 text-left font-semibold text-primary"
+                  onClick={() => setOpenFaq(openFaq === index ? -1 : index)}
+                  aria-expanded={openFaq === index}
+                >
+                  {item.q}
+                  <span className="text-primary/50">{openFaq === index ? '−' : '+'}</span>
+                </button>
+                {openFaq === index && (
+                  <p className="border-t border-gray-100 px-5 pb-4 text-sm leading-relaxed text-primary/75">{item.a}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="bg-gradient-to-r from-primary via-primary-dark to-success py-16 text-white">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <h2 className="text-3xl font-bold sm:text-4xl">Ready to take control of your academic schedule?</h2>
+          <p className="mt-4 text-white/90">
+            Join institutions that centralize students, courses, and timetables in SMS—starting takes minutes.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            {primaryCta}
+            <a href="#features" className="rounded-full border-2 border-white/50 px-8 py-3 font-semibold transition hover:bg-white/10">
+              Explore features
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-primary/10 bg-primary text-white">
+        <div className="mx-auto max-w-7xl px-6 py-14">
+          <div className="grid gap-10 md:grid-cols-4">
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-3">
+                <img src={logoSrc} alt="" className="h-9 w-9 rounded-full border border-white/20" />
+                <div>
+                  <p className="font-bold">School Management System</p>
+                  <p className="text-xs uppercase tracking-widest text-light-bg">SMS</p>
+                </div>
+              </div>
+              <p className="mt-4 max-w-md text-sm text-white/75">
+                Scheduling, imports, and role-based dashboards for schools and colleges that want clarity—not
+                spreadsheet sprawl.
+              </p>
             </div>
             <div>
-              <p className="text-lg font-semibold text-white">Product</p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-200">
-                <li><Link href="#features" className="hover:text-cyan-300">Features</Link></li>
-                <li><Link href="#how-it-works" className="hover:text-cyan-300">Solutions</Link></li>
-                <li><Link href="#security" className="hover:text-cyan-300">Security</Link></li>
-                <li><Link href="#roadmap" className="hover:text-cyan-300">Roadmap</Link></li>
+              <p className="font-semibold">Product</p>
+              <ul className="mt-3 space-y-2 text-sm text-white/75">
+                <li>
+                  <a href="#features" className="hover:text-white">
+                    Features
+                  </a>
+                </li>
+                <li>
+                  <a href="#how-it-works" className="hover:text-white">
+                    How it works
+                  </a>
+                </li>
+                <li>
+                  <Link href={auth?.user ? '/schedules/generate' : '/register'} className="hover:text-white">
+                    Schedule generator
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>
-              <p className="text-lg font-semibold text-white">Support</p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-200">
-                <li><Link href="#faq" className="hover:text-cyan-300">Documentation</Link></li>
-                <li><Link href="#help" className="hover:text-cyan-300">Help Center</Link></li>
-                <li><Link href="#contact" className="hover:text-cyan-300">Contact Us</Link></li>
-                <li><Link href="#status" className="hover:text-cyan-300">Status</Link></li>
+              <p className="font-semibold">Account</p>
+              <ul className="mt-3 space-y-2 text-sm text-white/75">
+                <li>
+                  <Link href="/login" className="hover:text-white">
+                    Sign in
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/register" className="hover:text-white">
+                    Register
+                  </Link>
+                </li>
+                <li>
+                  <a href="#faq" className="hover:text-white">
+                    FAQ
+                  </a>
+                </li>
+                <li>
+                  <a href="#testimonials" className="hover:text-white">
+                    Testimonials
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
-
-          <div className="mt-10 rounded-2xl border border-cyan-500/20 bg-[#02151f] p-6">
-            <p className="text-lg font-bold text-white">Subscribe to our newsletter</p>
-            <p className="mt-2 text-sm text-slate-300">Get the latest updates and tips delivered to your inbox.</p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <input type="email" placeholder="Enter your email" className="min-w-[240px] rounded-xl border border-cyan-500/20 bg-[#031a29] px-4 py-2 text-sm text-white outline-none focus:border-cyan-400" />
-              <button className="rounded-xl bg-gradient-to-r from-cyan-500 to-orange-500 px-6 py-2 font-bold text-white hover:brightness-110">Subscribe</button>
-            </div>
-          </div>
-
-          <p className="mt-10 text-center text-xs text-slate-400">© {new Date().getFullYear()} Scheduling Management System (SMS). All rights reserved.</p>
+          <p className="mt-12 border-t border-white/15 pt-8 text-center text-xs text-white/50">
+            © {new Date().getFullYear()} Scheduling Management System (SMS). All rights reserved.
+          </p>
         </div>
       </footer>
     </div>
   );
 }
-
