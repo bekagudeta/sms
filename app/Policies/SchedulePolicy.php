@@ -9,7 +9,7 @@ class SchedulePolicy
 {
     public function viewAny(User $user)
     {
-        return $user->can('view schedule');
+        return $user->can('view schedule') || $user->can('view schedules');
     }
 
     public function view(User $user, Schedule $schedule)
@@ -18,7 +18,7 @@ class SchedulePolicy
             return true;
         }
 
-        if ($user->can('view schedule')) {
+        if ($user->can('view schedule') || $user->can('view schedules')) {
             if ($user->hasRole('teacher')) {
                 // Check if teacher is assigned to this schedule's section via section_teachers
                 return $schedule->section?->teachers?->contains('id', $user->teacher?->id);

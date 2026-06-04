@@ -10,12 +10,15 @@ export const ENTITY_CONFIG = {
       { key: "first_name", label: "First Name", sortable: true, searchable: true },
       { key: "last_name", label: "Last Name", sortable: true, searchable: true },
       { key: "email", label: "Email", sortable: true, searchable: true },
+      { key: "department.name", label: "Department", sortable: true, searchable: true },
       { key: "level", label: "Level", sortable: true },
-      { key: "academic_section", label: "Academic Section", sortable: true },
+      { key: "academic_section", label: "Academic Section", sortable: true, searchable: true },
+      { key: "status", label: "Status", sortable: true, filterable: true },
+      { key: "enrollment_date", label: "Enrolled", sortable: true },
       { key: "phone", label: "Phone", sortable: true }
     ],
     requiredColumns: ["student_id", "first_name", "last_name", "email", "department_code", "academic_section"],
-    optionalColumns: ["level", "phone", "enrollment_date", "department_id"],
+    optionalColumns: ["level", "phone", "enrollment_date", "department_id", "status"],
     apiEndpoint: "/api/students",
     routePrefix: "students",
     permissions: {
@@ -37,11 +40,14 @@ export const ENTITY_CONFIG = {
       { key: "first_name", label: "First Name", sortable: true, searchable: true },
       { key: "last_name", label: "Last Name", sortable: true, searchable: true },
       { key: "email", label: "Email", sortable: true, searchable: true },
+      { key: "department.name", label: "Department", sortable: true, searchable: true },
       { key: "qualification", label: "Qualification", sortable: true },
-      { key: "max_hours_per_week", label: "Max Hours", sortable: true }
+      { key: "specialization", label: "Specialization", sortable: true, searchable: true },
+      { key: "max_hours_per_week", label: "Max Hours", sortable: true },
+      { key: "phone", label: "Phone", sortable: true }
     ],
     requiredColumns: ["teacher_id", "first_name", "last_name", "email", "department_id"],
-    optionalColumns: ["qualification", "phone", "max_hours_per_week"],
+    optionalColumns: ["qualification", "specialization", "phone", "max_hours_per_week"],
     apiEndpoint: "/api/teachers",
     routePrefix: "teachers",
     permissions: {
@@ -62,6 +68,9 @@ export const ENTITY_CONFIG = {
       { key: "course_code", label: "Code", sortable: true, searchable: true },
       { key: "course_name", label: "Name", sortable: true, searchable: true },
       { key: "credits", label: "Credits", sortable: true },
+      { key: "hours_per_week", label: "Hours / Week", sortable: true },
+      { key: "level", label: "Level", sortable: true, filterable: true },
+      { key: "required_room_type", label: "Room Type", sortable: true, filterable: true },
       { key: "department.name", label: "Department", sortable: true, filterable: true }
     ],
     requiredColumns: ["course_code", "course_name", "credits", "hours_per_week"],
@@ -108,12 +117,19 @@ export const ENTITY_CONFIG = {
       { key: "id", label: "ID", sortable: true },
       { key: "name", label: "Name", sortable: true, searchable: true },
       { key: "code", label: "Code", sortable: true, searchable: true },
+      {
+        key: "academic_year",
+        label: "Academic Year",
+        sortable: true,
+        searchable: true,
+        render: (value, item) => value || item.resolved_academic_year || "—",
+      },
       { key: "start_date", label: "Start Date", sortable: true },
       { key: "end_date", label: "End Date", sortable: true },
       { key: "is_active", label: "Active", sortable: true }
     ],
     requiredColumns: ["name", "code"],
-    optionalColumns: ["start_date", "end_date", "is_active"],
+    optionalColumns: ["academic_year", "start_date", "end_date", "is_active"],
     apiEndpoint: "/api/semesters",
     routePrefix: "semesters",
     permissions: {
@@ -133,6 +149,13 @@ export const ENTITY_CONFIG = {
       { key: "id", label: "ID", sortable: true },
       { key: "course.course_code", label: "Course", sortable: true, searchable: true },
       { key: "semester.name", label: "Semester", sortable: true, searchable: true },
+      {
+        key: "semester.academic_year",
+        label: "Academic Year",
+        sortable: true,
+        render: (value, item) =>
+          value || item.semester?.resolved_academic_year || "—",
+      },
       { key: "expected_students", label: "Expected Students", sortable: true },
       { key: "created_at", label: "Created", sortable: true }
     ],
@@ -156,7 +179,9 @@ export const ENTITY_CONFIG = {
     columns: [
       { key: "id", label: "ID", sortable: true },
       { key: "section_name", label: "Section", sortable: true, searchable: true },
+      { key: "courseOffering.course.course_code", label: "Course Code", sortable: true, searchable: true },
       { key: "course_name", label: "Course", sortable: true, searchable: true },
+      { key: "courseOffering.semester.name", label: "Semester", sortable: true, searchable: true },
       { key: "capacity", label: "Capacity", sortable: true },
       { key: "enrolled_count", label: "Enrolled", sortable: true },
       { key: "created_at", label: "Created", sortable: true }
@@ -232,10 +257,12 @@ export const ENTITY_CONFIG = {
     category: "Assignments",
     columns: [
       { key: "id", label: "ID", sortable: true },
-      { key: "student.name", label: "Student", sortable: true, searchable: true },
+      { key: "student.full_name", label: "Student", sortable: true, searchable: true },
+      { key: "student_code_value", label: "Student Code", sortable: true, searchable: true },
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
-      { key: "enrolled_at", label: "Enrolled Date", sortable: true },
-      { key: "student_code_value", label: "Student Code", sortable: true }
+      { key: "section.courseOffering.course.course_code", label: "Course", sortable: true },
+      { key: "section.courseOffering.semester.name", label: "Semester", sortable: true },
+      { key: "enrolled_at", label: "Enrolled Date", sortable: true }
     ],
     requiredColumns: ["student_id", "course_code", "semester_code", "section_name"],
     optionalColumns: ["section_code", "academic_section", "enrolled_at", "student_code_value"],
@@ -257,17 +284,20 @@ export const ENTITY_CONFIG = {
     columns: [
       { key: "id", label: "ID", sortable: true },
       { key: "section.section_name", label: "Section", sortable: true, searchable: true },
-      { key: "teacher.full_name", label: "Teacher", sortable: true, searchable: true }
+      { key: "section.courseOffering.course.course_code", label: "Course", sortable: true },
+      { key: "section.courseOffering.semester.name", label: "Semester", sortable: true },
+      { key: "teacher.full_name", label: "Teacher", sortable: true, searchable: true },
+      { key: "teacher.teacher_id", label: "Teacher ID", sortable: true, searchable: true }
     ],
     requiredColumns: ["course_code", "semester_code", "section_name", "teacher_code"],
     optionalColumns: ["append"],
     apiEndpoint: "/api/section-teachers",
     routePrefix: "section-teachers",
     permissions: {
-      view: "view enrollments",
-      create: "create enrollments",
-      edit: "edit enrollments",
-      delete: "delete enrollments",
+      view: "view section-teachers",
+      create: "create section-teachers",
+      edit: "edit section-teachers",
+      delete: "delete section-teachers",
       import: "import section-teachers"
     }
   }

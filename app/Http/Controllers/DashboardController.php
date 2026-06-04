@@ -7,6 +7,7 @@ use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\Course;
 use App\Models\Schedule;
+use App\Models\Section;
 use App\Models\Semester;
 use App\Models\Department;
 use App\Repositories\ScheduleRepository;
@@ -210,8 +211,16 @@ class DashboardController extends Controller
         $user = Auth::user();
         $role = $user->roles->first()?->name;
 
-        $stats = ['total_schedules' => Schedule::count()];
-        $recentSchedules = Schedule::with(['section.courseOffering.course', 'section.teachers.user', 'room', 'timeslot'])
+        $scheduledSectionIds = Schedule::query()->distinct()->pluck('section_id');
+        $activeSemester = Semester::where('is_active', true)->first();
+
+        $stats = [
+            'total_schedules' => Schedule::count(),
+            'total_sections' => Section::count(),
+            'unscheduled_sections' => Section::whereNotIn('id', $scheduledSectionIds)->count(),
+        ];
+
+        $recentSchedules = Schedule::with($this->scheduleEagerLoads())
             ->latest()
             ->take(5)
             ->get();
@@ -219,6 +228,11 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard/Index', [
             'stats' => $stats,
             'recentSchedules' => $recentSchedules,
+            'activeSemester' => $activeSemester ? [
+                'id' => $activeSemester->id,
+                'name' => $activeSemester->name,
+                'academic_year' => $activeSemester->resolved_academic_year,
+            ] : null,
             'role' => $role,
         ]);
     }

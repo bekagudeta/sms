@@ -18,6 +18,7 @@ class Teacher extends Model
         'email',
         'phone',
         'qualification',
+        'specialization',
         'max_hours_per_week',
     ];
 

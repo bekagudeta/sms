@@ -168,11 +168,23 @@ class EntityController extends Controller
                 // Load relationships for nested columns in generic list views
                 $relationIncludes = [];
                 switch ($entityType) {
+                    case 'students':
+                    case 'teachers':
+                        $relationIncludes = ['department'];
+                        break;
                     case 'enrollments':
-                        $relationIncludes = ['student', 'section'];
+                        $relationIncludes = [
+                            'student',
+                            'section.courseOffering.course',
+                            'section.courseOffering.semester',
+                        ];
                         break;
                     case 'section-teachers':
-                        $relationIncludes = ['section', 'teacher'];
+                        $relationIncludes = [
+                            'section.courseOffering.course',
+                            'section.courseOffering.semester',
+                            'teacher',
+                        ];
                         break;
                     case 'course-offerings':
                         $relationIncludes = ['course', 'semester'];
@@ -248,7 +260,18 @@ class EntityController extends Controller
         if ($entityType === 'course-offerings') {
             $relatedOptions = [
                 'courses' => Course::select('id', 'course_code')->orderBy('course_code')->get(),
-                'semesters' => Semester::select('id', 'name')->orderBy('name')->get(),
+                'semesters' => Semester::select('id', 'name', 'code', 'academic_year')
+                    ->orderBy('name')
+                    ->get()
+                    ->map(fn ($semester) => [
+                        'id' => $semester->id,
+                        'name' => $semester->name,
+                        'label' => trim(sprintf(
+                            '%s (%s)',
+                            $semester->name,
+                            $semester->academic_year ?: $semester->code
+                        )),
+                    ]),
             ];
         }
 
@@ -557,7 +580,6 @@ class EntityController extends Controller
             'section-teachers' => [
                 'section_id' => 'required|exists:sections,id',
                 'teacher_id' => 'required|exists:teachers,id',
-                'role' => 'nullable|string|max:255',
             ],
             'sections' => [
                 'course_offering_id' => 'required|exists:course_offerings,id',
@@ -588,6 +610,7 @@ class EntityController extends Controller
             'semesters' => [
                 'name' => 'required|string|max:255',
                 'code' => 'required|string|max:50|unique:semesters,code'.($id ? ",{$id}" : ''),
+                'academic_year' => 'nullable|string|max:20',
                 'start_date' => 'nullable|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
                 'is_active' => 'sometimes|boolean',

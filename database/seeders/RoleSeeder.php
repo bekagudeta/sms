@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
-use App\Models\User;
+use Spatie\Permission\Models\Role;
 
 class RoleSeeder extends Seeder
 {
@@ -21,13 +21,23 @@ class RoleSeeder extends Seeder
             'manage teachers',
             'manage courses',
             'generate schedule',
-            'view schedule'
+            'view schedule',
+            'view schedules',
+            'manage schedules',
         ];
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate([
                 'name' => $permission,
-                'guard_name' => 'web'
+                'guard_name' => 'web',
+            ]);
+        }
+
+        // Ensure scheduler entity permissions exist (RolesAndPermissionsSeeder may have created them first).
+        foreach (RolesAndPermissionsSeeder::schedulerPermissions() as $permission) {
+            Permission::firstOrCreate([
+                'name' => $permission,
+                'guard_name' => 'web',
             ]);
         }
 
@@ -38,12 +48,7 @@ class RoleSeeder extends Seeder
 
         $admin->syncPermissions(Permission::all());
 
-        $scheduler->syncPermissions([
-            'import data',
-            'generate schedule',
-            'export schedule',
-            'view schedule'
-        ]);
+        $scheduler->syncPermissions(RolesAndPermissionsSeeder::schedulerPermissions());
 
         $teacher->syncPermissions(['view schedule']);
         $student->syncPermissions(['view schedule']);
@@ -54,7 +59,7 @@ class RoleSeeder extends Seeder
                 'name' => 'Admin',
                 'password' => Hash::make('password'),
                 'plain_password' => 'password',
-                'must_change_password' => false
+                'must_change_password' => false,
             ]
         );
 

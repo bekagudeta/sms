@@ -1,176 +1,211 @@
 import React from 'react';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
+import { route } from 'ziggy-js';
+import ScheduleTable from '@/Components/ScheduleTable';
 
-export default function SchedulerDashboard({ stats, recentSchedules }) {
+function ActionIcon({ children, className = '' }) {
     return (
-        <>
-            <div className="py-12 bg-rich-black bg-opacity-90 min-h-screen" style={{ backgroundImage: 'linear-gradient(135deg, rgba(0,23,34,0.9) 0%, rgba(8,74,72,0.75) 50%, rgba(254,88,11,0.65) 100%)' }}>
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    <div className="bg-slate-950/80 backdrop-blur-md overflow-hidden shadow-2xl sm:rounded-2xl border border-deep-jungle-green/40">
-                        <div className="p-8 bg-gradient-to-r from-deep-jungle-green to-rich-black text-pearl-aqua">
-                            <h2 className="text-3xl font-extrabold mb-2">Scheduler Dashboard</h2>
-                            <p className="text-pearl-aqua/90">Generate and manage schedules with powerful scheduling tools</p>
+        <span
+            className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 ${className}`}
+            aria-hidden
+        >
+            {children}
+        </span>
+    );
+}
+
+const QUICK_ACTIONS = [
+    {
+        permission: 'generate schedule',
+        href: () => route('schedules.generate.show'),
+        title: 'Generate Schedule',
+        description: 'Run the auto-scheduler for the active semester',
+        className: 'app-primary-btn flex-col !h-auto !w-full !px-6 !py-6 text-center',
+        icon: (
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+        ),
+    },
+    {
+        permission: 'import data',
+        href: () => route('import.index'),
+        title: 'Import Data',
+        description: 'Upload Excel templates for students, sections, and more',
+        className: 'app-secondary-btn flex-col !h-auto !w-full !px-6 !py-6 text-center',
+        icon: (
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+        ),
+        linkComponent: Link,
+    },
+    {
+        permission: 'export schedule',
+        href: () => route('export.schedule'),
+        title: 'Export Schedule',
+        description: 'Download the current timetable as Excel',
+        className: 'app-secondary-btn flex-col !h-auto !w-full !px-6 !py-6 text-center',
+        icon: (
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+        ),
+        linkComponent: 'a',
+    },
+    {
+        permission: 'view schedule',
+        altPermission: 'view schedules',
+        href: () => '/schedules',
+        title: 'View Schedules',
+        description: 'Browse and review all generated class schedules',
+        className: 'app-secondary-btn flex-col !h-auto !w-full !px-6 !py-6 text-center',
+        icon: (
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+        ),
+        linkComponent: Link,
+    },
+];
+
+export default function SchedulerDashboard({ stats = {}, recentSchedules = [], activeSemester = null }) {
+    const permissions = usePage().props.auth?.permissions ?? [];
+
+    const can = (name, alt) => {
+        if (permissions.includes(name)) return true;
+        if (alt && permissions.includes(alt)) return true;
+        return false;
+    };
+
+    const visibleActions = QUICK_ACTIONS.filter((action) =>
+        can(action.permission, action.altPermission)
+    );
+
+    const statCards = [
+        {
+            label: 'Total Schedules',
+            value: stats.total_schedules ?? 0,
+            hint: 'Assigned class meetings',
+        },
+        {
+            label: 'Class Sections',
+            value: stats.total_sections ?? 0,
+            hint: 'Sections in the system',
+        },
+        {
+            label: 'Needs Scheduling',
+            value: stats.unscheduled_sections ?? 0,
+            hint: 'Sections without a timetable slot',
+        },
+    ];
+
+    return (
+        <div className="space-y-8">
+            <div className="app-panel overflow-hidden">
+                <div className="border-b border-deep-jungle-green/10 bg-deep-jungle-green px-8 py-7 text-platinum">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-vivid-orange">
+                        Scheduling workspace
+                    </p>
+                    <h2 className="text-3xl font-bold">Scheduler Dashboard</h2>
+                    <p className="mt-2 text-platinum/80">
+                        Generate timetables, import preparation data, and export results
+                        {activeSemester
+                            ? ` — ${activeSemester.name}${activeSemester.academic_year ? ` (${activeSemester.academic_year})` : ''}`
+                            : ''}
+                        .
+                    </p>
+                </div>
+
+                <div className="grid gap-4 border-b border-deep-jungle-green/10 bg-platinum/30 p-8 sm:grid-cols-3">
+                    {statCards.map((card) => (
+                        <div key={card.label} className="app-panel-muted p-5">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-deep-jungle-green/60">
+                                {card.label}
+                            </p>
+                            <p className="mt-2 text-3xl font-bold text-deep-jungle-green">{card.value}</p>
+                            <p className="mt-1 text-sm text-deep-jungle-green/70">{card.hint}</p>
                         </div>
-                        <div className="p-8">
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                                <div className="bg-gradient-to-br from-deep-jungle-green to-rich-black text-white p-6 rounded-2xl shadow-2xl shadow-deep-jungle-green/25 hover:shadow-deep-jungle-green/45 transition-shadow duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-semibold mb-2">Total Schedules</h3>
-                                            <p className="text-3xl font-bold text-pearl-aqua">{stats.total_schedules}</p>
-                                        </div>
-                                        <div className="text-4xl opacity-90">??</div>
-                                    </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-pearl-aqua to-deep-jungle-green text-rich-black p-6 rounded-2xl shadow-2xl shadow-pearl-aqua/20 hover:shadow-pearl-aqua/40 transition-shadow duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-semibold mb-2">Pending</h3>
-                                            <p className="text-3xl font-bold">{recentSchedules?.filter(s => s.status === 'pending').length || 0}</p>
-                                        </div>
-                                        <div className="text-4xl opacity-90">?</div>
-                                    </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-vivid-orange via-pearl-aqua to-deep-jungle-green text-white p-6 rounded-2xl shadow-2xl shadow-vivid-orange/25 hover:shadow-vivid-orange/45 transition-shadow duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-semibold mb-2">Active</h3>
-                                            <p className="text-3xl font-bold">{recentSchedules?.filter(s => s.status === 'active').length || 0}</p>
-                                        </div>
-                                        <div className="text-4xl opacity-90">?</div>
-                                    </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-rich-black to-deep-jungle-green text-white p-6 rounded-2xl shadow-2xl shadow-rich-black/25 hover:shadow-rich-black/45 transition-shadow duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-semibold mb-2">This Week</h3>
-                                            <p className="text-3xl font-bold">{recentSchedules?.filter(s => {
-                                                if (!s.timeslot) return false;
-                                                const scheduleDate = new Date();
-                                                const dayOfWeek = s.timeslot.day_of_week;
-                                                const dayMap = {'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 0};
-                                                const scheduleDay = dayMap[dayOfWeek] || 0;
-                                                const currentDay = scheduleDate.getDay();
-                                                return Math.abs(currentDay - scheduleDay) <= 3;
-                                            }).length || 0}</p>
-                                        </div>
-                                        <div className="text-4xl opacity-90">??</div>
-                                    </div>
-                                </div>
-                            </div>
+                    ))}
+                </div>
 
-                            {/* Recent Schedules */}
-                            <div className="mb-10">
-                                <h3 className="text-2xl font-bold mb-6 text-pearl-aqua">Recent Schedules</h3>
-                                <div className="bg-slate-900/80 border border-deep-jungle-green/40 rounded-2xl overflow-hidden shadow-2xl shadow-deep-jungle-green/25">
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-deep-jungle-green/40">
-                                            <thead className="bg-gradient-to-r from-deep-jungle-green/85 to-rich-black/85 text-white">
-                                                <tr>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Course</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Teacher</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Room</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Day</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Time</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-slate-950/80 divide-y divide-deep-jungle-green/30">
-                                                {recentSchedules?.length > 0 ? recentSchedules.map((schedule) => (
-                                                    <tr key={schedule.id} className="hover:bg-slate-800 transition-colors duration-200">
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="text-sm font-semibold text-pearl-aqua">
-                                                                {schedule.course ? schedule.course.course_code : 'Not assigned'}
-                                                            </div>
-                                                            <div className="text-xs text-slate-300">
-                                                                {schedule.course ? schedule.course.course_name : 'Not assigned'}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
-                                                            {schedule.teacher?.user?.name || 'Not assigned'}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
-                                                            {schedule.room?.room_code || 'Not assigned'}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
-                                                            {schedule.timeslot?.day_of_week || 'Not assigned'}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-200">
-                                                            {schedule.timeslot ? `${schedule.timeslot.start_time} - ${schedule.timeslot.end_time}` : 'Not assigned'}
-                                                        </td>
-                                                        <td className="px-6 py-4 whitespace-nowrap">
-                                                            <Link
-                                                                href={`/schedules/${schedule.id}`}
-                                                                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-pearl-aqua text-rich-black hover:bg-vivid-orange hover:text-white transition-colors duration-200"
-                                                            >
-                                                                View
-                                                            </Link>
-                                                        </td>
-                                                    </tr>
-                                                )) : (
-                                                    <tr>
-                                                        <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
-                                                            No schedules found. Generate a schedule to get started.
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
+                {visibleActions.length > 0 && (
+                    <div className="border-b border-deep-jungle-green/10 px-8 py-6">
+                        <h3 className="text-lg font-bold text-deep-jungle-green">Quick actions</h3>
+                        <p className="mt-1 text-sm text-deep-jungle-green/70">
+                            Scheduler tools — import, generate, export, and review timetables.
+                        </p>
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            {visibleActions.map((action) => {
+                                const LinkTag = action.linkComponent === 'a' ? 'a' : Link;
+                                const linkProps =
+                                    action.linkComponent === 'a'
+                                        ? { href: action.href() }
+                                        : { href: action.href() };
 
-                            {/* Quick Actions */}
-                            <div>
-                                <h3 className="text-2xl font-bold mb-6 text-pearl-aqua">Quick Actions</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                                    <Link
-                                        href={route('schedules.generate')}
-                                        className="group bg-gradient-to-r from-vivid-orange to-deep-jungle-green text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
+                                return (
+                                    <LinkTag
+                                        key={action.title}
+                                        {...linkProps}
+                                        className={`${action.className} gap-3 no-underline`}
                                     >
-                                        <div className="text-center">
-                                            <div className="text-4xl mb-3">?</div>
-                                            <h4 className="text-lg font-semibold mb-2">Generate Schedule</h4>
-                                            <p className="text-pearl-aqua/90 text-sm">Automatically create schedules for courses</p>
-                                        </div>
-                                    </Link>
-                                    <Link
-                                        href={route('import.index')}
-                                        className="group bg-gradient-to-r from-pearl-aqua to-deep-jungle-green text-rich-black p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
-                                    >
-                                        <div className="text-center">
-                                            <div className="text-4xl mb-3">??</div>
-                                            <h4 className="text-lg font-semibold mb-2">Import Data</h4>
-                                            <p className="text-rich-black/80 text-sm">Upload Excel files to import data</p>
-                                        </div>
-                                    </Link>
-                                    <a
-                                        href={route('export.schedule')}
-                                        className="group bg-gradient-to-r from-deep-jungle-green to-vivid-orange text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 block"
-                                    >
-                                        <div className="text-center">
-                                            <div className="text-4xl mb-3">??</div>
-                                            <h4 className="text-lg font-semibold mb-2">Export Schedule</h4>
-                                            <p className="text-pearl-aqua/90 text-sm">Download schedules as Excel file</p>
-                                        </div>
-                                    </a>
-                                    <Link
-                                        href="/schedules"
-                                        className="group bg-gradient-to-r from-deep-jungle-green to-pearl-aqua text-rich-black p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
-                                    >
-                                        <div className="text-center">
-                                            <div className="text-4xl mb-3">??</div>
-                                            <h4 className="text-lg font-semibold mb-2">Manage Schedules</h4>
-                                            <p className="text-rich-black/80 text-sm">View and edit existing schedules</p>
-                                        </div>
-                                    </Link>
-                                </div>
-                            </div>
+                                        <ActionIcon>{action.icon}</ActionIcon>
+                                        <span className="text-base font-semibold">{action.title}</span>
+                                        <span className="text-xs font-normal opacity-80">{action.description}</span>
+                                    </LinkTag>
+                                );
+                            })}
                         </div>
                     </div>
+                )}
+
+                <div className="p-8">
+                    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 className="text-2xl font-bold text-deep-jungle-green">Recent Schedules</h3>
+                            <p className="mt-1 text-sm text-deep-jungle-green/70">
+                                Latest timetable entries — open the full list to manage them.
+                            </p>
+                        </div>
+                        {(can('view schedule', 'view schedules') || can('generate schedule')) && (
+                            <Link href="/schedules" className="app-secondary-btn">
+                                View all schedules
+                            </Link>
+                        )}
+                    </div>
+
+                    {recentSchedules.length > 0 ? (
+                        <ScheduleTable
+                            schedules={recentSchedules}
+                            compact
+                            actionColumn={
+                                can('view schedule', 'view schedules') || can('generate schedule')
+                                    ? (schedule) => (
+                                          <Link
+                                              href={`/schedules/${schedule.id}`}
+                                              className="text-sm font-semibold text-deep-jungle-green underline-offset-2 hover:underline"
+                                          >
+                                              View
+                                          </Link>
+                                      )
+                                    : null
+                            }
+                        />
+                    ) : (
+                        <div className="app-panel-muted px-6 py-10 text-center">
+                            <p className="text-deep-jungle-green/80">No schedules yet.</p>
+                            {can('generate schedule') && (
+                                <Link
+                                    href={route('schedules.generate.show')}
+                                    className="app-primary-btn mt-4 inline-flex"
+                                >
+                                    Generate your first schedule
+                                </Link>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
-        </>
+        </div>
     );
 }

@@ -9,6 +9,7 @@ export default function NavigationSidebar({ currentRoute }) {
     const userRoles = user?.roles || [];
     const userPermissions = props.auth?.permissions || [];
     const isTeacher = userRoles.some((role) => role.name === 'teacher');
+    const isAdmin = userRoles.some((role) => role.name === 'admin');
 
     const toggleCategory = (category) => {
         const newExpanded = new Set(expandedCategories);
@@ -21,51 +22,19 @@ export default function NavigationSidebar({ currentRoute }) {
     };
 
     const hasPermission = (permission) => {
-        // Check if user has the required permission
         if (!user) return false;
-        
-        // Admin has all permissions
-        if (userRoles.some(role => role.name === 'admin')) {
+
+        if (isAdmin) {
             return true;
         }
-        
-        // Check specific role-based permissions
-        if (userRoles.some(role => role.name === 'scheduler')) {
-            const schedulerPermissions = [
-                'view students', 'create students', 'edit students', 'delete students', 'import students',
-                'view teachers', 'create teachers', 'edit teachers', 'delete teachers', 'import teachers',
-                'view courses', 'create courses', 'edit courses', 'delete courses', 'import courses', 'import course-offerings', 'import sections',
-                'view rooms', 'create rooms', 'edit rooms', 'delete rooms', 'import rooms',
-                'view timeslots', 'create timeslots', 'edit timeslots', 'delete timeslots', 'import timeslots',
-                'view enrollments', 'create enrollments', 'edit enrollments', 'delete enrollments', 'import enrollments', 'import section-teachers',
-                'view schedules', 'create schedules', 'edit schedules', 'delete schedules',
-                'import data', 'export schedule', 'generate schedule'
-            ];
-            return schedulerPermissions.includes(permission) || userPermissions.includes(permission);
-        }
-        
-        if (userRoles.some(role => role.name === 'teacher')) {
-            const teacherPermissions = [
-                'view schedules',
-                'view own schedule',
-                'view own students',
-                'export own students',
-            ];
 
-            return teacherPermissions.includes(permission) || userPermissions.includes(permission);
-        }
-        
-        if (userRoles.some(role => role.name === 'student')) {
-            const studentPermissions = [
-                'view schedules',
-                'view own schedule'
-            ];
-            return studentPermissions.includes(permission) || userPermissions.includes(permission);
-        }
-        
-        // Check direct permissions
         return userPermissions.includes(permission);
     };
+
+    const canViewSchedules =
+        hasPermission('view schedules') ||
+        hasPermission('view schedule') ||
+        hasPermission('generate schedule');
 
     const getIcon = (iconName) => {
         const icons = {
@@ -181,7 +150,7 @@ export default function NavigationSidebar({ currentRoute }) {
             )}
 
             {/* Schedules */}
-            {(hasPermission('view schedules') || hasPermission('generate schedule')) && (
+            {canViewSchedules && (
                 <Link
                     href="/schedules"
                     className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
@@ -210,7 +179,7 @@ export default function NavigationSidebar({ currentRoute }) {
                 </Link>
             )}
 
-            {/* Import/Export - Scheduler specific */}
+            {/* Import / Export */}
             {(hasPermission('import data') || hasPermission('export schedule')) && (
                 <div className="space-y-1">
                     <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/55">
@@ -304,18 +273,20 @@ export default function NavigationSidebar({ currentRoute }) {
                 );
             })}
 
-            {/* Settings */}
-            <Link
-                href="/settings"
-                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                    isActive('/settings')
-                        ? 'bg-success text-white shadow-sm'
-                        : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`}
-            >
-                {getIcon('Cog')}
-                <span className="ml-3">Settings</span>
-            </Link>
+            {/* Settings — admins only; others use profile from the header menu when available */}
+            {isAdmin && (
+                <Link
+                    href="/settings"
+                    className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        isActive('/settings')
+                            ? 'bg-success text-white shadow-sm'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                    {getIcon('Cog')}
+                    <span className="ml-3">Settings</span>
+                </Link>
+            )}
         </nav>
     );
 }

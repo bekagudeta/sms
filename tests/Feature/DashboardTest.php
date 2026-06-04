@@ -16,22 +16,18 @@ class DashboardTest extends TestCase
     {
         parent::setUp();
 
-        // create minimal permissions & roles used by dashboard
-        Permission::firstOrCreate(['name' => 'view schedule']);
-        Permission::firstOrCreate(['name' => 'generate schedule']);
-        Permission::firstOrCreate(['name' => 'import data']);
-        Permission::firstOrCreate(['name' => 'export schedule']);
+        foreach (\Database\Seeders\RolesAndPermissionsSeeder::schedulerPermissions() as $permission) {
+            Permission::firstOrCreate(['name' => $permission]);
+        }
+
         Permission::firstOrCreate(['name' => 'manage students']);
         Permission::firstOrCreate(['name' => 'manage teachers']);
         Permission::firstOrCreate(['name' => 'manage courses']);
 
         Role::firstOrCreate(['name' => 'admin'])->syncPermissions(Permission::all());
-        Role::firstOrCreate(['name' => 'scheduler'])->syncPermissions([
-            'import data',
-            'generate schedule',
-            'export schedule',
-            'view schedule',
-        ]);
+        Role::firstOrCreate(['name' => 'scheduler'])->syncPermissions(
+            \Database\Seeders\RolesAndPermissionsSeeder::schedulerPermissions()
+        );
         Role::firstOrCreate(['name' => 'teacher'])->syncPermissions(['view schedule']);
         Role::firstOrCreate(['name' => 'student'])->syncPermissions(['view schedule']);
     }
@@ -57,7 +53,7 @@ class DashboardTest extends TestCase
         $this->assertArrayHasKey('total_schedules', $data['stats']);
     }
 
-    public function test_scheduler_dashboard_shows_only_schedule_count()
+    public function test_scheduler_dashboard_shows_scheduling_stats_only()
     {
         $user = User::factory()->create();
         $user->assignRole('scheduler');
@@ -73,7 +69,23 @@ class DashboardTest extends TestCase
         $data = $response->json('props');
         $this->assertEquals('scheduler', $data['role']);
         $this->assertArrayHasKey('total_schedules', $data['stats']);
-        $this->assertCount(1, $data['stats']);
+        $this->assertArrayHasKey('total_sections', $data['stats']);
+        $this->assertArrayHasKey('unscheduled_sections', $data['stats']);
+        $this->assertCount(3, $data['stats']);
+        $this->assertArrayNotHasKey('total_students', $data['stats']);
+    }
+
+    public function test_scheduler_has_entity_view_permissions_for_sidebar()
+    {
+        $user = User::factory()->create();
+        $user->assignRole('scheduler');
+
+        $this->assertTrue($user->can('view semesters'));
+        $this->assertTrue($user->can('view departments'));
+        $this->assertTrue($user->can('view enrollments'));
+        $this->assertTrue($user->can('view section-teachers'));
+        $this->assertTrue($user->can('view students'));
+        $this->assertTrue($user->can('view courses'));
     }
 
     public function test_teacher_dashboard_hides_stats()

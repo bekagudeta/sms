@@ -209,13 +209,8 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                     ]
                 },
                 max_hours_per_week: { type: 'number', min: 1, max: 38, label: 'Max Hours per Week' },
-                status: { 
-                    type: 'select', 
-                    options: [
-                        { value: 'active', label: 'Active' },
-                        { value: 'inactive', label: 'Inactive' }
-                    ]
-                }
+                specialization: { type: 'text', label: 'Specialization' },
+                phone: { type: 'text', label: 'Phone' },
             },
             courses: {
                 course_code: { label: 'Course Code' },
@@ -250,9 +245,14 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                 }
             },
             semesters: {
+                academic_year: {
+                    type: 'text',
+                    label: 'Academic Year',
+                    placeholder: 'e.g. 2024-2025 or 2024',
+                },
                 start_date: { type: 'date', label: 'Start Date' },
                 end_date: { type: 'date', label: 'End Date' },
-                is_active: { type: 'checkbox', label: 'Is Active' }
+                is_active: { type: 'checkbox', label: 'Is Active' },
             },
             'course-offerings': {
                 course_id: {
@@ -263,7 +263,10 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                 semester_id: {
                     type: 'select',
                     label: 'Semester',
-                    options: (relatedOptions.semesters || []).map(semester => ({ value: semester.id, label: semester.name }))
+                    options: (relatedOptions.semesters || []).map((semester) => ({
+                        value: semester.id,
+                        label: semester.label || semester.name,
+                    })),
                 },
                 expected_students: { type: 'number', min: 0, label: 'Expected Students' }
             },
@@ -301,7 +304,6 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                     label: 'Teacher',
                     options: (relatedOptions.teachers || []).map(teacher => ({ value: teacher.id, label: teacher.label }))
                 },
-                role: { label: 'Role' }
             },
             rooms: {
                 room_code: { label: 'Room Code' },

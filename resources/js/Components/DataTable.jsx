@@ -111,6 +111,25 @@ export default function DataTable({ columns, data, onEdit, onDelete, onSelect, l
             );
         }
 
+        if (
+            typeof value === 'boolean' ||
+            column.key === 'is_active' ||
+            column.key.startsWith('has_')
+        ) {
+            const truthy = value === true || value === 1 || value === '1';
+            return (
+                <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        truthy
+                            ? 'bg-deep-jungle-green text-platinum'
+                            : 'bg-platinum text-deep-jungle-green border border-deep-jungle-green/15'
+                    }`}
+                >
+                    {truthy ? 'Yes' : 'No'}
+                </span>
+            );
+        }
+
         return String(value);
     };
 
