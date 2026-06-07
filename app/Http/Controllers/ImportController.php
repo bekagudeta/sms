@@ -231,6 +231,17 @@ class ImportController extends Controller
         ]);
 
         $file = $request->file('file');
+        
+        // Validate file content for security threats
+        try {
+            $this->validateFileContent($file);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File validation failed: '.$e->getMessage(),
+            ], 422);
+        }
+
         $definition = $this->getImportDefinitions()[$request->input('entity_type')];
         $requiredColumns = $definition['required_columns'];
         $optionalColumns = $definition['optional_columns'];
@@ -302,6 +313,17 @@ class ImportController extends Controller
         $file = $request->file('file');
         $mappings = $request->input('mappings', []);
         $skipHeader = $request->boolean('skip_header', true);
+        
+        // Validate file content for security threats
+        try {
+            $this->validateFileContent($file);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File validation failed: '.$e->getMessage(),
+            ], 422);
+        }
+        
         $serviceMethod = $this->getImportDefinitions()[$entityType]['service_method'];
 
         $processedFile = $file;
@@ -461,6 +483,43 @@ class ImportController extends Controller
         $result = $this->importService->importRooms($request->file('file'));
 
         return $this->respondImportResult($result);
+    }
+
+    /**
+     * Validate file content for security threats
+     * Prevents malicious Excel files with formulas or external data connections
+     */
+    private function validateFileContent($file): void
+    {
+        $filePath = $file->getRealPath();
+        $fileContent = file_get_contents($filePath);
+
+        if ($file->extension() === 'csv') {
+            // For CSV, check for formula injection patterns
+            $lines = explode("\n", $fileContent);
+            foreach ($lines as $line) {
+                // Check for formula injection indicators
+                if (preg_match('/^[=@+\-]/', trim($line))) {
+                    throw new \Exception('File contains suspicious formula patterns. CSV files must not start with =, @, +, or -.');
+                }
+            }
+        } elseif (in_array($file->extension(), ['xlsx', 'xls'])) {
+            // For Excel files, look for suspicious XML patterns in the ZIP structure
+            if (function_exists('zip_open')) {
+                $zip = zip_open($filePath);
+                if (is_resource($zip)) {
+                    while ($entry = zip_read($zip)) {
+                        $name = zip_entry_name($entry);
+                        // Check for VBA macros or external connections
+                        if (preg_match('/\.(?:bin|xml)$/i', $name) && preg_match('/(VBA|externalConnections|oleObject)/i', $name)) {
+                            zip_close($zip);
+                            throw new \Exception('File contains VBA macros or external connections. Please use clean data files only.');
+                        }
+                    }
+                    zip_close($zip);
+                }
+            }
+        }
     }
 
     private function respondImportResult(array $result)

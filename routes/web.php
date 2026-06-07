@@ -28,19 +28,6 @@ Route::get('/', function () {
     ]);
 });
 
-// Auto-login route for local development only.
-if (app()->environment('local')) {
-    Route::get('/auto-login', function () {
-        $user = User::first();
-        if ($user) {
-            Auth::login($user);
-
-            return redirect('/admin/dashboard');
-        }
-
-        return 'No users found in database';
-    });
-}
 
 // authentication routes (login, register, password reset, etc.)
 require __DIR__.'/auth.php';

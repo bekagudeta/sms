@@ -16,9 +16,9 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, string $roles = null): Response
     {
-        // if no roles specified allow through
+        // if no roles specified deny access (prevent accidental bypass)
         if (empty($roles)) {
-            return $next($request);
+            abort(403, 'Unauthorized. Role validation failed: no roles specified.');
         }
 
         $allowed = array_map('trim', explode(',', $roles));

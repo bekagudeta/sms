@@ -47,7 +47,6 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
                         $plainPassword = Str::random(12);
                         $user->update([
                             'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                            'plain_password' => '',
                             'must_change_password' => true,
                         ]);
                     }
@@ -58,7 +57,6 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
                         'name' => trim(($row['first_name'] ?? '').' '.($row['last_name'] ?? '')),
                         'email' => $row['email'],
                         'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                        'plain_password' => '',
                         'must_change_password' => true,
                     ]);
                 }

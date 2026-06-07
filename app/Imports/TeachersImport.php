@@ -35,7 +35,6 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
                     $plainPassword = Str::random(12);
                     $user->update([
                         'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                        'plain_password' => '',
                         'must_change_password' => true,
                     ]);
                 }
@@ -46,7 +45,6 @@ class TeachersImport implements ToCollection, WithHeadingRow, WithValidation
                     'name' => trim(($row['first_name'] ?? '').' '.($row['last_name'] ?? '')),
                     'email' => $row['email'],
                     'password' => Hash::make($plainPassword, ['rounds' => 8]),
-                    'plain_password' => '',
                     'must_change_password' => true,
                 ]);
             }
