@@ -26,7 +26,6 @@ class StudentSeeder extends Seeder
                 [
                     'name' => $faker->name,
                     'password' => Hash::make('password'),
-                    'plain_password' => 'password',
                     'must_change_password' => false
                 ]
             );

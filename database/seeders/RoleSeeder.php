@@ -52,17 +52,5 @@ class RoleSeeder extends Seeder
 
         $teacher->syncPermissions(['view schedule']);
         $student->syncPermissions(['view schedule']);
-
-        $adminUser = User::firstOrCreate(
-            ['email' => 'admin@admin.com'],
-            [
-                'name' => 'Admin',
-                'password' => Hash::make('password'),
-                'plain_password' => 'password',
-                'must_change_password' => false,
-            ]
-        );
-
-        $adminUser->assignRole('admin');
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\ChangePasswordController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EntityController;
 use App\Http\Controllers\ExportController;
@@ -39,6 +40,14 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['role:admin'])->get('/admin/dashboard', [DashboardController::class, 'admin'])
         ->name('admin.dashboard');
+
+    // Audit Logs Routes (Admin only)
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])
+            ->name('audit-logs.index');
+        Route::get('/audit-logs/export', [AuditLogController::class, 'export'])
+            ->name('audit-logs.export');
+    });
 
     Route::middleware(['role:scheduler'])->get('/scheduler/dashboard', [DashboardController::class, 'scheduler'])
         ->name('scheduler.dashboard');
