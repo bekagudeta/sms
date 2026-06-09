@@ -354,6 +354,7 @@ class DashboardController extends Controller
                 'department' => $student->department?->name,
             ];
 
+            // Get enrolled courses from explicit enrollments
             $enrolledCourses = $student->enrollments->map(function ($enrollment) {
                 $section = $enrollment->section;
                 $course = $section?->courseOffering?->course;
@@ -365,6 +366,30 @@ class DashboardController extends Controller
                     'semester' => $section?->courseOffering?->semester?->name,
                 ];
             })->filter(fn ($row) => $row['course_code'])->values()->all();
+
+            // Fallback: If no explicit enrollments, show department courses from active semester
+            if (empty($enrolledCourses) && $student->department_id) {
+                $activeSemester = Semester::where('is_active', true)->first();
+                if ($activeSemester) {
+                    $departmentSections = Section::whereHas('courseOffering', function ($q) use ($student, $activeSemester) {
+                        $q->where('semester_id', $activeSemester->id)
+                            ->whereHas('course', function ($courseQuery) use ($student) {
+                                $courseQuery->where('department_id', $student->department_id);
+                            });
+                    })->with('courseOffering.course', 'courseOffering.semester')
+                        ->get();
+
+                    $enrolledCourses = $departmentSections->map(function ($section) {
+                        $course = $section?->courseOffering?->course;
+                        return [
+                            'course_code' => $course?->course_code,
+                            'course_name' => $course?->course_name,
+                            'section_name' => $section?->section_name,
+                            'semester' => $section?->courseOffering?->semester?->name,
+                        ];
+                    })->filter(fn ($row) => $row['course_code'])->values()->all();
+                }
+            }
         }
 
         return Inertia::render('Dashboard/Index', [
@@ -419,9 +444,18 @@ class DashboardController extends Controller
         $enrolledSectionIds = $student->enrollments()->pluck('section_id');
 
         if ($enrolledSectionIds->isNotEmpty()) {
+            // Student has explicit enrollments - show only enrolled sections
             $query->whereIn('section_id', $enrolledSectionIds);
         } else {
-            $query->whereRaw('1 = 0');
+            // Fallback: Show all sections for the student's department
+            // This ensures students see their academic cohort's schedules even without explicit enrollments
+            if ($student->department_id) {
+                $query->whereHas('section.courseOffering.course', function ($q) use ($student) {
+                    $q->where('department_id', $student->department_id);
+                });
+            } else {
+                $query->whereRaw('1 = 0');
+            }
         }
 
         return $query;

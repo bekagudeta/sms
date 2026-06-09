@@ -28,6 +28,7 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 class Kernel extends HttpKernel
 {

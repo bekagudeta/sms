@@ -41,7 +41,7 @@ export default function StudentDashboard({ recentSchedules, studentProfile, enro
 
                 <div className="app-panel-muted p-6">
                     <h3 className="text-lg font-semibold text-deep-jungle-green">Current Courses</h3>
-                    <p className="mt-1 text-xs text-deep-jungle-green/60">Course sections you are enrolled in (from Enrollments import).</p>
+                    <p className="mt-1 text-xs text-deep-jungle-green/60">All course sections available in your department this semester.</p>
                     {enrolledCourses.length > 0 ? (
                         <ul className="mt-4 divide-y divide-deep-jungle-green/10">
                             {enrolledCourses.map((course, index) => (
@@ -58,7 +58,7 @@ export default function StudentDashboard({ recentSchedules, studentProfile, enro
                         </ul>
                     ) : (
                         <p className="mt-4 text-sm text-deep-jungle-green/70">
-                            No course enrollments yet. Import enrollments after students and course sections.
+                            No courses available for your department this semester.
                         </p>
                     )}
                 </div>
@@ -95,7 +95,7 @@ export default function StudentDashboard({ recentSchedules, studentProfile, enro
                     </ul>
                 ) : (
                     <div className="app-panel-muted px-6 py-8 text-center text-deep-jungle-green/70">
-                        No scheduled classes for your enrolled course sections yet.
+                        No scheduled classes for your department this semester yet.
                     </div>
                 )}
             </div>

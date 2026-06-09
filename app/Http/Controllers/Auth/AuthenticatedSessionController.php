@@ -69,8 +69,9 @@ class AuthenticatedSessionController extends Controller
                 ->with('status', 'Your account is not assigned a role. Please contact an administrator.');
         }
 
-        // Force password change if required
-        if ($user->must_change_password) {
+        // Force password change if required (check fresh from database)
+        // This ensures the flag is read directly from DB, not from cache
+        if ($user->fresh()->must_change_password) {
             return redirect('/change-password');
         }
 

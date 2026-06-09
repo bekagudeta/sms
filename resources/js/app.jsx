@@ -10,22 +10,24 @@ import axios from 'axios';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
-// Get CSRF token from meta tag
+// Get CSRF token from meta tag or props
 const getCsrfToken = () => {
     const token = document.querySelector('meta[name="csrf-token"]');
     return token ? token.content : '';
 };
 
-const csrfToken = getCsrfToken();
+const updateAxiosCsrfToken = (token) => {
+    if (token) {
+        axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
+        axios.defaults.headers.post['X-CSRF-TOKEN'] = token;
+        axios.defaults.headers.put['X-CSRF-TOKEN'] = token;
+        axios.defaults.headers.patch['X-CSRF-TOKEN'] = token;
+        axios.defaults.headers.delete['X-CSRF-TOKEN'] = token;
+    }
+};
 
-// Configure axios to always include CSRF token
-if (csrfToken) {
-    axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
-    axios.defaults.headers.post['X-CSRF-TOKEN'] = csrfToken;
-    axios.defaults.headers.put['X-CSRF-TOKEN'] = csrfToken;
-    axios.defaults.headers.patch['X-CSRF-TOKEN'] = csrfToken;
-    axios.defaults.headers.delete['X-CSRF-TOKEN'] = csrfToken;
-}
+let csrfToken = getCsrfToken();
+updateAxiosCsrfToken(csrfToken);
 
 // Add request interceptor to ensure CSRF token is always included
 axios.interceptors.request.use((config) => {
@@ -44,6 +46,12 @@ createInertiaApp({
             import.meta.glob('./pages/**/*.jsx'),
         ),
     setup({ el, App, props }) {
+        // Update CSRF token from props on each page load
+        if (props.initialPage.props && props.initialPage.props.csrf_token) {
+            csrfToken = props.initialPage.props.csrf_token;
+            updateAxiosCsrfToken(csrfToken);
+        }
+        
         const root = createRoot(el);
         root.render(<App {...props} />);
     },
