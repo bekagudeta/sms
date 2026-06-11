@@ -49,11 +49,15 @@ class StudentController extends Controller
             'email'           => 'required|email|max:255|unique:students,email',
             'phone'           => 'nullable|string|max:20',
             'department_id'   => 'required|exists:departments,id',
+            'level'           => 'nullable|string|max:50',
+            'academic_section'=> 'required|string|max:50',
+            'student_type'    => 'nullable|string|in:regular,weekend',
             'status'          => 'nullable|string|in:active,inactive,pending,graduated,suspended',
             'enrollment_date' => 'nullable|date',
         ]);
 
         $validated['user_id'] = auth()->id();
+        $validated['student_type'] = $validated['student_type'] ?? 'regular';
 
         $this->repository->create($validated);
 
@@ -82,9 +86,14 @@ class StudentController extends Controller
             'email'           => 'required|email|max:255|unique:students,email,' . $student->id,
             'phone'           => 'nullable|string|max:20',
             'department_id'   => 'required|exists:departments,id',
+            'level'           => 'nullable|string|max:50',
+            'academic_section'=> 'required|string|max:50',
+            'student_type'    => 'nullable|string|in:regular,weekend',
             'status'          => 'nullable|string|in:active,inactive,pending,graduated,suspended',
             'enrollment_date' => 'nullable|date',
         ]);
+
+        $validated['student_type'] = $validated['student_type'] ?? 'regular';
 
         $this->repository->update($student->id, $validated);
 

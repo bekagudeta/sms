@@ -19,6 +19,7 @@ class Student extends Model
         'phone',
         'level',
         'academic_section',
+        'student_type',
         'status',
         'enrollment_date',
     ];
@@ -52,6 +53,13 @@ class Student extends Model
     public function sections()
     {
         return $this->belongsToMany(Section::class, 'enrollments');
+    }
+
+    public function schedules()
+    {
+        // Get schedules through sections pivot table
+        $sectionIds = $this->sections()->pluck('sections.id');
+        return Schedule::whereIn('section_id', $sectionIds);
     }
 
     public function getSchedulesAttribute()

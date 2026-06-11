@@ -184,6 +184,21 @@ export default function NavigationSidebar({ currentRoute }) {
                 </Link>
             )}
 
+            {/* Admin: Student Types Management */}
+            {isAdmin && (
+                <Link
+                    href="/admin/student-types"
+                    className={`group flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        isActive('/admin/student-types')
+                            ? 'bg-success text-white shadow-sm'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                >
+                    {getIcon('Users')}
+                    <span className="ml-3">Student Types</span>
+                </Link>
+            )}
+
             {/* Import / Export */}
             {(hasPermission('import data') || hasPermission('export schedule')) && (
                 <div className="space-y-1">

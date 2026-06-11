@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\TimeslotDuration;
+use App\Support\StudentScheduleRules;
 use App\Models\Course;
 use App\Models\Room;
 use App\Models\Schedule;
@@ -66,6 +67,8 @@ class AutoSchedulerService
     protected $availableTimeslotsCache    = [];
     protected $timeslotOrderMap           = [];
     protected $warnedRoomFallbackCourses  = [];
+    protected $sectionStudentTypes        = [];
+    protected $studentTypeByStudent       = [];
 
     /** Dominant student cohort (academic_section) per course section, for room-sharing rules. */
     protected $sectionCohortKeys = [];
@@ -663,8 +666,12 @@ class AutoSchedulerService
             return false;
         }
 
+        if (!$this->isTimeslotAllowedForSection($section, $timeslot)) {
+            return false;
+        }
+
         foreach ($section->teachers as $teacher) {
-            if (isset($this->teacherTimeslotMap[$teacher->id][$timeslot->id])) {
+            if ($this->hasTeacherConflictInMemory($teacher, $timeslot)) {
                 return false;
             }
             if (!$this->teacherCanAcceptTimeslot($teacher, $timeslot)) {
@@ -674,13 +681,45 @@ class AutoSchedulerService
 
         if (config('scheduling.enforce_student_conflicts', true)) {
             foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
-                if (isset($this->studentTimeslotMap[$studentId][$timeslot->id])) {
+                if ($this->hasStudentConflictInMemory((int) $studentId, $timeslot)) {
                     return false;
                 }
             }
         }
 
         return true;
+    }
+
+    protected function isTimeslotAllowedForSection($section, $timeslot): bool
+    {
+        return StudentScheduleRules::timeslotAllowedForType(
+            $this->getSectionStudentType($section),
+            $timeslot
+        );
+    }
+
+    protected function hasTeacherConflictInMemory($teacher, $timeslot): bool
+    {
+        foreach (array_keys($this->teacherTimeslotMap[$teacher->id] ?? []) as $existingTimeslotId) {
+            $existing = $this->timeslots->firstWhere('id', (int) $existingTimeslotId);
+            if (StudentScheduleRules::timeslotsOverlap($existing, $timeslot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function hasStudentConflictInMemory(int $studentId, $timeslot): bool
+    {
+        foreach (array_keys($this->studentTimeslotMap[$studentId] ?? []) as $existingTimeslotId) {
+            $existing = $this->timeslots->firstWhere('id', (int) $existingTimeslotId);
+            if (StudentScheduleRules::timeslotsOverlap($existing, $timeslot)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // =========================================================================
@@ -1140,7 +1179,14 @@ class AutoSchedulerService
 
     protected function hasRoomConflictInMemory($room, $timeslot): bool
     {
-        return isset($this->roomTimeslotMap[$room->id][$timeslot->id]);
+        foreach (array_keys($this->roomTimeslotMap[$room->id] ?? []) as $existingTimeslotId) {
+            $existing = $this->timeslots->firstWhere('id', (int) $existingTimeslotId);
+            if (StudentScheduleRules::timeslotsOverlap($existing, $timeslot)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function getEligibleRooms($course)
@@ -1277,6 +1323,11 @@ class AutoSchedulerService
         return trim((string) ($this->sectionCohortKeys[$section->id] ?? ''));
     }
 
+    protected function getSectionStudentType($section): string
+    {
+        return $this->sectionStudentTypes[$section->id] ?? StudentScheduleRules::DEFAULT_TYPE;
+    }
+
     protected function getSectionBatchKey($section): string
     {
         return $this->getSectionAcademicCohort($section);
@@ -1393,7 +1444,7 @@ class AutoSchedulerService
             'courseOffering.course',
             'courseOffering.semester',
             'teachers',
-            'enrollments',
+            'enrollments.student',
         ])
             ->whereHas('courseOffering', fn ($q) => $q->where('semester_id', $this->semesterId))
             ->get()
@@ -1405,12 +1456,15 @@ class AutoSchedulerService
         $this->teachers = Teacher::all();
         $this->rooms    = Room::all();
 
-        $this->timeslots = Timeslot::whereIn('day_of_week', [
-            'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
-        ])
-            ->orderBy('day_of_week')
-            ->orderBy('start_time')
-            ->get();
+        $allowedDays = array_keys(config('scheduling.days', []));
+
+        $this->timeslots = Timeslot::whereIn('day_of_week', $allowedDays)
+            ->get()
+            ->sortBy([
+                fn ($a, $b) => $this->getDayIndex($a->day_of_week) <=> $this->getDayIndex($b->day_of_week),
+                fn ($a, $b) => strcmp((string) $a->start_time, (string) $b->start_time),
+            ])
+            ->values();
 
         if ($this->timeslots->isEmpty()) {
             $this->timeslots = $this->createDefaultTimeslots();
@@ -1425,10 +1479,12 @@ class AutoSchedulerService
         );
         $weeklyTeachingHours = TimeslotDuration::totalWeeklyTeachingHours($this->timeslots);
 
-        if ($totalRequired > $weeklyTeachingHours + 0.001) {
+        $weeklySlotCapacity = $weeklyTeachingHours * max(1, $this->rooms->count());
+
+        if ($totalRequired > $weeklySlotCapacity + 0.001) {
             throw new \Exception(
                 "Insufficient total capacity. Required: {$totalRequired} teaching hour(s), "
-                ."available: {$weeklyTeachingHours} hour(s) across all timeslots."
+                ."available: {$weeklySlotCapacity} room-hour combination(s) across all timeslots."
             );
         }
 
@@ -1482,23 +1538,38 @@ class AutoSchedulerService
             $allStudentIds = array_merge($allStudentIds, $ids);
         }
 
-        $cohortsByStudent = Student::whereIn('id', array_unique($allStudentIds))
-            ->pluck('academic_section', 'id');
+        $studentsById = Student::whereIn('id', array_unique($allStudentIds))
+            ->get(['id', 'first_name', 'last_name', 'academic_section', 'student_type'])
+            ->keyBy('id');
+
+        $this->studentTypeByStudent = $studentsById
+            ->map(fn ($student) => StudentScheduleRules::normalizeStudentType($student->student_type))
+            ->all();
 
         foreach ($this->sections as $section) {
             $counts = [];
+            $studentTypes = [];
             foreach ($this->sectionStudentIds[$section->id] ?? [] as $studentId) {
-                $cohort = trim((string) ($cohortsByStudent[$studentId] ?? ''));
+                $student = $studentsById->get($studentId);
+                $cohort = trim((string) ($student?->academic_section ?? ''));
                 if ($cohort !== '') {
                     $counts[$cohort] = ($counts[$cohort] ?? 0) + 1;
                 }
+
+                $studentTypes[] = $this->studentTypeByStudent[$studentId] ?? StudentScheduleRules::DEFAULT_TYPE;
             }
+
             if ($counts !== []) {
                 arsort($counts);
                 $this->sectionCohortKeys[$section->id] = (string) array_key_first($counts);
             } else {
                 $this->sectionCohortKeys[$section->id] = '';
             }
+
+            $studentTypes = array_values(array_unique($studentTypes));
+            $this->sectionStudentTypes[$section->id] = count($studentTypes) <= 1
+                ? ($studentTypes[0] ?? StudentScheduleRules::DEFAULT_TYPE)
+                : StudentScheduleRules::MIXED_TYPE;
         }
 
         $this->cohortWeeklyHours = [];
@@ -1542,6 +1613,30 @@ class AutoSchedulerService
 
         $academicCohorts = array_keys(array_filter($this->cohortWeeklyHours));
         $cohortCount     = count($academicCohorts);
+        $requiredHoursByStudentType = [];
+
+        foreach ($this->sections as $section) {
+            $studentType = $this->getSectionStudentType($section);
+            if ($studentType === StudentScheduleRules::MIXED_TYPE) {
+                throw new \Exception(
+                    "Section {$section->section_name} contains both regular and weekend students. "
+                    .'Split the enrollment into separate course sections before generating schedules.'
+                );
+            }
+
+            $requiredHours = $this->getRequiredWeeklyHours($section->courseOffering->course);
+            $allowedHours = StudentScheduleRules::allowedTeachingHoursForType($studentType, $this->timeslots);
+
+            if ($allowedHours + 0.001 < $requiredHours) {
+                throw new \Exception(
+                    "Section {$section->section_name} needs {$requiredHours} weekly teaching hour(s), "
+                    ."but {$studentType} students only have {$allowedHours} allowed weekly timeslot hour(s). "
+                    .'Import or create more allowed timeslots.'
+                );
+            }
+
+            $requiredHoursByStudentType[$studentType] = ($requiredHoursByStudentType[$studentType] ?? 0) + $requiredHours;
+        }
 
         if ($cohortCount > 0) {
             $minRoomsRequired = (int) ceil($cohortCount / max(1, $maxCohortsPerRoom));

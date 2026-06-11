@@ -213,6 +213,10 @@ class EntityController extends Controller
         if ($entityType === 'students') {
             $relatedOptions = [
                 'departments' => Department::select('id', 'name')->orderBy('name')->get(),
+                'studentTypes' => [
+                    ['value' => 'regular', 'label' => 'Regular'],
+                    ['value' => 'weekend', 'label' => 'Weekend'],
+                ],
                 'levels' => [
                     ['value' => 'bachelor', 'label' => 'Bachelor'],
                     ['value' => 'master', 'label' => 'Master'],
@@ -550,6 +554,7 @@ class EntityController extends Controller
                 'email' => 'required|email|max:255|unique:students,email'.($id ? ",{$id}" : ''),
                 'level' => 'nullable|string|max:50',
                 'academic_section' => 'required|string|max:50',
+                'student_type' => 'nullable|string|in:regular,weekend',
                 'phone' => 'nullable|string|max:20',
                 'department_id' => 'required|exists:departments,id',
                 'grade' => 'nullable|integer|min:1|max:12',

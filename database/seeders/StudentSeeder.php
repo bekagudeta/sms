@@ -43,6 +43,7 @@ class StudentSeeder extends Seeder
                     'department_id' => $faker->randomElement($departments),
                     'level' => $faker->randomElements(['undergraduate', 'postgraduate'])[0],
                     'academic_section' => $faker->randomElement(['SE-3A', 'SE-3B', 'CS-2A', 'CS-2B']),
+                    'student_type' => $faker->randomElement(['regular', 'weekend']),
                     'enrollment_date' => $faker->date('Y-m-d'),
                 ]
             );

@@ -18,6 +18,21 @@ return [
     'max_generation_attempts' => 5,
     // Teaching hours per assignment = timeslot end_time − start_time (exact, not rounded).
     'minutes_per_credit_hour' => 60,
+    'student_types' => ['regular', 'weekend'],
+    'session_windows' => [
+        'morning' => ['start' => '14:00', 'end' => '18:00'],    // 2:00 PM - 6:00 PM
+        'afternoon' => ['start' => '19:30', 'end' => '23:30'],  // 7:30 PM - 11:30 PM
+        'evening' => ['start' => '11:30', 'end' => '14:00'],    // 11:30 AM - 2:00 PM
+    ],
+    'student_type_timeslots' => [
+        'regular' => [
+            ['days' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], 'sessions' => ['morning', 'afternoon']],
+        ],
+        'weekend' => [
+            ['days' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], 'sessions' => ['evening']],
+            ['days' => ['Saturday', 'Sunday'], 'sessions' => ['morning', 'afternoon']],
+        ],
+    ],
     'days' => [
         'Monday' => 1,
         'Tuesday' => 2,

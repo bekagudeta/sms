@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Schedule;
 use App\Models\Section;
+use App\Support\StudentScheduleRules;
 
 class ScheduleDisplay
 {
@@ -27,6 +28,7 @@ class ScheduleDisplay
             'day' => $timeslot?->day_of_week,
             'time' => static::formatTimeRange($timeslot?->start_time, $timeslot?->end_time),
             'section' => $schedule->section?->section_name,
+            'student_type' => static::studentTypeForSection($schedule->section),
         ];
     }
 
@@ -95,4 +97,16 @@ class ScheduleDisplay
 
         return trim($start).' - '.trim($end);
     }
+
+    public static function studentTypeForSection(?Section $section): string
+    {
+        if (! $section) {
+            return 'Regular';
+        }
+
+        return StudentScheduleRules::sectionStudentType($section) === 'weekend'
+            ? 'Weekend'
+            : 'Regular';
+    }
 }
+

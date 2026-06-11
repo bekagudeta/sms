@@ -167,6 +167,14 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
             students: {
                 email: { type: 'email', label: 'Email Address' },
                 academic_section: { type: 'text', label: 'Academic Section (cohort, e.g. SE-3A)' },
+                student_type: {
+                    type: 'select',
+                    label: 'Student Type',
+                    options: [
+                        { value: 'regular', label: 'Regular' },
+                        { value: 'weekend', label: 'Weekend' }
+                    ]
+                },
                 level: {
                     type: 'select',
                     options: relatedOptions.levels || [

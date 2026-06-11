@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\Department;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\StudentScheduleRules;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -88,6 +89,7 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
                         'status' => $row['status'] ?? 'active',
                         'level' => $this->optionalString($row['level'] ?? null),
                         'academic_section' => $academicSection,
+                        'student_type' => StudentScheduleRules::normalizeStudentType($row['student_type'] ?? null),
                         'enrollment_date' => $enrollmentDate,
                     ]
                 );
@@ -114,6 +116,7 @@ class StudentsImport implements ToCollection, WithChunkReading, WithHeadingRow, 
             '*.department_name' => 'nullable|string',
             '*.academic_section' => 'required_without:*.section|nullable|string',
             '*.section' => 'nullable|string',
+            '*.student_type' => 'nullable|string',
             '*.level' => 'nullable|string',
             '*.phone' => 'nullable|string',
             '*.enrollment_date' => 'nullable',

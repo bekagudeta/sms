@@ -168,9 +168,10 @@ const fallbackImportOptions = [
             "email",
             "department_code",
             "academic_section",
+            "student_type",
             "phone",
         ],
-        note: "academic_section is the student's homeroom/cohort (SE-3A), not a course class. department_code must exist in Departments. Credentials download after import.",
+        note: "student_type can be regular or weekend. academic_section is the student's homeroom/cohort (SE-3A), not a course class. department_code must exist in Departments. Credentials download after import.",
     },
     {
         value: "enrollments",
@@ -1590,4 +1591,3 @@ export default function ImportExcel({
         </DashboardLayout>
     );
 }
-

@@ -51,6 +51,7 @@ class TeacherStudentsExport implements FromCollection, WithHeadings, WithMapping
             'Department',
             'Year Level',
             'Academic Section',
+            'Student Type',
             'Status',
             'Enrolled Courses',
         ];
@@ -79,6 +80,7 @@ class TeacherStudentsExport implements FromCollection, WithHeadings, WithMapping
                 ?? ScheduleDisplay::yearLevelFromAcademicSection($student->academic_section)
                 ?? '',
             $student->academic_section ?? '',
+            ucfirst($student->student_type ?? 'regular'),
             $student->status ?? '',
             $courses,
         ];

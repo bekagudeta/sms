@@ -44,7 +44,9 @@ class StudentRequest extends FormRequest
             ],
             'phone' => ['nullable', 'string', 'max:20'],
             'department_id' => ['required', 'exists:departments,id'],
-            'semester' => ['required', 'integer', 'min:1', 'max:12'],
+            'level' => ['nullable', 'string', 'max:50'],
+            'academic_section' => ['required', 'string', 'max:50'],
+            'student_type' => ['nullable', 'string', Rule::in(['regular', 'weekend'])],
             'enrollment_date' => ['required', 'date'],
         ];
     }

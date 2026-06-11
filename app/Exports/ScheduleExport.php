@@ -53,6 +53,7 @@ class ScheduleExport implements FromCollection, WithHeadings, WithMapping, WithS
             'Day',
             'Time',
             'Section',
+            'Student Type',
             'Max Students',
             'Status',
         ];
@@ -74,6 +75,7 @@ class ScheduleExport implements FromCollection, WithHeadings, WithMapping, WithS
             $display['day'] ?? 'Not set',
             $display['time'] ?? 'Not set',
             $display['section'] ?? 'N/A',
+            $display['student_type'] ?? 'Regular',
             $schedule->section?->capacity ?? 'N/A',
             'Scheduled',
         ];

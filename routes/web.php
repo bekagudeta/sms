@@ -10,6 +10,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SchedulingController;
 use App\Http\Controllers\StudentImportController;
+use App\Http\Controllers\StudentTypeAdminController;
 use App\Http\Controllers\TeacherImportController;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -40,6 +41,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['role:admin'])->get('/admin/dashboard', [DashboardController::class, 'admin'])
         ->name('admin.dashboard');
+
+    // Admin Student Types Dashboard
+    Route::middleware(['role:admin'])->get('/admin/student-types', [StudentTypeAdminController::class, 'index'])
+        ->name('admin.student-types');
 
     // Audit Logs Routes (Admin only)
     Route::middleware(['role:admin'])->group(function () {

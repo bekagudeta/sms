@@ -13,12 +13,13 @@ export const ENTITY_CONFIG = {
       { key: "department.name", label: "Department", sortable: true, searchable: true },
       { key: "level", label: "Level", sortable: true },
       { key: "academic_section", label: "Academic Section", sortable: true, searchable: true },
+      { key: "student_type", label: "Student Type", sortable: true, filterable: true },
       { key: "status", label: "Status", sortable: true, filterable: true },
       { key: "enrollment_date", label: "Enrolled", sortable: true },
       { key: "phone", label: "Phone", sortable: true }
     ],
     requiredColumns: ["student_id", "first_name", "last_name", "email", "department_code", "academic_section"],
-    optionalColumns: ["level", "phone", "enrollment_date", "department_id", "status"],
+    optionalColumns: ["student_type", "level", "phone", "enrollment_date", "department_id", "status"],
     apiEndpoint: "/api/students",
     routePrefix: "students",
     permissions: {

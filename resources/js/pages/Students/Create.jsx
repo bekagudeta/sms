@@ -10,7 +10,9 @@ export default function StudentsCreate({ departments }) {
         email: '',
         phone: '',
         department_id: '',
-        semester: '',
+        level: '',
+        academic_section: '',
+        student_type: 'regular',
         enrollment_date: ''
     });
 
@@ -130,19 +132,50 @@ export default function StudentsCreate({ departments }) {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Semester
+                                    Level
                                 </label>
                                 <input
-                                    type="number"
-                                    min="1"
-                                    max="12"
-                                    value={data.semester}
-                                    onChange={e => setData('semester', e.target.value)}
+                                    type="text"
+                                    value={data.level}
+                                    onChange={e => setData('level', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                                {errors.level && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.level}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Academic Section (cohort)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={data.academic_section}
+                                    onChange={e => setData('academic_section', e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     required
                                 />
-                                {errors.semester && (
-                                    <p className="text-red-500 text-sm mt-1">{errors.semester}</p>
+                                {errors.academic_section && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.academic_section}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Student Type
+                                </label>
+                                <select
+                                    value={data.student_type}
+                                    onChange={e => setData('student_type', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    required
+                                >
+                                    <option value="regular">Regular</option>
+                                    <option value="weekend">Weekend</option>
+                                </select>
+                                {errors.student_type && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.student_type}</p>
                                 )}
                             </div>
 
