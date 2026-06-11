@@ -55,6 +55,15 @@ class StudentScheduleRules
         }
 
         $studentType = self::normalizeStudentType($studentType);
+
+        if (($timeslot->student_type ?? null) !== null && (string) $timeslot->student_type !== '') {
+            if ($studentType === self::normalizeStudentType((string) $timeslot->student_type)) {
+                return true;
+            }
+
+            return false;
+        }
+
         $rules = config("scheduling.student_type_timeslots.{$studentType}", []);
 
         foreach ($rules as $rule) {

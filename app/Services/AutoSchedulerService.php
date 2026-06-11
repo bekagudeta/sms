@@ -2015,17 +2015,17 @@ class AutoSchedulerService
 
     protected function createDefaultTimeslots()
     {
-        $slots   = collect();
-        $days    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-        $times   = [
-            ['start' => '08:00', 'end' => '09:00'],
-            ['start' => '09:00', 'end' => '10:00'],
-            ['start' => '10:00', 'end' => '11:00'],
-            ['start' => '11:00', 'end' => '12:00'],
-            ['start' => '13:00', 'end' => '14:00'],
+        $slots = collect();
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        $times = [
             ['start' => '14:00', 'end' => '15:00'],
             ['start' => '15:00', 'end' => '16:00'],
             ['start' => '16:00', 'end' => '17:00'],
+            ['start' => '17:00', 'end' => '18:00'],
+            ['start' => '19:30', 'end' => '20:30'],
+            ['start' => '20:30', 'end' => '21:30'],
+            ['start' => '21:30', 'end' => '22:30'],
+            ['start' => '22:30', 'end' => '23:30'],
         ];
 
         $counter = 1;
@@ -2036,6 +2036,7 @@ class AutoSchedulerService
                     'day_of_week' => $day,
                     'start_time'  => $time['start'],
                     'end_time'    => $time['end'],
+                    'student_type' => 'regular',
                 ]);
             }
         }
