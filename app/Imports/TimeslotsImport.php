@@ -20,6 +20,7 @@ class TimeslotsImport implements ToCollection, WithHeadingRow, WithValidation
             $start = $this->formatTime($row['start_time']);
             $end = $this->formatTime($row['end_time']);
             $slotCode = trim($row['slot_code'] ?? '');
+            $studentType = trim($row['student_type'] ?? '') ?: null;
 
             if (! $day || ! $start || ! $end || ! $slotCode) {
                 continue;
@@ -32,6 +33,7 @@ class TimeslotsImport implements ToCollection, WithHeadingRow, WithValidation
                     'start_time' => $start,
                     'end_time' => $end,
                     'slot_code' => $slotCode,
+                    'student_type' => $studentType,
                 ]
             );
 
@@ -69,6 +71,7 @@ class TimeslotsImport implements ToCollection, WithHeadingRow, WithValidation
             '*.start_time' => 'required',
             '*.end_time' => 'required',
             '*.slot_code' => 'required|string',
+            '*.student_type' => 'nullable|string',
         ];
     }
 

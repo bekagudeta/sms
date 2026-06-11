@@ -15,7 +15,8 @@ class Timeslot extends Model
         'day_of_week',
         'start_time',
         'end_time',
-        'slot_code'
+        'slot_code',
+        'student_type'
     ];
 
     public function schedules()
