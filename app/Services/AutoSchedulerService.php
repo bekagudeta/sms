@@ -1315,7 +1315,7 @@ class AutoSchedulerService
     protected function getSectionDepartmentId($section): ?int
     {
         $deptId = $section->courseOffering?->course?->department_id;
-        return $deptId ? (int) $deptId : null;
+        return $deptId !== null && $deptId !== '' ? (int) $deptId : null;
     }
 
     protected function getSectionAcademicCohort($section): string
