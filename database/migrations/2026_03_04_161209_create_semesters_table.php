@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('code')->unique();
+            $table->string('academic_year', 9)->nullable();
             $table->date('start_date');
             $table->date('end_date');
             $table->boolean('is_active')->default(false);

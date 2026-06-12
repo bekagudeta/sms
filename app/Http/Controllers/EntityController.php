@@ -117,7 +117,7 @@ class EntityController extends Controller
         ],
         'enrollments' => [
             'model' => 'App\Models\Enrollment',
-            'controller' => null, // Handle directly in this controller
+            'controller' => null,
             'permissions' => [
                 'view' => 'view enrollments',
                 'create' => 'create enrollments',
@@ -128,13 +128,24 @@ class EntityController extends Controller
         ],
         'section-teachers' => [
             'model' => 'App\Models\SectionTeacher',
-            'controller' => null, // Handle directly in this controller
+            'controller' => null,
             'permissions' => [
                 'view' => 'view section-teachers',
                 'create' => 'create section-teachers',
                 'edit' => 'edit section-teachers',
                 'delete' => 'delete section-teachers',
                 'import' => 'import section-teachers',
+            ],
+        ],
+        'schedulers' => [
+            'model' => 'App\Models\User',
+            'controller' => null,
+            'permissions' => [
+                'view' => 'view schedulers',
+                'create' => 'create schedulers',
+                'edit' => 'edit schedulers',
+                'delete' => 'delete schedulers',
+                'import' => 'import schedulers',
             ],
         ],
     ];
@@ -148,24 +159,20 @@ class EntityController extends Controller
         $entityConfig = $this->entityMap[$entityType];
         $permissions = $entityConfig['permissions'];
 
-        // Check if user is admin - admins have all permissions
         $user = auth()->user();
         $isAdmin = $user && $user->hasRole('admin');
 
-        // Check view permission (admin bypass)
         if (! $isAdmin && ! auth()->user()->can($permissions['view'])) {
             abort(403, 'Unauthorized');
         }
 
         $model = $entityConfig['model'];
-
         $data = collect([]);
 
         if (class_exists($model)) {
             try {
                 $query = $model::query();
 
-                // Load relationships for nested columns in generic list views
                 $relationIncludes = [];
                 switch ($entityType) {
                     case 'students':
@@ -194,6 +201,9 @@ class EntityController extends Controller
                         break;
                     case 'courses':
                         $relationIncludes = ['department'];
+                        break;
+                    case 'schedulers':
+                        $query = $query->role('scheduler');
                         break;
                 }
 
@@ -361,7 +371,14 @@ class EntityController extends Controller
             ];
         }
 
-        // Always render the Entities/Index view with the entity data
+        if ($entityType === 'schedulers') {
+            $relatedOptions = [
+                'roles' => \Spatie\Permission\Models\Role::select('id', 'name', 'guard_name')
+                    ->orderBy('name')
+                    ->get(),
+            ];
+        }
+
         return Inertia::render('Entities/Index', [
             'entityType' => $entityType,
             'data' => $data,
@@ -385,11 +402,9 @@ class EntityController extends Controller
 
         $entityConfig = $this->entityMap[$entityType];
 
-        // Check if user is admin - admins have all permissions
         $user = auth()->user();
         $isAdmin = $user && $user->hasRole('admin');
 
-        // Check create permission (admin bypass)
         if (! $isAdmin && ! auth()->user()->can($entityConfig['permissions']['create'])) {
             abort(403, 'Unauthorized');
         }
@@ -405,11 +420,9 @@ class EntityController extends Controller
 
         $entityConfig = $this->entityMap[$entityType];
 
-        // Check if user is admin - admins have all permissions
         $user = auth()->user();
         $isAdmin = $user && $user->hasRole('admin');
 
-        // Check edit permission (admin bypass)
         if (! $isAdmin && ! auth()->user()->can($entityConfig['permissions']['edit'])) {
             abort(403, 'Unauthorized');
         }
@@ -425,11 +438,9 @@ class EntityController extends Controller
 
         $entityConfig = $this->entityMap[$entityType];
 
-        // Check if user is admin - admins have all permissions
         $user = auth()->user();
         $isAdmin = $user && $user->hasRole('admin');
 
-        // Check delete permission (admin bypass)
         if (! $isAdmin && ! auth()->user()->can($entityConfig['permissions']['delete'])) {
             abort(403, 'Unauthorized');
         }
@@ -445,11 +456,9 @@ class EntityController extends Controller
 
         $entityConfig = $this->entityMap[$entityType];
 
-        // Check if user is admin - admins have all permissions
         $user = auth()->user();
         $isAdmin = $user && $user->hasRole('admin');
 
-        // Check delete permission (admin bypass)
         if (! $isAdmin && ! auth()->user()->can($entityConfig['permissions']['delete'])) {
             abort(403, 'Unauthorized');
         }
@@ -473,17 +482,13 @@ class EntityController extends Controller
 
         $entityConfig = $this->entityMap[$entityType];
 
-        // Check if user is admin - admins have all permissions
         $user = auth()->user();
         $isAdmin = $user && $user->hasRole('admin');
 
-        // Check view permission (admin bypass)
         if (! $isAdmin && ! auth()->user()->can($entityConfig['permissions']['view'])) {
             abort(403, 'Unauthorized');
         }
 
-        // Implementation for export functionality
-        // This would generate CSV/Excel exports
         return response()->json(['message' => 'Export functionality coming soon']);
     }
 
@@ -491,7 +496,6 @@ class EntityController extends Controller
     {
         $model = $this->entityMap[$entityType]['model'];
 
-        // Define validation rules for entities without dedicated controllers
         $validationRules = $this->getValidationRules($entityType);
         $validated = $request->validate($validationRules);
 
@@ -508,7 +512,17 @@ class EntityController extends Controller
             unset($validated['student_code_value']);
         }
 
+        if ($entityType === 'schedulers') {
+            $validated['password'] = bcrypt($validated['password']);
+            $validated['must_change_password'] = false;
+            $validated['role'] = 'scheduler';
+        }
+
         $entity = $model::create($validated);
+
+        if ($entityType === 'schedulers') {
+            $entity->syncRoles(['scheduler']);
+        }
 
         return redirect()->route('entities.index', ['entityType' => $entityType])
             ->with('success', ucfirst($entityType).' created successfully.');
@@ -525,6 +539,10 @@ class EntityController extends Controller
         if ($entityType === 'enrollments' && isset($validated['student_code_value'])) {
             $validated['student_code'] = $validated['student_code_value'];
             unset($validated['student_code_value']);
+        }
+
+        if ($entityType === 'schedulers' && ! empty($validated['password'])) {
+            $validated['password'] = bcrypt($validated['password']);
         }
 
         $entity->update($validated);
@@ -582,10 +600,6 @@ class EntityController extends Controller
                 'has_computers' => 'sometimes|boolean',
                 'computer_count' => 'sometimes|integer|min:0',
             ],
-            'section-teachers' => [
-                'section_id' => 'required|exists:sections,id',
-                'teacher_id' => 'required|exists:teachers,id',
-            ],
             'sections' => [
                 'course_offering_id' => 'required|exists:course_offerings,id',
                 'section_name' => 'required|string|max:255',
@@ -630,6 +644,11 @@ class EntityController extends Controller
                 'start_time' => 'required|date_format:H:i',
                 'end_time' => 'required|date_format:H:i|after:start_time',
                 'slot_code' => 'nullable|string|max:100',
+            ],
+            'schedulers' => [
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:users,email'.($id ? ",{$id}" : ''),
+                'password' => $id ? 'nullable|string|min:8' : 'required|string|min:8',
             ],
         ];
 

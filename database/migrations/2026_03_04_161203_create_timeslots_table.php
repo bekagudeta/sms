@@ -13,9 +13,15 @@ return new class extends Migration
             $table->string('day_of_week'); // Monday, Tuesday, etc.
             $table->time('start_time');
             $table->time('end_time');
+            $table->string('student_type', 20)->default('regular');
             $table->string('slot_code')->unique(); // e.g., MON_10_12
             $table->timestamps();
         });
+        DB::statement("UPDATE timeslots SET student_type = CASE
+            WHEN slot_code LIKE 'WKE_%' THEN 'weekend'
+            ELSE 'regular'
+            END
+        ");
     }
 
     public function down()

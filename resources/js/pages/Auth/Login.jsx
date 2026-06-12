@@ -4,10 +4,14 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-export default function Login({ status, canResetPassword }) {
+export default function Login({ canResetPassword }) {
+    const { props } = usePage();
+    const url = new URL(window.location.href);
+    const sessionExpired = url.searchParams.get('session') === 'expired';
+
     const [showPassword, setShowPassword] = useState(false);
     const [pwStrength, setPwStrength] = useState(0);
 
@@ -206,9 +210,9 @@ export default function Login({ status, canResetPassword }) {
 
                 {/* Body */}
                 <div className="su-body">
-                    {status && (
-                        <div style={{ background: '#e8f8f0', border: '0.5px solid #7ed8a8', color: '#1a6e45', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: '1.25rem' }}>
-                            {status}
+                    {(sessionExpired || props.flash?.status) && (
+                        <div style={{ background: '#fdf3f2', border: '0.5px solid #f5c6c2', color: '#c0392b', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: '1.25rem' }}>
+                            {sessionExpired ? 'Your session has expired. Please sign in again.' : props.flash?.status}
                         </div>
                     )}
 

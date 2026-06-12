@@ -180,9 +180,15 @@ class DashboardController extends Controller
         $role = $user->roles->first()?->name;
 
         $pendingCredentials = 0;
-        if (Schema::hasTable('users') && Schema::hasColumn('users', 'must_change_password') && Schema::hasColumn('users', 'plain_password')) {
+        if (Schema::hasTable('users') && Schema::hasColumn('users', 'must_change_password')) {
+            // Count users with generated credentials who have NEVER attempted to log in
+            // Check by email since audit logs track logins by email
+            $usersWithLoginAttempts = \App\Models\AuditLog::whereIn('action', ['login', 'failed_login'])
+                ->pluck('user_email')
+                ->unique();
+            
             $pendingCredentials = User::where('must_change_password', true)
-                ->whereNotNull('plain_password')
+                ->whereNotIn('email', $usersWithLoginAttempts)
                 ->count();
         }
 
@@ -398,6 +404,18 @@ class DashboardController extends Controller
             'role' => $role,
             'studentProfile' => $studentProfile,
             'enrolledCourses' => $enrolledCourses,
+        ]);
+    }
+
+    public function adminSchedulers()
+    {
+        $schedulers = User::role('scheduler')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
+        return Inertia::render('Admin/Schedulers/Index', [
+            'schedulers' => $schedulers,
         ]);
     }
 

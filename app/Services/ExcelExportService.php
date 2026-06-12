@@ -39,22 +39,33 @@ class ExcelExportService
 
     public function exportCredentials(): BinaryFileResponse
     {
-        // Export credentials for users who are required to change password on first login
-        if (! Schema::hasTable('users') || ! Schema::hasColumn('users', 'must_change_password') || ! Schema::hasColumn('users', 'plain_password')) {
+        if (! Schema::hasTable('users') || ! Schema::hasColumn('users', 'must_change_password')) {
             return Excel::download(new \App\Exports\CredentialsExport([]), 'credentials.xlsx');
         }
 
-        $users = \App\Models\User::where('must_change_password', true)
-            ->whereNotNull('plain_password')
-            ->get(['name', 'email', 'plain_password']);
 
-        $data = $users->map(function ($user) {
-            return [
-                'name' => $user->name,
-                'email' => $user->email,
-                'password' => $user->plain_password,
+        // Get users that need credentials (must_change_password = true)
+        $users = \App\Models\User::where('must_change_password', true)->get();
+
+        $data = [];
+        foreach ($users as $user) {
+            // If user already has a plain password stored, use it
+            if ($user->plain_password && $user->plain_password !== '') {
+                $plainPassword = $user->plain_password;
+            } else {
+                // Generate a new temporary password if not already stored
+                $plainPassword = \Illuminate\Support\Str::random(12);
+                
+                // Save the plain password to database
+                $user->update(['plain_password' => $plainPassword]);
+            }
+
+            $data[] = [
+                'name'     => $user->name,
+                'email'    => $user->email,
+                'password' => $plainPassword,
             ];
-        })->toArray();
+        }
 
         return Excel::download(new \App\Exports\CredentialsExport($data), 'credentials.xlsx');
     }

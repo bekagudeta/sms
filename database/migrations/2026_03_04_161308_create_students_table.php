@@ -19,6 +19,8 @@ return new class extends Migration
             $table->foreignId('department_id')->constrained();
             $table->string('level')->nullable();
             $table->string('academic_section');
+            $table->enum('student_type', ['regular', 'weekend'])
+                ->default('regular');          
             $table->enum('status', ['active', 'inactive', 'pending', 'graduated', 'suspended'])
                 ->default('active');
             $table->date('enrollment_date');

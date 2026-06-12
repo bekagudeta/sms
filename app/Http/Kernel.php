@@ -28,8 +28,8 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
-use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\AuthenticateSession;
 class Kernel extends HttpKernel
 {
     /**
@@ -59,11 +59,10 @@ class Kernel extends HttpKernel
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
-            AuthenticateSession::class,
             ShareErrorsFromSession::class,
             VerifyCsrfToken::class,
             SubstituteBindings::class,
-            // Prevent browser from caching protected pages behind authentication
+            AuthenticateSession::class,
             PreventBackHistory::class,
         ],
 

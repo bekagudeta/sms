@@ -313,6 +313,10 @@ export default function EntityForm({ isOpen, onClose, config, formData, setFormD
                     options: (relatedOptions.teachers || []).map(teacher => ({ value: teacher.id, label: teacher.label }))
                 },
             },
+            schedulers: {
+                email: { type: 'email', label: 'Email Address' },
+                password: { type: 'password', label: 'Password' }
+            },
             rooms: {
                 room_code: { label: 'Room Code' },
                 building: { label: 'Building' },

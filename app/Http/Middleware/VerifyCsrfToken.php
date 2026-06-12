@@ -18,7 +18,7 @@ class VerifyCsrfToken extends Middleware
         'import/*',
         'import-students',
         'import-teachers',
-        'logout',
         'login',
+        'logout',
     ];
 }

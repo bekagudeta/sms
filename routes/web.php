@@ -42,6 +42,10 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:admin'])->get('/admin/dashboard', [DashboardController::class, 'admin'])
         ->name('admin.dashboard');
 
+    // Admin Scheduler Management
+    Route::middleware(['role:admin'])->get('/admin/schedulers', [DashboardController::class, 'adminSchedulers'])
+        ->name('admin.schedulers');
+
     // Admin Student Types Dashboard
     Route::middleware(['role:admin'])->get('/admin/student-types', [StudentTypeAdminController::class, 'index'])
         ->name('admin.student-types');
@@ -126,6 +130,7 @@ Route::middleware(['auth'])->group(function () {
     Route::redirect('/timeslots', '/entities/timeslots');
     Route::redirect('/enrollments', '/entities/enrollments');
     Route::redirect('/section-teachers', '/entities/section-teachers');
+    Route::redirect('/schedulers', '/entities/schedulers');
 
     // Advanced Scheduling Engine routes
     Route::middleware(['permission:generate schedule'])->prefix('scheduling')->group(function () {

@@ -301,6 +301,29 @@ export const ENTITY_CONFIG = {
       delete: "delete section-teachers",
       import: "import section-teachers"
     }
+  },
+  schedulers: {
+    title: "Schedulers",
+    singular: "Scheduler",
+    icon: "UserCheck",
+    category: "System",
+    columns: [
+      { key: "id", label: "ID", sortable: true },
+      { key: "name", label: "Name", sortable: true, searchable: true },
+      { key: "email", label: "Email", sortable: true, searchable: true },
+      { key: "created_at", label: "Created At", sortable: true }
+    ],
+    requiredColumns: ["name", "email", "password"],
+    optionalColumns: [],
+    apiEndpoint: "/api/schedulers",
+    routePrefix: "schedulers",
+    permissions: {
+      view: "view schedulers",
+      create: "create schedulers",
+      edit: "edit schedulers",
+      delete: "delete schedulers",
+      import: "import schedulers"
+    }
   }
 };
 
@@ -315,7 +338,7 @@ export const NAVIGATION_STRUCTURE = [
   },
   {
     category: "Academics",
-    icon: "BookOpen", 
+    icon: "BookOpen",
     items: [
       { key: "departments", name: "Departments", icon: "Archive" },
       { key: "semesters", name: "Semesters", icon: "Calendar" },
@@ -338,6 +361,13 @@ export const NAVIGATION_STRUCTURE = [
     items: [
       { key: "enrollments", name: "Enrollments", icon: "UserPlus" },
       { key: "section-teachers", name: "Section Teachers", icon: "Users" }
+    ]
+  },
+  {
+    category: "System",
+    icon: "Settings",
+    items: [
+      { key: "schedulers", name: "Schedulers", icon: "UserCheck" }
     ]
   }
 ];
