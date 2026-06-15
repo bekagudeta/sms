@@ -20,6 +20,36 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["student_id", "first_name", "last_name", "email", "department_code", "academic_section"],
     optionalColumns: ["student_type", "level", "phone", "enrollment_date", "department_id", "status"],
+    // Fields for the manual Add/Edit form (decoupled from import columns).
+    // These mirror the server validation rules in EntityController::getValidationRules('students').
+    formFields: [
+      { name: "student_id", label: "Student ID", type: "text", required: true, maxLength: 50, placeholder: "e.g. S001" },
+      { name: "first_name", label: "First Name", type: "text", required: true, maxLength: 100 },
+      { name: "last_name", label: "Last Name", type: "text", required: true, maxLength: 100 },
+      { name: "email", label: "Email Address", type: "email", required: true, maxLength: 255, placeholder: "name@student.university.edu" },
+      { name: "department_id", label: "Department", type: "select", required: true, optionsKey: "departments" },
+      { name: "academic_section", label: "Academic Section", type: "text", required: true, maxLength: 50, placeholder: "Cohort, e.g. SE-3A" },
+      { name: "level", label: "Level", type: "select", required: false, optionsKey: "levels", options: [
+        { value: "bachelor", label: "Bachelor" },
+        { value: "master", label: "Master" },
+        { value: "phd", label: "PhD" },
+        { value: "diploma", label: "Diploma" },
+        { value: "certificate", label: "Certificate" },
+      ] },
+      { name: "student_type", label: "Student Type", type: "select", required: false, options: [
+        { value: "regular", label: "Regular" },
+        { value: "weekend", label: "Weekend" },
+      ] },
+      { name: "status", label: "Status", type: "select", required: false, options: [
+        { value: "active", label: "Active" },
+        { value: "inactive", label: "Inactive" },
+        { value: "pending", label: "Pending" },
+        { value: "graduated", label: "Graduated" },
+        { value: "suspended", label: "Suspended" },
+      ] },
+      { name: "phone", label: "Phone", type: "tel", required: false, maxLength: 20, pattern: "^[0-9+()\\-\\s]{7,20}$", patternMessage: "Enter a valid phone number" },
+      { name: "enrollment_date", label: "Enrollment Date", type: "date", required: false },
+    ],
     apiEndpoint: "/api/students",
     routePrefix: "students",
     permissions: {
@@ -49,6 +79,26 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["teacher_id", "first_name", "last_name", "email", "department_id"],
     optionalColumns: ["qualification", "specialization", "phone", "max_hours_per_week"],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('teachers').
+    formFields: [
+      { name: "teacher_id", label: "Teacher ID", type: "text", required: true, maxLength: 50, placeholder: "e.g. T001" },
+      { name: "first_name", label: "First Name", type: "text", required: true, maxLength: 100 },
+      { name: "last_name", label: "Last Name", type: "text", required: true, maxLength: 100 },
+      { name: "email", label: "Email Address", type: "email", required: true, maxLength: 255, placeholder: "name@university.edu" },
+      { name: "department_id", label: "Department", type: "select", required: true, optionsKey: "departments" },
+      { name: "max_hours_per_week", label: "Max Hours per Week", type: "number", required: true, min: 1, max: 38, integer: true },
+      { name: "qualification", label: "Qualification", type: "select", required: false, options: [
+        { value: "BSc", label: "BSc" },
+        { value: "MSc", label: "MSc" },
+        { value: "PhD", label: "PhD" },
+        { value: "MBA", label: "MBA" },
+        { value: "MA", label: "MA" },
+        { value: "EdD", label: "EdD" },
+        { value: "Other", label: "Other" },
+      ] },
+      { name: "specialization", label: "Specialization", type: "text", required: false, maxLength: 255 },
+      { name: "phone", label: "Phone", type: "tel", required: false, maxLength: 20, pattern: "^[0-9+()\\-\\s]{7,20}$", patternMessage: "Enter a valid phone number" },
+    ],
     apiEndpoint: "/api/teachers",
     routePrefix: "teachers",
     permissions: {
@@ -76,6 +126,28 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["course_code", "course_name", "credits", "hours_per_week"],
     optionalColumns: ["description", "department_id", "department_code", "department_name", "level", "required_room_type"],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('courses').
+    formFields: [
+      { name: "course_code", label: "Course Code", type: "text", required: true, maxLength: 50, placeholder: "e.g. CS101" },
+      { name: "course_name", label: "Course Name", type: "text", required: true, maxLength: 255 },
+      { name: "credits", label: "Credits", type: "number", required: true, min: 1, max: 38, integer: true },
+      { name: "hours_per_week", label: "Hours per Week", type: "number", required: true, min: 1, max: 38, integer: true },
+      { name: "department_id", label: "Department", type: "select", required: false, optionsKey: "departments" },
+      { name: "level", label: "Level", type: "select", required: false, optionsKey: "levels", options: [
+        { value: "undergraduate", label: "Undergraduate" },
+        { value: "graduate", label: "Graduate" },
+        { value: "certificate", label: "Certificate" },
+        { value: "professional", label: "Professional" },
+      ] },
+      { name: "required_room_type", label: "Required Room Type", type: "select", required: false, optionsKey: "roomTypes", options: [
+        { value: "lecture", label: "Lecture" },
+        { value: "lab", label: "Laboratory" },
+        { value: "seminar", label: "Seminar" },
+        { value: "conference", label: "Conference" },
+        { value: "studio", label: "Studio" },
+      ] },
+      { name: "description", label: "Description", type: "textarea", required: false },
+    ],
     apiEndpoint: "/api/courses",
     routePrefix: "courses",
     permissions: {
@@ -99,6 +171,12 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["code", "name"],
     optionalColumns: ["description"],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('departments').
+    formFields: [
+      { name: "code", label: "Code", type: "text", required: true, maxLength: 50, placeholder: "e.g. CS" },
+      { name: "name", label: "Name", type: "text", required: true, maxLength: 255 },
+      { name: "description", label: "Description", type: "textarea", required: false },
+    ],
     apiEndpoint: "/api/departments",
     routePrefix: "departments",
     permissions: {
@@ -131,6 +209,15 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["name", "code"],
     optionalColumns: ["academic_year", "start_date", "end_date", "is_active"],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('semesters').
+    formFields: [
+      { name: "name", label: "Name", type: "text", required: true, maxLength: 255, placeholder: "e.g. Fall 2024" },
+      { name: "code", label: "Code", type: "text", required: true, maxLength: 50, placeholder: "e.g. FA24" },
+      { name: "academic_year", label: "Academic Year", type: "text", required: false, maxLength: 20, placeholder: "e.g. 2024-2025 or 2024" },
+      { name: "start_date", label: "Start Date", type: "date", required: false },
+      { name: "end_date", label: "End Date", type: "date", required: false },
+      { name: "is_active", label: "Is Active", type: "checkbox", required: false },
+    ],
     apiEndpoint: "/api/semesters",
     routePrefix: "semesters",
     permissions: {
@@ -162,6 +249,12 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["course_code", "semester_code", "expected_students"],
     optionalColumns: ["course_id", "semester_id"] ,
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('course-offerings').
+    formFields: [
+      { name: "course_id", label: "Course", type: "select", required: true, optionsKey: "courses", labelField: "course_code" },
+      { name: "semester_id", label: "Semester", type: "select", required: true, optionsKey: "semesters", labelField: "label" },
+      { name: "expected_students", label: "Expected Students", type: "number", required: true, min: 0, integer: true },
+    ],
     apiEndpoint: "/api/course-offerings",
     routePrefix: "course-offerings",
     permissions: {
@@ -189,6 +282,12 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["course_code", "semester_code", "section_name", "capacity"],
     optionalColumns: ["course_offering_id"] ,
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('sections').
+    formFields: [
+      { name: "course_offering_id", label: "Course Offering", type: "select", required: true, optionsKey: "courseOfferings", labelField: "label" },
+      { name: "section_name", label: "Section Name", type: "text", required: true, maxLength: 255, placeholder: "e.g. A" },
+      { name: "capacity", label: "Capacity", type: "number", required: true, min: 1, integer: true },
+    ],
     apiEndpoint: "/api/sections",
     routePrefix: "sections",
     permissions: {
@@ -217,6 +316,22 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["room_code", "building", "floor", "capacity", "type"],
     optionalColumns: ["has_projector", "has_computers", "computer_count"],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('rooms').
+    formFields: [
+      { name: "room_code", label: "Room Code", type: "text", required: true, maxLength: 50, placeholder: "e.g. B101" },
+      { name: "building", label: "Building", type: "text", required: true, maxLength: 100 },
+      { name: "floor", label: "Floor", type: "number", required: true, min: 0, integer: true },
+      { name: "capacity", label: "Capacity", type: "number", required: true, min: 1, integer: true },
+      { name: "type", label: "Type", type: "select", required: true, options: [
+        { value: "lecture", label: "Lecture" },
+        { value: "lab", label: "Laboratory" },
+        { value: "seminar", label: "Seminar" },
+        { value: "conference", label: "Conference" },
+      ] },
+      { name: "has_projector", label: "Has Projector", type: "checkbox", required: false },
+      { name: "has_computers", label: "Has Computers", type: "checkbox", required: false },
+      { name: "computer_count", label: "Computer Count", type: "number", required: false, min: 0, integer: true },
+    ],
     apiEndpoint: "/api/rooms",
     routePrefix: "rooms",
     permissions: {
@@ -241,6 +356,22 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["day_of_week", "start_time", "end_time", "slot_code"],
     optionalColumns: [],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('timeslots').
+    // Note: start_time/end_time post as H:i; EntityManager normalizes before submit.
+    formFields: [
+      { name: "day_of_week", label: "Day of Week", type: "select", required: true, options: [
+        { value: "Monday", label: "Monday" },
+        { value: "Tuesday", label: "Tuesday" },
+        { value: "Wednesday", label: "Wednesday" },
+        { value: "Thursday", label: "Thursday" },
+        { value: "Friday", label: "Friday" },
+        { value: "Saturday", label: "Saturday" },
+        { value: "Sunday", label: "Sunday" },
+      ] },
+      { name: "start_time", label: "Start Time", type: "time", required: true },
+      { name: "end_time", label: "End Time", type: "time", required: true },
+      { name: "slot_code", label: "Slot Code", type: "text", required: false, maxLength: 100 },
+    ],
     apiEndpoint: "/api/timeslots",
     routePrefix: "timeslots",
     permissions: {
@@ -267,6 +398,14 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["student_id", "course_code", "semester_code", "section_name"],
     optionalColumns: ["section_code", "academic_section", "enrolled_at", "student_code_value"],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('enrollments').
+    // Here student_id / section_id are DB ids (the form selects), not the import codes.
+    formFields: [
+      { name: "student_id", label: "Student", type: "select", required: true, optionsKey: "students", labelField: "label" },
+      { name: "section_id", label: "Course Section", type: "select", required: true, optionsKey: "sections", labelField: "label" },
+      { name: "enrolled_at", label: "Enrolled At", type: "date", required: false },
+      { name: "student_code_value", label: "Student Code Value", type: "text", required: false, maxLength: 255 },
+    ],
     apiEndpoint: "/api/enrollments",
     routePrefix: "enrollments",
     permissions: {
@@ -292,6 +431,11 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["course_code", "semester_code", "section_name", "teacher_code"],
     optionalColumns: ["append"],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('section-teachers').
+    formFields: [
+      { name: "section_id", label: "Section", type: "select", required: true, optionsKey: "sections", labelField: "label" },
+      { name: "teacher_id", label: "Teacher", type: "select", required: true, optionsKey: "teachers", labelField: "label" },
+    ],
     apiEndpoint: "/api/section-teachers",
     routePrefix: "section-teachers",
     permissions: {
@@ -315,6 +459,13 @@ export const ENTITY_CONFIG = {
     ],
     requiredColumns: ["name", "email", "password"],
     optionalColumns: [],
+    // Manual Add/Edit form fields — mirror EntityController::getValidationRules('schedulers').
+    // Password is required only when creating; on edit, leave blank to keep current.
+    formFields: [
+      { name: "name", label: "Name", type: "text", required: true, maxLength: 255 },
+      { name: "email", label: "Email Address", type: "email", required: true, maxLength: 255 },
+      { name: "password", label: "Password", type: "password", requiredOnCreate: true, minLength: 8, placeholder: "Min. 8 characters", helpOnEdit: "Leave blank to keep the current password" },
+    ],
     apiEndpoint: "/api/schedulers",
     routePrefix: "schedulers",
     permissions: {

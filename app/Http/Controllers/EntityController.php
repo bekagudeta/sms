@@ -650,6 +650,10 @@ class EntityController extends Controller
                 'email' => 'required|email|max:255|unique:users,email'.($id ? ",{$id}" : ''),
                 'password' => $id ? 'nullable|string|min:8' : 'required|string|min:8',
             ],
+            'section-teachers' => [
+                'section_id' => 'required|exists:sections,id',
+                'teacher_id' => 'required|exists:teachers,id',
+            ],
         ];
 
         return $rules[$entityType] ?? [];

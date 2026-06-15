@@ -12,6 +12,17 @@ export default function ImportModal({
     const [dragActive, setDragActive] = useState(false);
     const [previewData, setPreviewData] = useState([]);
     const [step, setStep] = useState(1); // 1: file selection, 2: preview, 3: processing
+    const [error, setError] = useState("");
+    const [loadingPreview, setLoadingPreview] = useState(false);
+
+    const MAX_FILE_MB = 10;
+
+    const formatBytes = (bytes) => {
+        if (!bytes && bytes !== 0) return "";
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    };
 
     const { data, setData, post, processing, errors, reset } = useForm({
         file: null,
@@ -129,15 +140,23 @@ export default function ImportModal({
     const handleFile = async (file) => {
         if (!file) return;
 
+        setError("");
+
         const validTypes = [".csv", ".xlsx", ".xls"];
         const fileExtension = "." + file.name.split(".").pop().toLowerCase();
 
         if (!validTypes.includes(fileExtension)) {
-            alert("Please upload a CSV or Excel file");
+            setError("Unsupported file type. Please upload a .csv, .xlsx, or .xls file.");
+            return;
+        }
+
+        if (file.size > MAX_FILE_MB * 1024 * 1024) {
+            setError(`File is too large (${formatBytes(file.size)}). Maximum allowed size is ${MAX_FILE_MB} MB.`);
             return;
         }
 
         setData("file", file);
+        setLoadingPreview(true);
 
         const formData = new FormData();
         formData.append("file", file);
@@ -232,9 +251,13 @@ export default function ImportModal({
             });
             setData("mappings", finalMappings);
             setStep(2);
-        } catch (error) {
-            console.error("Error reading file:", error);
-            alert("Error reading file. Please check the file format or size.");
+        } catch (err) {
+            console.error("Error reading file:", err);
+            setError("We couldn't read that file. Please check it's a valid CSV/Excel file and try again.");
+            setData("file", null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        } finally {
+            setLoadingPreview(false);
         }
     };
 
@@ -288,15 +311,17 @@ export default function ImportModal({
             formData.append(`mappings[${key}]`, value);
         });
 
+        setError("");
         post("/import/bulk", {
             data: formData,
             onSuccess: () => {
                 onSuccess();
                 handleClose();
             },
-            onError: (errors) => {
-                console.error("Import errors:", errors);
-                alert("Import failed. Please check the file and mappings.");
+            onError: (errs) => {
+                console.error("Import errors:", errs);
+                const firstError = errs && typeof errs === "object" ? Object.values(errs)[0] : null;
+                setError(firstError || "Import failed. Please check the file and column mappings, then try again.");
             },
         });
     };
@@ -307,6 +332,9 @@ export default function ImportModal({
         setData("file", null);
         setData("mappings", {});
         setData("skip_header", true);
+        setError("");
+        setLoadingPreview(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
         reset();
         onClose();
     };
@@ -314,11 +342,20 @@ export default function ImportModal({
     const renderFileSelection = () => (
         <div>
             <div
-                className={`relative border-2 border-dashed rounded-lg p-6 text-center ${
+                role="button"
+                tabIndex={0}
+                onClick={() => !loadingPreview && fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                    if ((e.key === "Enter" || e.key === " ") && !loadingPreview) {
+                        e.preventDefault();
+                        fileInputRef.current?.click();
+                    }
+                }}
+                className={`relative cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition ${
                     dragActive
-                        ? "border-blue-400 bg-blue-50"
-                        : "border-gray-300"
-                }`}
+                        ? "border-primary bg-primary/5"
+                        : "border-primary/25 hover:border-primary/50 hover:bg-gray-50"
+                } ${loadingPreview ? "pointer-events-none opacity-70" : ""}`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
@@ -332,38 +369,37 @@ export default function ImportModal({
                     onChange={handleFileSelect}
                 />
 
-                <div className="space-y-4">
-                    <div className="mx-auto h-12 w-12 text-gray-400">
-                        <svg
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 48 48"
-                        >
-                            <path
-                                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
+                {loadingPreview ? (
+                    <div className="space-y-3">
+                        <svg className="mx-auto h-10 w-10 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
+                        <p className="text-sm font-medium text-primary">Reading file…</p>
                     </div>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="mx-auto h-12 w-12 text-primary/60">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 48 48">
+                                <path
+                                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                            </svg>
+                        </div>
 
-                    <div>
-                        <p className="text-lg font-medium text-gray-900">
-                            Drop your file here, or{" "}
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="text-blue-600 hover:text-blue-500"
-                            >
-                                browse
-                            </button>
-                        </p>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Supports CSV, Excel files (.csv, .xlsx, .xls)
-                        </p>
+                        <div>
+                            <p className="text-lg font-medium text-primary">
+                                Drop your file here, or <span className="text-primary underline">browse</span>
+                            </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                                Supports CSV and Excel (.csv, .xlsx, .xls) · up to {MAX_FILE_MB} MB
+                            </p>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
@@ -374,7 +410,7 @@ export default function ImportModal({
                     {config.requiredColumns.map((col) => (
                         <span
                             key={col}
-                            className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded mr-2 mb-2"
+                            className="inline-block px-2 py-1 bg-primary/10 text-primary rounded mr-2 mb-2"
                         >
                             {col}
                         </span>
@@ -420,7 +456,7 @@ export default function ImportModal({
                         onChange={(e) =>
                             setData("skip_header", e.target.checked)
                         }
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        className="h-4 w-4 rounded border-primary/30 text-primary focus:ring-primary"
                     />
                     <span className="ml-2 text-sm text-gray-700">
                         Skip first row (header)
@@ -452,7 +488,7 @@ export default function ImportModal({
                                     onChange={(e) =>
                                         handleMappingChange(col, e.target.value)
                                     }
-                                    className="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                    className="app-input block w-full"
                                 >
                                     <option value="">Select column...</option>
                                     {previewData.headers?.map(
@@ -624,61 +660,46 @@ export default function ImportModal({
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen px-4">
-                <div
-                    className="fixed inset-0 bg-gray-500 bg-opacity-75"
-                    onClick={handleClose}
-                ></div>
+            <div className="flex min-h-screen items-center justify-center px-4 py-6">
+                <div className="fixed inset-0 bg-black/40" onClick={handleClose}></div>
 
-                <div className="relative bg-white rounded-lg max-w-4xl w-full p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-semibold text-gray-900">
+                <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+                    <div className="mb-6 flex items-center justify-between">
+                        <h2 className="text-xl font-semibold text-primary">
                             Import {config.title}
                         </h2>
                         <button
                             onClick={handleClose}
-                            className="text-gray-400 hover:text-gray-500"
+                            className="text-gray-400 transition hover:text-gray-600"
+                            aria-label="Close"
                         >
-                            <svg
-                                className="h-6 w-6"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                />
+                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
+
+                    {error && (
+                        <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            <svg className="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <span>{error}</span>
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit}>
                         {step === 1 && renderFileSelection()}
                         {step === 2 && renderPreview()}
 
-                        <div className="flex justify-between mt-6">
+                        <div className="mt-6 flex justify-between">
                             <button
                                 type="button"
-                                onClick={
-                                    step === 2 ? () => setStep(1) : handleClose
-                                }
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                                onClick={step === 2 ? () => setStep(1) : handleClose}
+                                className="app-secondary-btn"
                             >
                                 {step === 2 ? "Back" : "Cancel"}
                             </button>
-
-                            {step === 1 && data.file && (
-                                <button
-                                    type="button"
-                                    onClick={() => setStep(2)}
-                                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                                >
-                                    Next
-                                </button>
-                            )}
 
                             {step === 2 && (
                                 <button
@@ -689,11 +710,9 @@ export default function ImportModal({
                                             (col) => !data.mappings[col],
                                         )
                                     }
-                                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+                                    className="app-primary-btn"
                                 >
-                                    {processing
-                                        ? "Importing..."
-                                        : "Import Data"}
+                                    {processing ? "Importing…" : "Import Data"}
                                 </button>
                             )}
                         </div>

@@ -30,10 +30,19 @@ export default function EntityManager({ entityType, initialData = [], filters = 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilters, setActiveFilters] = useState(filters);
 
-    const { data: formData, setData: setFormData, post, put, delete: destroy, processing, errors, reset } = useForm({
-        ...config.requiredColumns.reduce((acc, col) => ({ ...acc, [col]: '' }), {}),
-        ...config.optionalColumns.reduce((acc, col) => ({ ...acc, [col]: '' }), {})
-    });
+    // Seed the form state from the explicit formFields when available (these are
+    // decoupled from import columns); otherwise fall back to import columns.
+    const initialFormState = config.formFields?.length
+        ? config.formFields.reduce(
+              (acc, field) => ({ ...acc, [field.name]: field.type === 'checkbox' ? false : '' }),
+              {}
+          )
+        : {
+              ...config.requiredColumns.reduce((acc, col) => ({ ...acc, [col]: '' }), {}),
+              ...config.optionalColumns.reduce((acc, col) => ({ ...acc, [col]: '' }), {}),
+          };
+
+    const { data: formData, setData: setFormData, post, put, delete: destroy, processing, errors, reset } = useForm(initialFormState);
 
     useEffect(() => {
         if (initialData?.data) {
