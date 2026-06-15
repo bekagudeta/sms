@@ -50,6 +50,9 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                // Signals the frontend to auto-download a freshly generated
+                // credentials sheet (set after a student/teacher bulk import).
+                'download_credentials' => fn () => $request->session()->get('download_credentials'),
             ],
             'errors' => function () use ($request) {
                 return $request->session()->get('errors') 

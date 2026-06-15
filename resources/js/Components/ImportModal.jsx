@@ -75,12 +75,11 @@ export default function ImportModal({
         ];
 
         const aliasMap = {
+            // NOTE: do NOT alias department_id to department_code/name — a code
+            // value (e.g. "SE") landing in department_id breaks integer validation.
+            // department_code / department_name map to their own fields instead.
             department_id: [
                 "department_id",
-                "department",
-                "department_code",
-                "department name",
-                "dept",
                 "dept_id",
             ],
             hours_per_week: [

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Head, useForm, usePage, router } from '@inertiajs/react';
 import { getEntityConfig } from '../config/entities';
 import DataTable from './DataTable';
@@ -60,6 +60,23 @@ export default function EntityManager({ entityType, initialData = [], filters = 
             setPagination(null);
         }
     }, [initialData]);
+
+    // After a student/teacher bulk import the server stashes a one-time plaintext
+    // credentials sheet and flashes `download_credentials`. Pull it down automatically
+    // so the scheduler gets the login sheet without hunting for a button. The endpoint
+    // consumes the sheet on first hit, so guard against a duplicate trigger.
+    const credentialsDownloaded = useRef(false);
+    useEffect(() => {
+        if (!flash?.download_credentials || credentialsDownloaded.current) return;
+        credentialsDownloaded.current = true;
+
+        const link = document.createElement('a');
+        link.href = route('import.credentials.download');
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    }, [flash?.download_credentials]);
 
     const handleCreate = () => {
         setEditingItem(null);

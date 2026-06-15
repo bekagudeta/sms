@@ -156,16 +156,16 @@ return [
             'dependencies' => [],
             'service_method' => 'importTimeslots',
             'required_columns' => ['day_of_week', 'start_time', 'end_time', 'slot_code'],
-            'optional_columns' => ['time_period'],
-            'template_headers' => ['day_of_week', 'start_time', 'end_time', 'slot_code', 'time_period'],
+            'optional_columns' => ['student_type', 'time_period'],
+            'template_headers' => ['day_of_week', 'start_time', 'end_time', 'slot_code', 'student_type', 'time_period'],
             'template_rows' => [
-                ['Monday', '14:00', '15:00', 'REG_MON_1400_1500', 'afternoon'],
-                ['Monday', '15:00', '16:00', 'REG_MON_1500_1600', 'afternoon'],
-                ['Monday', '19:30', '20:30', 'REG_MON_1930_2030', 'evening'],
-                ['Saturday', '14:00', '15:00', 'WKE_SAT_1400_1500', 'afternoon'],
+                ['Monday', '14:00', '15:00', 'REG_MON_1400_1500', 'regular', 'afternoon'],
+                ['Monday', '15:00', '16:00', 'REG_MON_1500_1600', 'regular', 'afternoon'],
+                ['Monday', '19:30', '20:30', 'REG_MON_1930_2030', 'regular', 'evening'],
+                ['Saturday', '14:00', '15:00', 'WKE_SAT_1400_1500', 'weekend', 'afternoon'],
             ],
             'filename' => 'timeslots_template.csv',
-            'note' => 'time_period is optional and for reference only (morning/afternoon/evening). Student type rules are enforced dynamically via the scheduler configuration, not stored in this table. Use 24-hour format. Slot_code must be unique.',
+            'note' => 'student_type is optional (regular/weekend); leave blank for slots available to all. time_period is optional and for reference only (morning/afternoon/evening). Use 24-hour format. Slot_code must be unique.',
         ],
 
         'students' => [

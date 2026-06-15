@@ -352,10 +352,11 @@ export const ENTITY_CONFIG = {
       { key: "day_of_week", label: "Day", sortable: true, filterable: true },
       { key: "start_time", label: "Start Time", sortable: true },
       { key: "end_time", label: "End Time", sortable: true },
-      { key: "slot_code", label: "Slot Code", sortable: true, searchable: true }
+      { key: "slot_code", label: "Slot Code", sortable: true, searchable: true },
+      { key: "student_type", label: "Student Type", sortable: true, filterable: true }
     ],
     requiredColumns: ["day_of_week", "start_time", "end_time", "slot_code"],
-    optionalColumns: [],
+    optionalColumns: ["student_type"],
     // Manual Add/Edit form fields — mirror EntityController::getValidationRules('timeslots').
     // Note: start_time/end_time post as H:i; EntityManager normalizes before submit.
     formFields: [
@@ -371,6 +372,11 @@ export const ENTITY_CONFIG = {
       { name: "start_time", label: "Start Time", type: "time", required: true },
       { name: "end_time", label: "End Time", type: "time", required: true },
       { name: "slot_code", label: "Slot Code", type: "text", required: false, maxLength: 100 },
+      { name: "student_type", label: "Student Type", type: "select", required: false, options: [
+        { value: "", label: "All students" },
+        { value: "regular", label: "Regular" },
+        { value: "weekend", label: "Weekend" },
+      ] },
     ],
     apiEndpoint: "/api/timeslots",
     routePrefix: "timeslots",

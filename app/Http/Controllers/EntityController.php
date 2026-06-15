@@ -644,6 +644,7 @@ class EntityController extends Controller
                 'start_time' => 'required|date_format:H:i',
                 'end_time' => 'required|date_format:H:i|after:start_time',
                 'slot_code' => 'nullable|string|max:100',
+                'student_type' => 'nullable|string|in:regular,weekend',
             ],
             'schedulers' => [
                 'name' => 'required|string|max:255',

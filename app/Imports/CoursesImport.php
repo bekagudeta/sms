@@ -141,10 +141,14 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation, Ski
             '*.course_name' => 'required|string',
             '*.credits' => 'required|integer|min:1|max:38',
             '*.hours_per_week' => 'required|integer|min:1|max:38',
-            '*.department_id' => 'required_without_all:*.department_code,*.department_name|integer|exists:departments,id',
-            '*.department_code' => 'nullable|string|exists:departments,code',
-            '*.department_name' => 'nullable|string|exists:departments,name',
-            '*.level' => 'required|string',
+            // Department may arrive as id, code, or name. resolveDepartmentId()
+            // validates and resolves it (case-insensitive), so keep these lenient
+            // here — a department code in any of these columns must not be rejected
+            // as a non-integer before we get a chance to resolve it.
+            '*.department_id' => 'nullable',
+            '*.department_code' => 'nullable|string',
+            '*.department_name' => 'nullable|string',
+            '*.level' => 'nullable|string',
         ];
     }
 
@@ -166,39 +170,44 @@ class CoursesImport implements ToCollection, WithHeadingRow, WithValidation, Ski
 
     protected function resolveDepartmentId($row, int $rowNumber): ?int
     {
-        $departmentId = trim((string) ($row['department_id'] ?? ''));
-        if ($departmentId !== '') {
-            if (is_numeric($departmentId) && isset($this->departmentsById[(int) $departmentId])) {
-                return (int) $departmentId;
+        $rawId = trim((string) ($row['department_id'] ?? ''));
+
+        // A numeric department_id is treated as a real primary key.
+        if ($rawId !== '' && is_numeric($rawId)) {
+            if (isset($this->departmentsById[(int) $rawId])) {
+                return (int) $rawId;
             }
 
-            $this->errors[] = "Row {$rowNumber}: Department not found for department_id '{$departmentId}'.";
+            $this->errors[] = "Row {$rowNumber}: Department not found for department_id '{$rawId}'.";
             return null;
         }
 
-        $departmentCode = strtolower(trim((string) ($row['department_code'] ?? '')));
-        if ($departmentCode !== '') {
-            $department = $this->departmentsByCode[$departmentCode] ?? null;
-            if ($department) {
-                return $department->id;
-            }
-
-            $this->errors[] = "Row {$rowNumber}: Department not found for department_code '{$row['department_code']}'.";
-            return null;
+        // Otherwise resolve by code, then name (case-insensitive). A non-numeric
+        // department_id (e.g. a code mistakenly placed there) is treated as a
+        // code/name candidate so the import still succeeds.
+        $code = strtolower(trim((string) ($row['department_code'] ?? '')));
+        if ($code === '' && $rawId !== '') {
+            $code = strtolower($rawId);
+        }
+        if ($code !== '' && isset($this->departmentsByCode[$code])) {
+            return $this->departmentsByCode[$code]->id;
         }
 
-        $departmentName = strtolower(trim((string) ($row['department_name'] ?? '')));
-        if ($departmentName !== '') {
-            $department = $this->departmentsByName[$departmentName] ?? null;
-            if ($department) {
-                return $department->id;
-            }
-
-            $this->errors[] = "Row {$rowNumber}: Department not found for department_name '{$row['department_name']}'.";
-            return null;
+        $name = strtolower(trim((string) ($row['department_name'] ?? '')));
+        if ($name === '' && $rawId !== '') {
+            $name = strtolower($rawId);
+        }
+        if ($name !== '' && isset($this->departmentsByName[$name])) {
+            return $this->departmentsByName[$name]->id;
         }
 
-        $this->errors[] = "Row {$rowNumber}: Missing department_id, department_code or department_name.";
+        $provided = trim((string) ($row['department_code'] ?? $row['department_name'] ?? $rawId));
+        if ($provided !== '') {
+            $this->errors[] = "Row {$rowNumber}: Department not found for '{$provided}'.";
+        } else {
+            $this->errors[] = "Row {$rowNumber}: Missing department_id, department_code or department_name.";
+        }
+
         return null;
     }
 
