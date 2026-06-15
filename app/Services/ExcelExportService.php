@@ -6,7 +6,9 @@ use App\Exports\ScheduleExport;
 use App\Exports\StudentsExport;
 use App\Exports\TeacherStudentsExport;
 use App\Exports\TeachersExport;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -37,35 +39,42 @@ class ExcelExportService
         return Excel::download(new TeachersExport(), 'teachers.xlsx');
     }
 
+    /**
+     * Issue FRESH temporary passwords for every account that still hasn't
+     * completed first login (must_change_password = true) and return them once
+     * as a downloadable sheet.
+     *
+     * SECURITY: passwords are generated in-memory, only the hash is persisted,
+     * and the plaintext exists solely for the lifetime of this response. No
+     * password is ever stored in plaintext. Because this re-issues passwords,
+     * any previously distributed sheet is invalidated on each export — that is
+     * intentional ("you can only issue new credentials, never retrieve old ones").
+     */
     public function exportCredentials(): BinaryFileResponse
     {
         if (! Schema::hasTable('users') || ! Schema::hasColumn('users', 'must_change_password')) {
             return Excel::download(new \App\Exports\CredentialsExport([]), 'credentials.xlsx');
         }
 
-
-        // Get users that need credentials (must_change_password = true)
-        $users = \App\Models\User::where('must_change_password', true)->get();
-
         $data = [];
-        foreach ($users as $user) {
-            // If user already has a plain password stored, use it
-            if ($user->plain_password && $user->plain_password !== '') {
-                $plainPassword = $user->plain_password;
-            } else {
-                // Generate a new temporary password if not already stored
-                $plainPassword = \Illuminate\Support\Str::random(12);
-                
-                // Save the plain password to database
-                $user->update(['plain_password' => $plainPassword]);
-            }
 
-            $data[] = [
-                'name'     => $user->name,
-                'email'    => $user->email,
-                'password' => $plainPassword,
-            ];
-        }
+        \App\Models\User::where('must_change_password', true)
+            ->chunkById(500, function ($users) use (&$data) {
+                foreach ($users as $user) {
+                    $plainPassword = Str::random(12);
+
+                    $user->forceFill([
+                        'password' => Hash::make($plainPassword),
+                        'must_change_password' => true,
+                    ])->save();
+
+                    $data[] = [
+                        'name'     => $user->name,
+                        'email'    => $user->email,
+                        'password' => $plainPassword,
+                    ];
+                }
+            });
 
         return Excel::download(new \App\Exports\CredentialsExport($data), 'credentials.xlsx');
     }

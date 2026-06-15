@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 
@@ -46,10 +45,6 @@ class ChangePasswordController extends Controller
             'password' => Hash::make($request->password),
             'must_change_password' => false,
         ];
-
-        if (Schema::hasColumn('users', 'plain_password')) {
-            $updateData['plain_password'] = '';
-        }
 
         // Use raw update with timestamp to avoid observer issues while preserving data integrity
         $user->update($updateData);

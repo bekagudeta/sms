@@ -161,10 +161,10 @@ export default function Welcome({ auth }) {
     </Link>
   ) : (
     <Link
-      href="/register"
+      href="/login"
       className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-success to-primary px-8 py-3 text-base font-bold text-white shadow-lg shadow-success/25 transition hover:-translate-y-0.5 hover:brightness-105"
     >
-      Start for free
+      Sign in
     </Link>
   );
 
@@ -348,8 +348,8 @@ export default function Welcome({ auth }) {
               Import your institutional data in the right order, assign teachers and rooms, generate conflict-aware
               schedules, and give every role a tailored view—from admin dashboards to teacher and student portals.
             </p>
-            <Link href={auth?.user ? '/import' : '/register'} className="app-primary-btn mt-6 inline-flex">
-              {auth?.user ? 'Open import center' : 'Set up your institution'}
+            <Link href={auth?.user ? '/import' : '/login'} className="app-primary-btn mt-6 inline-flex">
+              {auth?.user ? 'Open import center' : 'Sign in'}
             </Link>
           </div>
         </div>
@@ -464,14 +464,14 @@ export default function Welcome({ auth }) {
       {/* Pricing teaser */}
       <section className="border-t border-primary/10 bg-light-bg/20 py-12">
         <div className="mx-auto max-w-3xl px-6 text-center">
-          <h2 className="text-2xl font-bold text-primary">Free to get started</h2>
+          <h2 className="text-2xl font-bold text-primary">Managed access</h2>
           <p className="mt-3 text-primary/70">
-            Register your account, explore the dashboard, and import your first datasets. No credit card required—scale
-            when your institution is ready.
+            Accounts are provisioned by your administrator or via bulk import—sign in to explore the dashboard and
+            manage your institution's data.
           </p>
           {!auth?.user && (
-            <Link href="/register" className="app-primary-btn mt-6 inline-flex rounded-full px-8">
-              Create your free account
+            <Link href="/login" className="app-primary-btn mt-6 inline-flex rounded-full px-8">
+              Sign in
             </Link>
           )}
         </div>
@@ -549,7 +549,7 @@ export default function Welcome({ auth }) {
                   </a>
                 </li>
                 <li>
-                  <Link href={auth?.user ? '/schedules/generate' : '/register'} className="hover:text-white">
+                  <Link href={auth?.user ? '/schedules/generate' : '/login'} className="hover:text-white">
                     Schedule generator
                   </Link>
                 </li>
@@ -564,8 +564,8 @@ export default function Welcome({ auth }) {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/register" className="hover:text-white">
-                    Register
+                  <Link href="/forgot-password" className="hover:text-white">
+                    Forgot password
                   </Link>
                 </li>
                 <li>

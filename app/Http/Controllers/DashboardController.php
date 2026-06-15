@@ -494,7 +494,7 @@ class DashboardController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:8',
+            'password' => ['required', 'string', \Illuminate\Validation\Rules\Password::min(12)->mixedCase()->numbers()->symbols()],
             'role' => 'required|exists:roles,name',
             'department_id' => 'required_if:role,student,teacher|nullable|exists:departments,id',
             'level' => 'required_if:role,student|nullable|string',
@@ -507,8 +507,7 @@ class DashboardController extends Controller
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => bcrypt($validated['password']),
-                'must_change_password' => false,
-                'plain_password' => $validated['password'],
+                'must_change_password' => true,
                 'role' => $validated['role'],
             ]);
             $user->syncRoles([$validated['role']]);

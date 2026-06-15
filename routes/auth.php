@@ -7,7 +7,6 @@ use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,11 +15,9 @@ Route::get('/test', function () {
 });
 
 Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
-
-    Route::post('register', [RegisteredUserController::class, 'store'])
-        ->middleware('throttle:5,1'); // 5 attempts per minute
+    // Public self-registration is intentionally DISABLED for this closed
+    // university system. Accounts are created only by admins or via Excel import.
+    // (RegisteredUserController also aborts as defense-in-depth.)
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');

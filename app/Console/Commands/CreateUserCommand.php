@@ -5,7 +5,9 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
 
 class CreateUserCommand extends Command
@@ -45,12 +47,32 @@ class CreateUserCommand extends Command
             return 1;
         }
 
-        // Generate or use provided password
-        $password = $this->option('password') ?? Str::random(16) . '@Pwd123';
+        // Resolve the password. Precedence:
+        //   1. --password option (non-interactive / automation)
+        //   2. hidden interactive prompt (never echoed, never in shell history)
+        //   3. auto-generated strong password
+        $password = $this->option('password');
+        $wasGenerated = false;
 
-        // Validate password strength if provided
-        if (!$this->isStrongPassword($password)) {
-            $this->error('Password must be at least 8 characters with uppercase, lowercase, number, and symbol.');
+        if (! $password && $this->input->isInteractive()) {
+            $password = $this->secret('Enter password (leave blank to auto-generate)') ?: null;
+            if ($password) {
+                $confirm = $this->secret('Confirm password');
+                if ($password !== $confirm) {
+                    $this->error('Passwords do not match.');
+                    return 1;
+                }
+            }
+        }
+
+        if (! $password) {
+            $password = Str::password(16, letters: true, numbers: true, symbols: true);
+            $wasGenerated = true;
+        }
+
+        // Validate password strength (skipped for auto-generated, which is strong by construction).
+        if (! $wasGenerated && ! $this->isStrongPassword($password)) {
+            $this->error('Password must be at least 12 characters with uppercase, lowercase, number, and symbol.');
             return 1;
         }
 
@@ -69,13 +91,14 @@ class CreateUserCommand extends Command
             // Log audit entry
             \App\Services\AuditLogService::log(
                 'User created via CLI',
-                'user_created',
+                'User',
+                $user->id,
                 [
-                    'user_id' => $user->id,
                     'email' => $email,
                     'role' => $role,
                     'command' => 'create:user',
-                ]
+                ],
+                "Created {$role} account {$email} via create:user"
             );
 
             $this->newLine();
@@ -84,7 +107,11 @@ class CreateUserCommand extends Command
             $this->line("Name:     {$name}");
             $this->line("Email:    {$email}");
             $this->line("Role:     {$role}");
-            $this->line("Password: {$password}");
+            if ($wasGenerated) {
+                $this->line("Password: {$password}  (auto-generated — capture it now, shown once)");
+            } else {
+                $this->line("Password: (set by operator — not displayed)");
+            }
             $this->info('═══════════════════════════════════════════════════════════');
             $this->warn('⚠️  IMPORTANT:');
             $this->line('• User MUST change password on first login');
@@ -104,14 +131,13 @@ class CreateUserCommand extends Command
     }
 
     /**
-     * Validate password strength
+     * Validate password strength using Laravel's password rule.
      */
     private function isStrongPassword(string $password): bool
     {
-        return strlen($password) >= 8
-            && preg_match('/[A-Z]/', $password)
-            && preg_match('/[a-z]/', $password)
-            && preg_match('/[0-9]/', $password)
-            && preg_match('/[!@#$%^&*]/', $password);
+        return Validator::make(
+            ['password' => $password],
+            ['password' => ['required', Password::min(12)->mixedCase()->numbers()->symbols()]]
+        )->passes();
     }
 }

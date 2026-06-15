@@ -322,8 +322,8 @@ export default function Login({ canResetPassword }) {
                     <hr className="su-divider" />
 
                     <div className="su-register">
-                        New to the system?{' '}
-                        <Link href={route('register')}>Create an account</Link>
+                        Accounts are issued by your administrator.{' '}
+                        <Link href={route('password.request')}>Forgot password?</Link>
                     </div>
 
                     <div className="su-secure">

@@ -4,184 +4,146 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
-use App\Models\Student;
-use App\Models\Teacher;
-use App\Models\Department;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role;
 
+/**
+ * Seeds the privileged bootstrap accounts (admin, scheduler).
+ *
+ * SECURITY MODEL
+ * --------------
+ * - No password is ever hard-coded in this file (nothing ends up in git history).
+ * - Credentials are read from the environment (SEED_ADMIN_*, SEED_SCHEDULER_*).
+ * - If a password is NOT supplied via env, a strong random one is generated and
+ *   printed to the console exactly once so the operator can capture it.
+ * - Operator-supplied passwords are validated and NEVER echoed back.
+ * - Every account is flagged must_change_password, so the temporary secret is
+ *   only ever valid until first login.
+ *
+ * Demo teacher/student accounts live in DemoUserSeeder (dev/local only).
+ */
 class UserSeeder extends Seeder
 {
-    /**
-     * Security: Prevent accidental seeding in production
-     */
     public function run(): void
     {
-        // SECURITY: Never seed default users in production
         if ($this->isProduction()) {
-            $this->command->warn('⚠️  Seeding is DISABLED in production environment.');
-            $this->command->warn('Use manual user creation via CLI commands instead.');
+            $this->command->warn('⚠️  Seeding is DISABLED in production.');
+            $this->command->warn('Bootstrap the first admin with: php artisan create:user --role=admin');
             return;
         }
 
-        $this->command->info('📋 Creating seed users...');
+        $this->command->info('📋 Creating privileged bootstrap users...');
 
-        // Ensure roles exist before assigning
-        $roles = ['admin', 'scheduler', 'teacher', 'student'];
-        foreach ($roles as $role) {
+        // Ensure roles exist before assigning.
+        foreach (['admin', 'scheduler', 'teacher', 'student'] as $role) {
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
         }
 
-        // Define seed users with better password practices
-        $seedUsers = [
-            [
-                'email' => 'admin@example.local',
-                'name' => 'System Administrator',
-                'role' => 'admin',
-                'defaultPassword' => 'Admin@123456', // Will be changed on first login
-                'mustChange' => true, // SECURITY: Force password change
-            ],
-            [
-                'email' => 'scheduler@example.local',
-                'name' => 'Scheduler',
-                'role' => 'scheduler',
-                'defaultPassword' => 'Scheduler@123456',
-                'mustChange' => true,
-            ],
-            [
-                'email' => 'teacher@example.local',
-                'name' => 'Test Teacher',
-                'role' => 'teacher',
-                'defaultPassword' => 'Teacher@123456',
-                'mustChange' => true,
-            ],
-            [
-                'email' => 'student@example.local',
-                'name' => 'Test Student',
-                'role' => 'student',
-                'defaultPassword' => 'Student@123456',
-                'mustChange' => true,
-            ],
-        ];
+        $generated = [];
 
-        foreach ($seedUsers as $userData) {
-            $user = User::firstOrCreate(
-                ['email' => $userData['email']],
-                [
-                    'name' => $userData['name'],
-                    'password' => Hash::make($userData['defaultPassword']),
-                    'must_change_password' => $userData['mustChange'],
-                ]
-            );
-            $user->assignRole($userData['role']);
+        $generated[] = $this->createPrivilegedUser(
+            email: env('SEED_ADMIN_EMAIL', 'admin@example.local'),
+            name: env('SEED_ADMIN_NAME', 'System Administrator'),
+            role: 'admin',
+            envPassword: env('SEED_ADMIN_PASSWORD'),
+        );
 
-            $this->command->line("✓ Created user: {$userData['email']}");
+        $generated[] = $this->createPrivilegedUser(
+            email: env('SEED_SCHEDULER_EMAIL', 'scheduler@example.local'),
+            name: env('SEED_SCHEDULER_NAME', 'Scheduler'),
+            role: 'scheduler',
+            envPassword: env('SEED_SCHEDULER_PASSWORD'),
+        );
+
+        $this->command->info('✅ Privileged users ready.');
+        $this->displayGeneratedCredentials(array_filter($generated));
+    }
+
+    /**
+     * Create (idempotently) a privileged user.
+     *
+     * @return array{email:string,role:string,password:string}|null
+     *         Returns the credential row ONLY when the password was auto-generated
+     *         (so it can be shown once); null when the operator supplied it via env
+     *         or the user already existed.
+     */
+    private function createPrivilegedUser(string $email, string $name, string $role, ?string $envPassword): ?array
+    {
+        // Idempotent: never reset the password of an already-seeded account.
+        if (User::where('email', $email)->exists()) {
+            $this->command->line("• {$email} already exists — left untouched.");
+            return null;
         }
 
-        // Create related records for teacher and student roles
-        $this->createTeacherRecord();
-        $this->createStudentRecord();
+        $wasGenerated = empty($envPassword);
+        $password = $wasGenerated ? $this->generateStrongPassword() : $envPassword;
 
-        $this->command->info('✅ Seed users created successfully!');
-        $this->displayCredentials($seedUsers);
+        if (! $wasGenerated && ! $this->passwordIsStrong($password)) {
+            $this->command->error(
+                "✗ SEED password for {$email} is too weak (need 12+ chars, mixed case, number, symbol). Skipped."
+            );
+            return null;
+        }
+
+        $user = User::create([
+            'name' => $name,
+            'email' => $email,
+            'password' => Hash::make($password),
+            'must_change_password' => true,
+        ]);
+        $user->assignRole($role);
+
+        $this->command->line("✓ Created {$role}: {$email}" . ($wasGenerated ? ' (generated password)' : ' (env password)'));
+
+        return $wasGenerated
+            ? ['email' => $email, 'role' => $role, 'password' => $password]
+            : null;
     }
 
-    /**
-     * Create a default teacher record for testing
-     */
-    private function createTeacherRecord(): void
+    private function generateStrongPassword(): string
     {
-        $user = User::where('email', 'teacher@example.local')->first();
-        if (!$user) return;
-
-        $department = Department::firstOrCreate(
-            ['name' => 'Computer Science'],
-            [
-                'code' => 'CS',
-                'description' => 'Default department for system users',
-            ]
-        );
-
-        Teacher::updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'teacher_id' => 'TCH' . str_pad($user->id, 6, '0', STR_PAD_LEFT),
-                'first_name' => 'Test',
-                'last_name' => 'Teacher',
-                'email' => $user->email,
-                'department_id' => $department->id,
-                'phone' => '000-000-0000',
-                'qualification' => 'N/A',
-                'max_hours_per_week' => 38,
-            ]
-        );
+        return Str::password(16, letters: true, numbers: true, symbols: true);
     }
 
-    /**
-     * Create a default student record for testing
-     */
-    private function createStudentRecord(): void
+    private function passwordIsStrong(string $password): bool
     {
-        $user = User::where('email', 'student@example.local')->first();
-        if (!$user) return;
-
-        // Get or create default department
-        $department = Department::firstOrCreate(
-            ['name' => 'Computer Science'],
-            [
-                'code' => 'CS',
-                'description' => 'Default department for system users',
-            ]
-        );
-
-        Student::firstOrCreate(
-            ['user_id' => $user->id],
-            [
-                'student_id' => 'STU999',
-                'first_name' => 'Test',
-                'last_name' => 'Student',
-                'email' => $user->email,
-                'phone' => '000-000-0000',
-                'department_id' => $department->id,
-                'level' => 'Level 1',
-                'academic_section' => 'SE-3A',
-                'status' => 'active',
-                'enrollment_date' => now()->toDateString(),
-            ]
-        );
+        return Validator::make(
+            ['password' => $password],
+            ['password' => ['required', Password::min(12)->mixedCase()->numbers()->symbols()]]
+        )->passes();
     }
 
-    /**
-     * SECURITY: Check if running in production
-     */
     private function isProduction(): bool
     {
         return app()->environment(['production', 'prod']);
     }
 
     /**
-     * Display credentials for development (development only!)
+     * Show auto-generated passwords once. Operator-supplied (env) passwords are
+     * intentionally never printed.
      */
-    private function displayCredentials(array $seedUsers): void
+    private function displayGeneratedCredentials(array $rows): void
     {
-        $this->command->newLine();
-        $this->command->info('═══════════════════════════════════════════════════════════');
-        $this->command->warn('🔐 SEED CREDENTIALS (Development Only - Change on First Login!)');
-        $this->command->info('═══════════════════════════════════════════════════════════');
-
-        foreach ($seedUsers as $user) {
-            $this->command->line("Email:    {$user['email']}");
-            $this->command->line("Password: {$user['defaultPassword']}");
-            $this->command->line("Role:     {$user['role']}");
-            $this->command->line("---");
+        if (empty($rows)) {
+            $this->command->line('No generated passwords to display (all supplied via env or already existed).');
+            return;
         }
 
+        $this->command->newLine();
+        $this->command->warn('🔐 GENERATED CREDENTIALS — shown ONCE, capture them now:');
         $this->command->info('═══════════════════════════════════════════════════════════');
-        $this->command->warn('⚠️  IMPORTANT SECURITY NOTES:');
-        $this->command->line('• These credentials are ONLY for local development');
-        $this->command->line('• Users MUST change password on first login');
-        $this->command->line('• Never use .local domain in production');
-        $this->command->line('• Never commit seed files with real credentials to git');
+        foreach ($rows as $row) {
+            $this->command->line("Role:     {$row['role']}");
+            $this->command->line("Email:    {$row['email']}");
+            $this->command->line("Password: {$row['password']}");
+            $this->command->line('---');
+        }
+        $this->command->info('═══════════════════════════════════════════════════════════');
+        $this->command->line('• These accounts must change their password on first login.');
+        $this->command->line('• Set SEED_ADMIN_PASSWORD / SEED_SCHEDULER_PASSWORD in .env to control these.');
         $this->command->newLine();
     }
 }

@@ -22,7 +22,8 @@ class DatabaseSeeder extends Seeder
             SectionTeacherSeeder::class,
             EnrollmentSeeder::class,
             ScheduleSeeder::class,
-            UserSeeder::class,
+            UserSeeder::class,      // privileged bootstrap accounts (env-or-generated)
+            DemoUserSeeder::class,  // demo teacher/student logins (local/testing only)
         ]);
     }
 }
