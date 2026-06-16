@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import logoSrc from '../images/logo.png';
+import heroBg from '../images/hero-campus.jpg';
+
+const CURRENT_YEAR = new Date().getFullYear();
 
 const FEATURES = [
   {
@@ -59,24 +62,24 @@ const STEPS = [
   },
 ];
 
-const TESTIMONIALS = [
+const ROLE_HIGHLIGHTS = [
   {
-    quote: 'We replaced spreadsheet chaos with one place for students, teachers, and rooms. Importing our roster took an afternoon, not a week.',
-    name: 'Maria Santos',
-    role: 'Registrar, Metro Community College',
-    initials: 'MS',
+    role: 'For registrars',
+    initials: 'AD',
+    title: 'One source of truth',
+    desc: 'Manage students, teachers, courses, and rooms in one place instead of spreadsheets that drift out of sync.',
   },
   {
-    quote: 'The guided import order and validation caught bad department codes before they broke our timetable. That alone saved us days of cleanup.',
-    name: 'James Okonkwo',
-    role: 'Scheduling Coordinator, Lakeside Academy',
-    initials: 'JO',
+    role: 'For schedulers',
+    initials: 'SC',
+    title: 'Conflict-aware timetables',
+    desc: 'Guided imports validate your data, then schedule generation assigns teachers, rooms, and timeslots automatically.',
   },
   {
-    quote: 'Teachers log in and see their own sections; admins keep full control. Exactly the split we needed without extra IT overhead.',
-    name: 'Elena Ruiz',
-    role: 'Academic Dean, North Valley Institute',
-    initials: 'ER',
+    role: 'For teachers & students',
+    initials: 'TS',
+    title: 'The right view per role',
+    desc: 'Teachers see their own sections and students; students see their own schedules—no extra IT overhead.',
   },
 ];
 
@@ -186,7 +189,7 @@ export default function Welcome({ auth }) {
           <Link href="/" className="flex items-center gap-3">
             <img src={logoSrc} alt="SMS logo" className="h-10 w-10 rounded-full border border-primary/20 shadow-sm" />
             <div>
-              <p className="text-lg font-bold leading-tight text-primary">School Management System</p>
+              <p className="text-lg font-bold leading-tight text-primary">Scheduling Management System</p>
               <p className="text-xs font-semibold uppercase tracking-widest text-success">SMS</p>
             </div>
           </Link>
@@ -203,7 +206,7 @@ export default function Welcome({ auth }) {
           <nav className="hidden items-center gap-8 text-sm font-medium text-primary/80 md:flex">
             <a href="#features" className="transition hover:text-primary">Features</a>
             <a href="#how-it-works" className="transition hover:text-primary">How it works</a>
-            <a href="#testimonials" className="transition hover:text-primary">Testimonials</a>
+            <a href="#testimonials" className="transition hover:text-primary">For teams</a>
             <a href="#faq" className="transition hover:text-primary">FAQ</a>
           </nav>
 
@@ -223,14 +226,19 @@ export default function Welcome({ auth }) {
         {mobileOpen && (
           <div className="border-t border-primary/10 bg-white px-6 py-4 md:hidden">
             <div className="space-y-1">
-              {['#features', '#how-it-works', '#testimonials', '#faq'].map((href) => (
+              {[
+                { href: '#features', label: 'Features' },
+                { href: '#how-it-works', label: 'How it works' },
+                { href: '#testimonials', label: 'For teams' },
+                { href: '#faq', label: 'FAQ' },
+              ].map(({ href, label }) => (
                 <a
                   key={href}
                   href={href}
                   className="block rounded-lg px-3 py-2 font-medium text-primary hover:bg-gray-50"
                   onClick={() => setMobileOpen(false)}
                 >
-                  {href.replace('#', '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {label}
                 </a>
               ))}
               <Link
@@ -249,10 +257,7 @@ export default function Welcome({ auth }) {
       <section id="hero" className="relative min-h-[85vh] overflow-hidden text-white">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1696197018935-fe03c621838f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920')",
-          }}
+          style={{ backgroundImage: `url(${heroBg})` }}
           aria-hidden="true"
         />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/90 via-primary-dark/85 to-primary-bright/75" aria-hidden="true" />
@@ -306,12 +311,10 @@ export default function Welcome({ auth }) {
             </div>
           </div>
           <div className="flex items-center gap-3 text-center sm:text-right">
-            <div className="flex text-amber-400" aria-hidden="true">
-              {'★★★★★'.split('').map((star, i) => (
-                <span key={i} className="text-lg">
-                  {star}
-                </span>
-              ))}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success" aria-hidden="true">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
             <p className="max-w-xs text-sm text-primary/70">
               <span className="font-semibold text-primary">Built for schools and colleges</span> that need reliable
@@ -402,35 +405,28 @@ export default function Welcome({ auth }) {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Built for every role */}
       <section id="testimonials" className="py-16">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-primary sm:text-4xl">Trusted by scheduling teams</h2>
-            <p className="mt-2 text-primary/65">What academic leaders say about streamlining their workflows</p>
+            <h2 className="text-3xl font-bold text-primary sm:text-4xl">Built for every role on campus</h2>
+            <p className="mt-2 text-primary/65">One platform, tailored to how each team actually works</p>
           </div>
           <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {TESTIMONIALS.map((item) => (
-              <blockquote
-                key={item.name}
+            {ROLE_HIGHLIGHTS.map((item) => (
+              <div
+                key={item.title}
                 className="flex flex-col rounded-2xl border border-primary/10 bg-white p-6 shadow-sm"
               >
-                <div className="mb-3 flex gap-0.5 text-amber-400" aria-label="5 out of 5 stars">
-                  {'★★★★★'.split('').map((s, i) => (
-                    <span key={i}>{s}</span>
-                  ))}
-                </div>
-                <p className="flex-1 text-sm leading-relaxed text-primary/80">&ldquo;{item.quote}&rdquo;</p>
-                <footer className="mt-5 flex items-center gap-3 border-t border-gray-100 pt-5">
+                <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                     {item.initials}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-primary">{item.name}</p>
-                    <p className="text-xs text-primary/60">{item.role}</p>
-                  </div>
-                </footer>
-              </blockquote>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-success">{item.role}</p>
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-primary">{item.title}</h3>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-primary/75">{item.desc}</p>
+              </div>
             ))}
           </div>
         </div>
@@ -575,14 +571,14 @@ export default function Welcome({ auth }) {
                 </li>
                 <li>
                   <a href="#testimonials" className="hover:text-white">
-                    Testimonials
+                    For teams
                   </a>
                 </li>
               </ul>
             </div>
           </div>
           <p className="mt-12 border-t border-white/15 pt-8 text-center text-xs text-white/50">
-            © {new Date().getFullYear()} Scheduling Management System (SMS). All rights reserved.
+            © {CURRENT_YEAR} Scheduling Management System (SMS). All rights reserved.
           </p>
         </div>
       </footer>
