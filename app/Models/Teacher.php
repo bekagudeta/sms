@@ -22,11 +22,16 @@ class Teacher extends Model
         'max_hours_per_week',
     ];
 
-    protected $appends = ['full_name'];
+    protected $appends = ['full_name', 'section_ids'];
 
     protected $casts = [
         'max_hours_per_week' => 'integer'
     ];
+
+    public function getSectionIdsAttribute()
+    {
+        return $this->sections()->pluck('sections.id')->all();
+    }
 
     public function department()
     {

@@ -5,13 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Course;
 use App\Models\CourseOffering;
 use App\Models\Department;
+use App\Models\Enrollment;
 use App\Models\Section;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use Spatie\Permission\Models\Role;
 
 class EntityController extends Controller
 {
@@ -176,8 +180,10 @@ class EntityController extends Controller
                 $relationIncludes = [];
                 switch ($entityType) {
                     case 'students':
-                    case 'teachers':
                         $relationIncludes = ['department'];
+                        break;
+                    case 'teachers':
+                        $relationIncludes = ['department', 'sections'];
                         break;
                     case 'enrollments':
                         $relationIncludes = [
@@ -240,6 +246,19 @@ class EntityController extends Controller
         if ($entityType === 'teachers') {
             $relatedOptions = [
                 'departments' => Department::select('id', 'name')->orderBy('name')->get(),
+                'sections' => Section::with(['courseOffering.course', 'courseOffering.semester'])
+                    ->get()
+                    ->map(function ($section) {
+                        return [
+                            'value' => $section->id,
+                            'label' => trim(sprintf(
+                                '%s [%s - %s]',
+                                $section->section_name,
+                                $section->courseOffering?->course?->course_code,
+                                $section->courseOffering?->semester?->name
+                            )),
+                        ];
+                    }),
                 'qualifications' => [
                     ['value' => 'BSc', 'label' => 'BSc'],
                     ['value' => 'MSc', 'label' => 'MSc'],
@@ -500,11 +519,48 @@ class EntityController extends Controller
         $validated = $request->validate($validationRules);
 
         if ($entityType === 'students') {
-            $validated['user_id'] = auth()->id();
+            $tempPassword = $validated['password'];
+            unset($validated['password']);
+
+            $user = User::firstOrNew(['email' => $validated['email']]);
+            $user->name = trim($validated['first_name'].' '.$validated['last_name']);
+            $user->password = Hash::make($tempPassword);
+            $user->must_change_password = true;
+            $user->save();
+
+            Role::firstOrCreate(['name' => 'student', 'guard_name' => 'web']);
+            if (! $user->hasRole('student')) {
+                $user->assignRole('student');
+            }
+
+            $validated['user_id'] = $user->id;
 
             if (empty($validated['enrollment_date'])) {
                 $validated['enrollment_date'] = now()->toDateString();
             }
+        }
+
+        $teacherSectionIds = null;
+
+        if ($entityType === 'teachers') {
+            $teacherSectionIds = $validated['section_ids'] ?? [];
+            unset($validated['section_ids']);
+
+            $tempPassword = $validated['password'];
+            unset($validated['password']);
+
+            $user = User::firstOrNew(['email' => $validated['email']]);
+            $user->name = trim($validated['first_name'].' '.$validated['last_name']);
+            $user->password = Hash::make($tempPassword);
+            $user->must_change_password = true;
+            $user->save();
+
+            Role::firstOrCreate(['name' => 'teacher', 'guard_name' => 'web']);
+            if (! $user->hasRole('teacher')) {
+                $user->assignRole('teacher');
+            }
+
+            $validated['user_id'] = $user->id;
         }
 
         if ($entityType === 'enrollments' && isset($validated['student_code_value'])) {
@@ -524,8 +580,97 @@ class EntityController extends Controller
             $entity->syncRoles(['scheduler']);
         }
 
+        if ($entityType === 'students') {
+            $enrolled = $this->enrollStudentIntoCohortSections($entity);
+
+            $message = 'Student created. They can log in with their email and the temporary password you set, then must change it on first login.';
+            $message .= $enrolled > 0
+                ? " Enrolled into {$enrolled} cohort section(s) for {$entity->academic_section}."
+                : " No cohort sections found yet for {$entity->academic_section}; enroll them once their schedule exists.";
+
+            return redirect()->route('entities.index', ['entityType' => $entityType])
+                ->with('success', $message);
+        }
+
+        if ($entityType === 'teachers') {
+            $assigned = 0;
+            if (is_array($teacherSectionIds)) {
+                $entity->sections()->sync($teacherSectionIds);
+                $assigned = count($teacherSectionIds);
+            }
+
+            $message = 'Teacher created. They can log in with their email and the temporary password you set, then must change it on first login.';
+            $message .= $assigned > 0
+                ? " Assigned to {$assigned} section(s)."
+                : ' Assign them to sections so their schedule and student list appear.';
+
+            return redirect()->route('entities.index', ['entityType' => $entityType])
+                ->with('success', $message);
+        }
+
         return redirect()->route('entities.index', ['entityType' => $entityType])
             ->with('success', ucfirst($entityType).' created successfully.');
+    }
+
+    /**
+     * Attach a newly created student to the same course sections their academic
+     * cohort (academic_section) is already enrolled in for the active semester.
+     * A section's cohort identity is derived from its enrolled students, so this
+     * is what makes the new student's schedule and course list appear.
+     */
+    private function enrollStudentIntoCohortSections(Student $student): int
+    {
+        $cohort = trim((string) $student->academic_section);
+        if ($cohort === '') {
+            return 0;
+        }
+
+        // A section's cohort identity is derived purely from the academic_section
+        // of the students enrolled in it, so the only way to attach a new student
+        // to "their" sections is to mirror what their cohort-mates are enrolled in.
+        $cohortMateEnrollments = Enrollment::query()
+            ->whereHas('student', function ($q) use ($cohort, $student) {
+                $q->where('id', '!=', $student->id)
+                    ->whereRaw('LOWER(TRIM(academic_section)) = ?', [strtolower($cohort)]);
+            })
+            ->with('section.courseOffering')
+            ->get();
+
+        // Prefer the active semester, but if the cohort's enrollments live in a
+        // different (or unset) semester, fall back to all of them rather than
+        // silently enrolling the student into nothing.
+        $activeSemester = Semester::where('is_active', true)->first();
+
+        $sectionIds = $cohortMateEnrollments;
+        if ($activeSemester) {
+            $scoped = $cohortMateEnrollments->filter(
+                fn ($e) => $e->section?->courseOffering?->semester_id === $activeSemester->id
+            );
+            if ($scoped->isNotEmpty()) {
+                $sectionIds = $scoped;
+            }
+        }
+
+        $sectionIds = $sectionIds->pluck('section_id')->filter()->unique();
+
+        Log::info('Cohort auto-enroll', [
+            'student_id' => $student->id,
+            'academic_section' => $cohort,
+            'cohort_enrollment_rows' => $cohortMateEnrollments->count(),
+            'active_semester_id' => $activeSemester?->id,
+            'sections_to_enroll' => $sectionIds->values()->all(),
+        ]);
+
+        $count = 0;
+        foreach ($sectionIds as $sectionId) {
+            Enrollment::firstOrCreate(
+                ['student_id' => $student->id, 'section_id' => $sectionId],
+                ['student_code' => $student->student_id, 'enrolled_at' => now()],
+            );
+            $count++;
+        }
+
+        return $count;
     }
 
     private function handleEntityUpdate(Request $request, $entityType, $id)
@@ -545,7 +690,29 @@ class EntityController extends Controller
             $validated['password'] = bcrypt($validated['password']);
         }
 
+        $teacherSectionIds = null;
+        if ($entityType === 'teachers' && array_key_exists('section_ids', $validated)) {
+            $teacherSectionIds = $validated['section_ids'] ?? [];
+            unset($validated['section_ids']);
+        }
+
+        if ($entityType === 'students' || $entityType === 'teachers') {
+            $newPassword = $validated['password'] ?? null;
+            unset($validated['password']);
+
+            if (! empty($newPassword) && $entity->user) {
+                $entity->user->update([
+                    'password' => Hash::make($newPassword),
+                    'must_change_password' => true,
+                ]);
+            }
+        }
+
         $entity->update($validated);
+
+        if ($entityType === 'teachers' && is_array($teacherSectionIds)) {
+            $entity->sections()->sync($teacherSectionIds);
+        }
 
         return redirect()->route('entities.index', ['entityType' => $entityType])
             ->with('success', ucfirst($entityType).' updated successfully.');
@@ -570,6 +737,7 @@ class EntityController extends Controller
                 'first_name' => 'required|string|max:100',
                 'last_name' => 'required|string|max:100',
                 'email' => 'required|email|max:255|unique:students,email'.($id ? ",{$id}" : ''),
+                'password' => $id ? 'nullable|string|min:8' : 'required|string|min:8',
                 'level' => 'nullable|string|max:50',
                 'academic_section' => 'required|string|max:50',
                 'student_type' => 'nullable|string|in:regular,weekend',
@@ -584,11 +752,14 @@ class EntityController extends Controller
                 'first_name' => 'required|string|max:100',
                 'last_name' => 'required|string|max:100',
                 'email' => 'required|email|max:255|unique:teachers,email'.($id ? ",{$id}" : ''),
+                'password' => $id ? 'nullable|string|min:8' : 'required|string|min:8',
                 'phone' => 'nullable|string|max:20',
                 'department_id' => 'required|exists:departments,id',
                 'qualification' => 'nullable|string|max:255',
                 'max_hours_per_week' => 'required|integer|min:1|max:38',
                 'specialization' => 'nullable|string|max:255',
+                'section_ids' => 'nullable|array',
+                'section_ids.*' => 'integer|exists:sections,id',
             ],
             'rooms' => [
                 'room_code' => 'required|string|max:50|unique:rooms,room_code'.($id ? ",{$id}" : ''),

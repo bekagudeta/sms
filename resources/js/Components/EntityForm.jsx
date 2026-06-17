@@ -162,6 +162,42 @@ export default function EntityForm({
             );
         }
 
+        if (fieldType === 'multiselect') {
+            const selected = Array.isArray(formData[field.name]) ? formData[field.name].map(String) : [];
+            const toggle = (optionValue) => {
+                const v = String(optionValue);
+                const next = selected.includes(v)
+                    ? selected.filter((s) => s !== v)
+                    : [...selected, v];
+                setFormData(field.name, next);
+            };
+            const opts = resolveOptions(field);
+
+            return (
+                <div key={field.name} className="mb-4">
+                    {labelEl}
+                    <div className={`mt-1 max-h-48 space-y-1 overflow-y-auto rounded-md border p-2 ${error ? 'border-red-400' : 'border-gray-300'}`}>
+                        {opts.length === 0 && (
+                            <p className="px-1 py-2 text-sm text-gray-500">No options available.</p>
+                        )}
+                        {opts.map((option) => (
+                            <label key={option.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-gray-50">
+                                <input
+                                    type="checkbox"
+                                    checked={selected.includes(String(option.value))}
+                                    onChange={() => toggle(option.value)}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <span className="text-deep-jungle-green">{option.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                    {field.help && !error && <p className="mt-1 text-xs text-gray-500">{field.help}</p>}
+                    {errorEl}
+                </div>
+            );
+        }
+
         if (fieldType === 'textarea') {
             return (
                 <div key={field.name} className="mb-4">

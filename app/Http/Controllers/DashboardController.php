@@ -373,19 +373,18 @@ class DashboardController extends Controller
                 ];
             })->filter(fn ($row) => $row['course_code'])->values()->all();
 
-            // Fallback: If no explicit enrollments, show department courses from active semester
-            if (empty($enrolledCourses) && $student->department_id) {
-                $activeSemester = Semester::where('is_active', true)->first();
-                if ($activeSemester) {
-                    $departmentSections = Section::whereHas('courseOffering', function ($q) use ($student, $activeSemester) {
-                        $q->where('semester_id', $activeSemester->id)
-                            ->whereHas('course', function ($courseQuery) use ($student) {
-                                $courseQuery->where('department_id', $student->department_id);
-                            });
-                    })->with('courseOffering.course', 'courseOffering.semester')
+            // Fallback: if no explicit enrollments, show the courses of the
+            // sections the student's academic cohort is enrolled in (department
+            // is not a reliable link in this data).
+            if (empty($enrolledCourses)) {
+                $cohortSectionIds = $this->studentSectionIds($student);
+
+                if ($cohortSectionIds->isNotEmpty()) {
+                    $cohortSections = Section::whereIn('id', $cohortSectionIds)
+                        ->with('courseOffering.course', 'courseOffering.semester')
                         ->get();
 
-                    $enrolledCourses = $departmentSections->map(function ($section) {
+                    $enrolledCourses = $cohortSections->map(function ($section) {
                         $course = $section?->courseOffering?->course;
                         return [
                             'course_code' => $course?->course_code,
@@ -393,7 +392,7 @@ class DashboardController extends Controller
                             'section_name' => $section?->section_name,
                             'semester' => $section?->courseOffering?->semester?->name,
                         ];
-                    })->filter(fn ($row) => $row['course_code'])->values()->all();
+                    })->filter(fn ($row) => $row['course_code'])->unique('course_code')->values()->all();
                 }
             }
         }
@@ -459,24 +458,46 @@ class DashboardController extends Controller
             });
         }
 
-        $enrolledSectionIds = $student->enrollments()->pluck('section_id');
+        $sectionIds = $this->studentSectionIds($student);
 
-        if ($enrolledSectionIds->isNotEmpty()) {
-            // Student has explicit enrollments - show only enrolled sections
-            $query->whereIn('section_id', $enrolledSectionIds);
+        if ($sectionIds->isNotEmpty()) {
+            $query->whereIn('section_id', $sectionIds);
         } else {
-            // Fallback: Show all sections for the student's department
-            // This ensures students see their academic cohort's schedules even without explicit enrollments
-            if ($student->department_id) {
-                $query->whereHas('section.courseOffering.course', function ($q) use ($student) {
-                    $q->where('department_id', $student->department_id);
-                });
-            } else {
-                $query->whereRaw('1 = 0');
-            }
+            // No sections we can attribute to this student -> show nothing rather
+            // than leaking every department's schedule.
+            $query->whereRaw('1 = 0');
         }
 
         return $query;
+    }
+
+    /**
+     * The course sections a student belongs to. Prefer their own enrollments;
+     * if they have none yet, fall back to the sections their academic cohort
+     * (same academic_section) is enrolled in. A section's cohort identity is
+     * derived from its enrolled students, so this is the only reliable link —
+     * the course's department is NOT a dependable signal in this data.
+     */
+    private function studentSectionIds(Student $student)
+    {
+        $enrolled = $student->enrollments()->pluck('section_id');
+        if ($enrolled->isNotEmpty()) {
+            return $enrolled->unique()->values();
+        }
+
+        $cohort = trim((string) $student->academic_section);
+        if ($cohort === '') {
+            return collect();
+        }
+
+        return \App\Models\Enrollment::query()
+            ->whereHas('student', function ($q) use ($cohort, $student) {
+                $q->where('id', '!=', $student->id)
+                    ->whereRaw('LOWER(TRIM(academic_section)) = ?', [strtolower($cohort)]);
+            })
+            ->pluck('section_id')
+            ->unique()
+            ->values();
     }
 
     public function create()

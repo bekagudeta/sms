@@ -32,9 +32,15 @@ export default function EntityManager({ entityType, initialData = [], filters = 
 
     // Seed the form state from the explicit formFields when available (these are
     // decoupled from import columns); otherwise fall back to import columns.
+    const fieldDefault = (field) => {
+        if (field.type === 'checkbox') return false;
+        if (field.type === 'multiselect') return [];
+        return '';
+    };
+
     const initialFormState = config.formFields?.length
         ? config.formFields.reduce(
-              (acc, field) => ({ ...acc, [field.name]: field.type === 'checkbox' ? false : '' }),
+              (acc, field) => ({ ...acc, [field.name]: fieldDefault(field) }),
               {}
           )
         : {
@@ -42,7 +48,7 @@ export default function EntityManager({ entityType, initialData = [], filters = 
               ...config.optionalColumns.reduce((acc, col) => ({ ...acc, [col]: '' }), {}),
           };
 
-    const { data: formData, setData: setFormData, post, put, delete: destroy, processing, errors, reset } = useForm(initialFormState);
+    const { data: formData, setData: setFormData, transform, post, put, delete: destroy, processing, errors, reset } = useForm(initialFormState);
 
     useEffect(() => {
         if (initialData?.data) {
@@ -113,8 +119,13 @@ export default function EntityManager({ entityType, initialData = [], filters = 
 
     const handleEdit = (item) => {
         setEditingItem(item);
+        const fieldTypeByName = Object.fromEntries((config.formFields || []).map((f) => [f.name, f.type]));
         Object.keys(formData).forEach(key => {
-            let value = item[key] ?? '';
+            const isMulti = fieldTypeByName[key] === 'multiselect';
+            let value = item[key] ?? (isMulti ? [] : '');
+            if (isMulti && !Array.isArray(value)) {
+                value = [];
+            }
 
             if (['start_time', 'end_time'].includes(key)) {
                 value = toTimeInputValue(value);
@@ -187,8 +198,12 @@ export default function EntityManager({ entityType, initialData = [], filters = 
     const handleFormSubmit = (e) => {
         e.preventDefault();
 
-        const payload = { ...formData };
-        if (entityType === 'timeslots') {
+        // Normalise timeslot times before submit. useForm sends its own `data`,
+        // so we apply per-submit tweaks via transform() rather than passing a
+        // payload argument (which useForm.post/put do NOT accept).
+        transform((data) => {
+            if (entityType !== 'timeslots') return data;
+
             const formatTime = (t) => {
                 if (!t) return t;
                 if (/^\d{2}:\d{2}$/.test(t)) return t;
@@ -207,44 +222,31 @@ export default function EntityManager({ entityType, initialData = [], filters = 
                 return t;
             };
 
-            payload.start_time = formatTime(payload.start_time);
-            payload.end_time = formatTime(payload.end_time);
-        }
+            return {
+                ...data,
+                start_time: formatTime(data.start_time),
+                end_time: formatTime(data.end_time),
+            };
+        });
 
-        setLoading(true);
-
-        const handleSuccess = () => {
-            if (editingItem) {
-                setData((prev) => prev.map((item) =>
-                    item.id === editingItem.id ? { ...item, ...payload } : item
-                ));
-            }
-
-            setShowFormModal(false);
-            reset();
-            router.reload();
-        };
-
-        const handleError = (errorData) => {
-            console.error('Form submission error:', errorData);
-        };
-
-        const handleFinish = () => {
-            setLoading(false);
+        // The controller responds with a redirect to the index route, which
+        // Inertia follows automatically — that already navigates to the list and
+        // refreshes `data`. Just close the modal and clear the form on success.
+        const options = {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowFormModal(false);
+                reset();
+            },
+            onError: (errorData) => {
+                console.error('Form submission error:', errorData);
+            },
         };
 
         if (editingItem) {
-            put(`/entities/${entityType}/${editingItem.id}`, payload, {
-                onSuccess: handleSuccess,
-                onError: handleError,
-                onFinish: handleFinish
-            });
+            put(`/entities/${entityType}/${editingItem.id}`, options);
         } else {
-            post(`/entities/${entityType}`, payload, {
-                onSuccess: handleSuccess,
-                onError: handleError,
-                onFinish: handleFinish
-            });
+            post(`/entities/${entityType}`, options);
         }
     };
 

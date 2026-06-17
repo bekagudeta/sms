@@ -27,6 +27,7 @@ export const ENTITY_CONFIG = {
       { name: "first_name", label: "First Name", type: "text", required: true, maxLength: 100 },
       { name: "last_name", label: "Last Name", type: "text", required: true, maxLength: 100 },
       { name: "email", label: "Email Address", type: "email", required: true, maxLength: 255, placeholder: "name@student.university.edu" },
+      { name: "password", label: "Temporary Password", type: "password", requiredOnCreate: true, minLength: 8, placeholder: "Min. 8 characters", helpOnEdit: "Leave blank to keep the current password" },
       { name: "department_id", label: "Department", type: "select", required: true, optionsKey: "departments" },
       { name: "academic_section", label: "Academic Section", type: "text", required: true, maxLength: 50, placeholder: "Cohort, e.g. SE-3A" },
       { name: "level", label: "Level", type: "select", required: false, optionsKey: "levels", options: [
@@ -85,6 +86,7 @@ export const ENTITY_CONFIG = {
       { name: "first_name", label: "First Name", type: "text", required: true, maxLength: 100 },
       { name: "last_name", label: "Last Name", type: "text", required: true, maxLength: 100 },
       { name: "email", label: "Email Address", type: "email", required: true, maxLength: 255, placeholder: "name@university.edu" },
+      { name: "password", label: "Temporary Password", type: "password", requiredOnCreate: true, minLength: 8, placeholder: "Min. 8 characters", helpOnEdit: "Leave blank to keep the current password" },
       { name: "department_id", label: "Department", type: "select", required: true, optionsKey: "departments" },
       { name: "max_hours_per_week", label: "Max Hours per Week", type: "number", required: true, min: 1, max: 38, integer: true },
       { name: "qualification", label: "Qualification", type: "select", required: false, options: [
@@ -98,6 +100,7 @@ export const ENTITY_CONFIG = {
       ] },
       { name: "specialization", label: "Specialization", type: "text", required: false, maxLength: 255 },
       { name: "phone", label: "Phone", type: "tel", required: false, maxLength: 20, pattern: "^[0-9+()\\-\\s]{7,20}$", patternMessage: "Enter a valid phone number" },
+      { name: "section_ids", label: "Assigned Course Sections", type: "multiselect", required: false, optionsKey: "sections", help: "Sections this teacher teaches. Drives their schedule and student list." },
     ],
     apiEndpoint: "/api/teachers",
     routePrefix: "teachers",
