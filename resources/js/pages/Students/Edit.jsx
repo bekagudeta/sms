@@ -32,7 +32,7 @@ export default function Edit({ student, departments }) {
         { name: 'phone', label: 'Phone', type: 'text' },
         { name: 'department_id', label: 'Department', type: 'select', required: false, options: departments.map(dept => ({ value: dept.id, label: dept.name })) },
         { name: 'level', label: 'Level', type: 'text' },
-        { name: 'academic_section', label: 'Academic Section (cohort)', type: 'text', required: true },
+        { name: 'academic_section', label: 'Academic Section (cohort)', type: 'text', required: true, placeholder: 'e.g. SE-3A', help: "Format: DEPT-<year><section> — combine the department code, the student's year, and an optional section letter (e.g. SE-3A = Software Engineering, year 3, section A). The year identifies the batch and is used to generate a separate schedule per batch." },
         { name: 'student_type', label: 'Student Type', type: 'select', options: [
             { value: 'regular', label: 'Regular' },
             { value: 'weekend', label: 'Weekend' }

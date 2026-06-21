@@ -183,7 +183,7 @@ return [
                 ['S003', 'Charlie', 'White', 'charlie.white@student.university.edu', 'SE', 'SE-3B', 'weekend', '555-2003'],
             ],
             'filename' => 'students_template.csv',
-            'note' => 'student_type may be regular or weekend. Weekend students are scheduled into weekday evening plus Saturday/Sunday morning/afternoon slots. academic_section is the student cohort (e.g. SE-3A), not a course section.',
+            'note' => 'student_type may be regular or weekend. Weekend students are scheduled into weekday evening plus Saturday/Sunday morning/afternoon slots. academic_section is the student cohort (e.g. SE-3A), not a course section. It combines the department code, the student\'s year, and an optional section letter as DEPT-<year><section> (e.g. SE-3A = Software Engineering, year 3, section A). The year identifies the batch, so the same department imported with different years generates a separate schedule per batch.',
         ],
 
         'student-promotions' => [

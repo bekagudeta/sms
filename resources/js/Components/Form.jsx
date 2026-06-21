@@ -85,7 +85,11 @@ export default function Form({
                     </label>
                     
                     {renderField(field)}
-                    
+
+                    {field.help && (
+                        <p className="text-xs text-gray-500 mt-1">{field.help}</p>
+                    )}
+
                     {errors[field.name] && (
                         <div className="text-red-500 text-sm mt-1">
                             {errors[field.name]}

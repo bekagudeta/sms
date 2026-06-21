@@ -153,9 +153,17 @@ export default function StudentsCreate({ departments }) {
                                     type="text"
                                     value={data.academic_section}
                                     onChange={e => setData('academic_section', e.target.value)}
+                                    placeholder="e.g. SE-3A"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                                     required
                                 />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Format: <span className="font-medium">DEPT-&lt;year&gt;&lt;section&gt;</span> — combine the
+                                    department code, the student's year, and an optional section letter
+                                    (e.g. <span className="font-medium">SE-3A</span> = Software Engineering, year 3, section A).
+                                    The year identifies the batch and is used when generating schedules, so each batch of the
+                                    same department gets its own schedule.
+                                </p>
                                 {errors.academic_section && (
                                     <p className="text-red-500 text-sm mt-1">{errors.academic_section}</p>
                                 )}
