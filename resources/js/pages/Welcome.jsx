@@ -171,13 +171,9 @@ export default function Welcome({ auth }) {
     </Link>
   );
 
-  const secondaryCta = auth?.user ? (
+  const secondaryCta = auth?.user && (
     <Link href="/schedules" className="rounded-full border-2 border-white/60 bg-white/10 px-8 py-3 text-base font-semibold text-white backdrop-blur transition hover:bg-white/20">
       View schedules
-    </Link>
-  ) : (
-    <Link href="/login" className="rounded-full border-2 border-white/60 bg-white/10 px-8 py-3 text-base font-semibold text-white backdrop-blur transition hover:bg-white/20">
-      Sign in
     </Link>
   );
 
